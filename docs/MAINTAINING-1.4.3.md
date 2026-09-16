@@ -96,7 +96,7 @@ KOMARI_VERSION=1.4.4 ./scripts/build-komari.sh
 | `scripts/patches/0002-reproducible-build-time.patch` | 让 `vite.config.ts:53` 的构建时间可被 `SOURCE_DATE_EPOCH` 覆盖 | 上游把**构建时刻**写进产物（由 `src/components/Footer.tsx:26` 显示），导致每次构建的 chunk 哈希连锁变化，产物无法复现 |
 | `install-komari.sh` | `REPO` 指向自有仓库；稳定版改用**锁定 tag** 而非 `releases/latest` | 否则一键安装会直接装上 1.5.x |
 | `install-komari.sh` | 两处 `curl` 加 `-f`，升级改为先下临时文件再替换 | 404/失败时不再把错误页当二进制写入，也不再截断正在运行的自有二进制 |
-| `.gitignore` | 忽略 `/.build/`、`/bin/` | 构建缓存与产物不入库 |
+| `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游的 `komari` 规则锚定为 `/komari` | 前两者是本地构建缓存与产物；后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
 
 更新检查的目标仓库可用构建期变量覆盖（默认值即本仓库）：
 

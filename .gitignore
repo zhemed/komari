@@ -33,7 +33,10 @@ go.work.sum
 .env
 
 # build
-komari
+# 注意：必须锚定为 /komari。上游原规则是不带斜杠的 komari，会连带忽略任何同名路径，
+# 包括 .trellis/workspace/komari/（Trellis 开发者工作区，跨会话记忆所在），
+# 导致 journal 等文件无法提交。
+/komari
 /dist/
 .codex
 
