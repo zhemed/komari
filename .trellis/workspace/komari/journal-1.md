@@ -28,3 +28,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: 0.0.1 自有基线 + 彻底移除插件系统
+<!-- trellis-session: v=2 fp=770c991de2029d42 -->
+
+**Date**: 2026-09-16
+**Task**: 0.0.1 自有基线 + 彻底移除插件系统
+**Branch**: `komari-1.4.3`
+
+### Summary
+
+把项目版本全面改为自有的 0.0.1（1.4.3 仅作为代码来源记录），并彻底移除插件系统：后端删除 internal/plugin 整包（21 文件/5414 行）与市场 API、插件 RPC、公开路由、模型与迁移注册、备份白名单条目、WebSocket 帧拦截器（约 -5.4k 行）；前端以补丁 0003 删除 5 个插件页面、路由与菜单组、types/plugin.ts、resolvePluginIcon、上传 purpose 与流量报告的插件市场 CTA（-1871 行）。保留 pkg/jsruntime（JS 消息发送器依赖）与主题系统。vendor 产物重新生成，FRONTEND_TREE_SHA256 由 eb98cd78 更新为 9bd12c8a（两次独立再生成一致）。AC1-AC7 全部实测通过，含真实升级路径验证：1.4.3 数据目录启动 0.0.1 触发一次 upgrade 备份且不重复。已推送 zhemed/komari。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `18305a9` | feat!: 以 0.0.1 为自有基线并彻底移除插件系统 |
+
+### Status
+
+[OK] **Completed**
