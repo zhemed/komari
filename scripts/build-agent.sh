@@ -128,6 +128,17 @@ else
   fi
 fi
 
+# ---------- 3.5 补丁关键防线自检 ----------
+# 这两条是"节点会不会被刷成服务器二进制/会不会刷回上游版本"的最后一道防线：
+# 一旦有人删掉过滤或改了默认仓库，构建立刻失败，而不是等到某个节点的 agent 换血才发现。
+grep -q 'Filters: \[\]string{"\^komari-agent-"}' update/update.go \
+  || die "补丁 0001 的资产过滤不见了（update/update.go 里没有 Filters: []string{\"^komari-agent-\"}）。
+     没有它，agent 会把同 release 里的服务器二进制 komari-linux-amd64 当成自己的更新包。
+     详见 docs/MAINTAINING.md §11.1。"
+grep -q 'Repo string = "zhemed/komari"' update/update.go \
+  || die "update/update.go 的自更新目标不是 zhemed/komari（补丁 0001 未生效或被改回上游？）"
+log "关键防线自检通过（资产过滤 + 自更新目标）"
+
 # ---------- 4. 源码树哈希校验 ----------
 SRC_HASH="$(tree_hash "${WORK_DIR}")"
 log "打补丁后源码树哈希: ${SRC_HASH}"
