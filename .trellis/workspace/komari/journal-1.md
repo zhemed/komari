@@ -95,3 +95,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: 彻底移除通知系统与内嵌 JS 运行时，发布 0.0.3
+<!-- trellis-session: v=2 fp=7363e34bc64531f4 -->
+
+**Date**: 2026-09-16
+**Task**: 彻底移除通知系统与内嵌 JS 运行时，发布 0.0.3
+**Branch**: `main`
+
+### Summary
+
+把通知子系统与随之失去消费者的 pkg/jsruntime 整体删除，并发布 0.0.3。(1) 后端约 -14.4k 行：删除 utils/messageSender（框架+8 渠道）、utils/notifier（离线/负载/流量/流量报告/到期）、database/notification、通知模型与迁移步骤、通知 RPC 与路由、admin:testSendMessage、调度任务与消息发送器重载钩子、internal/config 的通知配置项；pkg/jsruntime（46 文件/11427 行）一并移除，go.mod 去掉 goja/goja_nodejs/base64dec。(2) 4 个跨模块接线点重接：agent 上/下线改 logger 日志；登录改 auditlog.EventLog(auth)，因为此前登录只有通知这一条痕迹；续费本就有审计日志。(3) 前端补丁 0005 纯删 2319 行/13 文件：删除 5 个通知页面、菜单组、路由、零消费者的 TrafficReportContext.tsx，并清理 5 个语言包中无引用的 notification/loadAlert/admin.notification/settings.notification 文案。(4) 修掉两个上游遗留：reg() 注册助手原定义在被删的 admin.notification.go 里（删文件会让整个包编译失败），已迁移到 registry_helpers.go；迁移测试中依赖已删模型的断言已移除。(5) 验收：build/vet/test 全绿；二进制 48443168 → 35210400 字节（-13.2MB / -27%）；POST 三个被删端点均 404（GET 被 SPA 兜底为 200 text/html，非真实端点）；线上 bundle 无通知菜单；前端哈希 0dda6f17（两次一致）；0.0.3 已发布并部署到本地，三次版本切换各触发一次自动备份。教训：删除包含通用助手的文件前要先确认它是否被全包共用。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b397115` | feat!: 彻底移除通知系统与内嵌 JS 运行时（0.0.3） |
+
+### Status
+
+[OK] **Completed**

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-09-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~97 | Active |
+| `journal-1.md` | ~119 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-09-16 | 彻底移除通知系统与内嵌 JS 运行时，发布 0.0.3 | `b397115` | `main` |
 | 4 | 2026-09-16 | 解除内网地址限制、移除 HTTPS 横幅并发布 0.0.2 | `241dddb` | `main` |
 | 3 | 2026-09-16 | 重写历史为自有基线并发布 0.0.1 | `45f9f1c`, `e3a104f` | `main` |
 | 2 | 2026-09-16 | 0.0.1 自有基线 + 彻底移除插件系统 | `18305a9` | `komari-1.4.3` |
