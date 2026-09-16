@@ -170,8 +170,9 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **历史已于 2026-09-16 重写**：上游 835 个提交不再出现在历史中。上游代码以**单个快照根提交**
   引入（`chore: import komari 1.4.3 (upstream bf6b45ec) as our 0.0.1 code snapshot`），
   我们自己的提交重挂在该根之上，提交粒度保留。
-- 重写前的 HEAD 是 `77f36da`；本地保留分支 `backup/pre-rewrite` 指向它作为回滚锚点（**未推送**）。
-  因此 `18305a9`、`77f36da`、`e941b79` 这类旧 hash 只在本文件与旧 journal 中有意义。
+- 重写前的最后一次提交保留在**本地分支 `backup/pre-rewrite`**（未推送）上，作为回滚锚点。
+  因此旧 journal 里记录的 hash（如 `18305a9`、`77f36da`）在重写后**已不可达**，只具历史意义；
+  需要时以 `backup/pre-rewrite` 为准。
 - 「代码来源」由 `LICENSE` / `NOTICE` / `README.md` / 根提交信息承载，而不再由逐行历史承载。
 - 需要取回上游历史做 backport 时：`git fetch upstream --tags`（`upstream` remote 保留）。
 - 本地曾存在的 68 个上游 tag 已删除，避免上游对象长期驻留；本仓库只推送自己的 tag。
