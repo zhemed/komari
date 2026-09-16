@@ -75,8 +75,8 @@ chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变�
 
 **必须保留、不要连带删除**：
 
-- `pkg/jsruntime/` —— 插件系统移除时它仍被 `utils/messageSender/javascript` 使用而**保留**，
-  但该消费者已在 0.0.3 随通知系统一并删除，**现在它也已不在仓库里**（别按旧结论找它）。
+- 结构化的通知/插件运行时曾在插件系统移除时被刻意保留，但 0.0.3 已把它们（连带 goja 依赖）
+  **整体删除**，仓库里不再有这两个目录，别按旧结论去找。
 - 主题系统与主题市场 —— 它们没有版本门禁，不受版本号影响。
 - 数据库中的历史插件表（孤儿表，保留即可，不做破坏性迁移）。
 
@@ -119,7 +119,8 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：lin
 无法运行；glibc 静态虽能链接，但 `getaddrinfo`/NSS 依赖宿主共享库，不作为发布形态。
 zig 缺失时 `KOMARI_STATIC=1` 必须**明确报错**，不得静默退化为动态链接。
 
-改构建相关文件后的最小验证：
+改构建相关文件后的最小验证（也可以直接跑 `./scripts/check-repo.sh --full`，
+它把下面这些机械检查打包在一起，见 `docs/MAINTAINING.md` §2.1）：
 
 1. `GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh` —— 在**模块缓存已预热**的机器上必须成功。
    ⚠️ 本仓库**没有 `vendor/` 目录**（实测：`GOMODCACHE=<空目录> GOPROXY=off` 会报
