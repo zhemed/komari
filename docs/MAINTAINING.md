@@ -22,8 +22,8 @@
 
 **为什么必须自己 pin 前端**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
 主题产物缺失时 `static()` 会在 `public.go:130` 直接 panic——即**本后端仓库单独无法构建**。
-上游的 `.github/actions/build-frontend/action.yml:34` 在普通 tag 下会退化为克隆 komari-web 的
-**默认分支**，所以上游同 tag 的二进制所用前端本身就不是确定可复现的。
+上游 CI 里的 `.github/actions/build-frontend/action.yml:34`（**该目录已从本仓库移除**）在普通 tag 下
+会退化为克隆 komari-web 的**默认分支**，所以上游同 tag 的二进制所用前端本身就不是确定可复现的。
 
 **发版本规则**：递增三段中的 patch 位（`0.0.2`、`0.0.3`…）。
 前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段并要求严格递增，
@@ -37,8 +37,8 @@
 | gcc | 必需（`CGO_ENABLED=1`，`mattn/go-sqlite3`） | `gcc 11.4.0` 通过 |
 | Node / npm | 仅"重新生成前端"时需要 | `node v22.23.2` + `npm 10.9.8` 通过 |
 
-> 上游 `.github/workflows/release.yml:105` 写的是 `go-version: "1.23"`，与 `go.mod` 的
-> `1.25.0` 不一致；**以 `go.mod` 为准**。
+> 上游 `.github/workflows/release.yml:105`（已随该目录移除）写的是 `go-version: "1.23"`，
+> 与 `go.mod` 的 `1.25.0` 不一致；**以 `go.mod` 为准**。
 
 ## 3. 日常操作
 
@@ -74,14 +74,28 @@
 
 > 沙箱/受限环境下若 `~/.npm` 不可写，可加 `npm_config_cache=<某可写目录>` 前缀。
 
-### 3.3 发布一个版本
+### 3.3 静态构建（发布用）
+
+发布产物必须是**静态链接**的：`Dockerfile` 基于 `alpine:3.21`（musl），glibc 动态二进制在其中
+无法运行；而 glibc 静态虽然能链接成功，但 `getaddrinfo`/NSS 依赖宿主共享库，不作为发布形态。
 
 ```bash
-KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
+KOMARI_STATIC=1 ./scripts/build-komari.sh                      # linux/amd64 静态（需 zig）
+KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静态
 ```
 
-把 `bin/komari` 作为 release 资产上传到本仓库，tag 与 `KOMARI_VERSION` 一致
-（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.1` 拉取）。
+- zig 缺失或不可用时脚本**明确报错**，不会静默退化为动态链接（否则 alpine 部署会在运行期才失败）。
+- 受限环境下若 zig 默认缓存目录不可写，可设 `ZIG_GLOBAL_CACHE_DIR` / `ZIG_LOCAL_CACHE_DIR`。
+
+### 3.4 发布一个版本
+
+1. `KOMARI_VERSION=0.0.2 KOMARI_STATIC=1 ./scripts/build-komari.sh`
+2. 资产命名要与 `install-komari.sh` 的期望一致：`mv bin/komari komari-linux-amd64`
+3. `git tag 0.0.2 && git push origin 0.0.2`
+4. `gh release create 0.0.2 --title 0.0.2 --notes "..." komari-linux-amd64 [komari-linux-arm64]`
+
+tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.1` 拉取）。
+**本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
 
 ## 4. 与上游的解耦点
 
@@ -94,6 +108,9 @@ KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
 | `scripts/patches/0003-drop-plugin-system.patch` | 删除插件页面、路由、菜单与上传 purpose | 见第 5 节 |
 | `install-komari.sh` | 指向自有仓库并锁定 tag；`curl -f` + 先下临时文件再替换 | 不再安装上游 1.5.x；失败时不写入错误页、不截断运行中的二进制 |
 | `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游 `komari` 规则锚定为 `/komari` | 后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
+| `Dockerfile` | `ARG TARGETOS/TARGETARCH` 给出默认值 `linux/amd64` | 让普通 `docker build`（非 buildx）也能定位上下文里的二进制 |
+| `.github/workflows`、`.github/actions`、`.github/ISSUE_TEMPLATE` | 全部删除 | 上游流水线会从前端**默认分支**构建、并向 `ghcr.io/komari-monitor` 推镜像，对本仓库是错误产出 |
+| `README.md`、`README_zh-cn.md` | 删除上游版本，改为我们自己的单份 `README.md` | 上游 README 含上游徽章/部署按钮/截图与升级到 1.5.x 的指引 |
 
 更新检查的目标仓库可在构建期覆盖：
 
@@ -147,3 +164,14 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 
   注意仅 `git fetch --unshallow` 可能**无效**（refspec 只覆盖那个 tag 且 tip 未变时不会加深），
   必须显式给出 refspec 并配合 `--refetch`。
+
+## 9. 提交历史与我们自己的仓库
+
+- **历史已于 2026-09-16 重写**：上游 835 个提交不再出现在历史中。上游代码以**单个快照根提交**
+  引入（`chore: import komari 1.4.3 (upstream bf6b45ec) as our 0.0.1 code snapshot`），
+  我们自己的提交重挂在该根之上，提交粒度保留。
+- 重写前的 HEAD 是 `77f36da`；本地保留分支 `backup/pre-rewrite` 指向它作为回滚锚点（**未推送**）。
+  因此 `18305a9`、`77f36da`、`e941b79` 这类旧 hash 只在本文件与旧 journal 中有意义。
+- 「代码来源」由 `LICENSE` / `NOTICE` / `README.md` / 根提交信息承载，而不再由逐行历史承载。
+- 需要取回上游历史做 backport 时：`git fetch upstream --tags`（`upstream` remote 保留）。
+- 本地曾存在的 68 个上游 tag 已删除，避免上游对象长期驻留；本仓库只推送自己的 tag。

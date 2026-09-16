@@ -2,9 +2,10 @@ FROM alpine:3.21
 
 WORKDIR /app
 
-# Docker buildx 会在构建时自动填充这些变量
-ARG TARGETOS
-ARG TARGETARCH
+# 需要**静态链接**的二进制（见 docs/MAINTAINING.md：KOMARI_STATIC=1 构建）。
+# 默认值让普通 `docker build` 也能工作，不必依赖 buildx 注入平台参数。
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 RUN apk add --no-cache ca-certificates curl tzdata
 

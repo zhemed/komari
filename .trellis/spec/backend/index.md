@@ -24,7 +24,7 @@
 - [`scripts/`](../../../scripts/) — 构建与前端再生成脚本
 - [`web/public/`](../../../web/public/)（含 `web/public/.gitignore` 的 vendor 例外）
 - [`install-komari.sh`](../../../install-komari.sh)
-- `Dockerfile`
+- `Dockerfile`（本仓库无 CI；上游 `.github/` 流水线已移除，见 `docs/MAINTAINING.md` §4）
 
 其它后端改动，按对应规范文件执行；`.trellis/spec/guides/` 下是跨包思考指引。
 

@@ -1,78 +1,143 @@
-# Komari
+# Komari（自维护版）
 
-> [!IMPORTANT]
-> **This is a self-maintained fork of komari, versioned from `0.0.1`.** Upstream is
-> <https://github.com/komari-monitor/komari>; we deliberately do **not** track its
-> 1.5.x line. The `0.0.1` code derives from upstream `komari@1.4.3` +
-> `komari-web@1.4.3`. Build commands, version pinning, and every deliberate
-> deviation (including the removed plugin system) are documented in
-> [docs/MAINTAINING.md](./docs/MAINTAINING.md).
->
-> 本仓库是 **komari 的自维护分叉**，版本线从 `0.0.1` 开始，不跟随上游 1.5.x。
-> 版本固定点、构建方式与刻意的改动（含已移除的插件系统）见
-> [docs/MAINTAINING.md](./docs/MAINTAINING.md)。
+轻量、自托管的服务器监控：**单个 Go 二进制 + 内嵌 Web 前端**，由轻量 agent 上报指标。
 
-![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fkomari-monitor%2Fkomari&label=&icon=github&color=%23a370f7&message=&style=flat&tz=UTC)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/komari-monitor/komari)
+本仓库是**自维护分支**，版本线从 **0.0.1** 起步，独立演进——**不跟随上游 1.5.x**。
 
-![komari](https://socialify.git.ci/komari-monitor/komari/image?description=1&font=Inter&forks=1&issues=1&language=1&logo=https%3A%2F%2Fraw.githubusercontent.com%2Fkomari-monitor%2Fkomari-web%2Fd54ce1288df41ead08aa19f8700186e68028a889%2Fpublic%2Ffavicon.png&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto)
+## 与上游的关系
 
-[English](./README.md) | [简体中文](./README_zh-cn.md)
+代码派生自上游 [komari](https://github.com/komari-monitor/komari) `1.4.3`（commit `bf6b45ec`）
+与 [komari-web](https://github.com/komari-monitor/komari-web) `1.4.3`（commit `4a74e8a8`），
+此后由我们自己维护。**本仓库不是上游官方发行版。**
 
-Komari is a lightweight, self-hosted server monitoring solution. It provides a simple and efficient way to track server performance through a web interface, with metrics collected by a lightweight agent.
+与上游的刻意差异（完整说明见 [docs/MAINTAINING.md](./docs/MAINTAINING.md)）：
 
-> [!WARNING]
-> Komari is a self-hosted monitoring and control application. Deploy it only on systems you own or are authorized to manage. You are solely responsible for how you deploy and use Komari. The developers accept no liability for unauthorized access, persistence, command execution, other misuse, or any resulting consequences.
+- **移除插件系统**：插件市场、运行时、上传安装与插件 RPC 全部不存在。
+- **后台“发现新版本”检查指向本仓库**，不再提示升级到上游 1.5.x。
+- **默认主题产物 vendor 进仓库**：无需网络与 Node 即可构建后端。
+- **安装脚本指向本仓库并锁定 tag**，不会安装上游版本。
+- 仓库历史只包含我们自己的提交（上游代码以单个快照根提交引入）。
 
-[Documentation](https://www.komari.wiki/) | [Telegram Group](https://t.me/komari_monitor)
+## 快速开始
 
-## Features
+### 直接运行二进制
 
-- **Real-time monitoring**: Displays monitoring data at one-second intervals.
-- **Lightweight and efficient**: Uses minimal system resources and works well on servers of any size.
-- **Self-hosted**: Keeps you in control of your data and privacy.
-- **Web interface**: Provides an intuitive, easy-to-use monitoring dashboard.
-- **Extensible**: Supports custom themes and plugins.
+```bash
+# 从本仓库 release 下载对应架构的资产（资产名形如 komari-linux-amd64）
+chmod +x komari-linux-amd64
+./komari-linux-amd64 server
+```
 
-## Quick Start
+- 默认监听 `0.0.0.0:25774`，可用 `-l/--listen` 或环境变量 `KOMARI_LISTEN` 修改。
+- 数据写在**当前工作目录**的 `./data`（SQLite 主库 `komari.db`）。
+- 首次启动访问 `/install` 完成初始化。
 
-| Platform                                                                                                                                                                                                  | Description                                                                                                                                                              |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a href="https://app.rainyun.com/apps/rca/store/6780/NzYxNzAz_"><img src="https://rainyun-apps.cn-nb1.rains3.com/materials/deploy-on-rainyun-cn.svg" alt="Rainyun" width="180"></a>                       | Deploy websites, databases, and hundreds of popular apps in seconds with flexible hourly billing.                                                                        |
-| <a href="https://apps.fit2cloud.com/1panel/komari"><img src="https://raw.githubusercontent.com/komari-monitor/public/refs/heads/main/images/1panel-logo-blue.png" alt="1Panel App Store" width="180"></a> | A modern, open-source Linux server management panel for websites, databases, containers, files, backups, security, and AI, with one-click deployment from its app store. |
+```text
+Komari [command]
 
-For instructions on Docker deployment, binary installation, building from source, and updates, see the [installation guide](https://www.komari.wiki/en/install/quick-start).
+  server        启动服务
+  chpasswd      强制修改管理员密码
+  disable-2fa   强制关闭 2FA
+  permit-login  恢复密码登录
 
-## Screenshots
+全局参数:
+  -d, --database string   SQLite 数据库路径（默认 ./data/komari.db）
+  -t, --db-type string    数据库类型（默认 sqlite）
+```
 
-| Page                | Screenshot                                                                                                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Home Dashboard      | <img src="https://b2.akz.moe/awesome-pictures/komari-screenshot/%E4%B8%BB%E9%A1%B5%E4%BB%AA%E8%A1%A8%E7%9B%98-en.webp" width="800" alt="Home Dashboard">               |
-| Admin Dashboard     | <img src="https://b2.akz.moe/awesome-pictures/komari-screenshot/%E5%90%8E%E5%8F%B0%E4%BB%AA%E8%A1%A8%E7%9B%98-en.webp" width="800" alt="Admin Dashboard">              |
-| History Charts      | <img src="https://b2.akz.moe/awesome-pictures/komari-screenshot/%E5%8E%86%E5%8F%B2%E5%9B%BE%E8%A1%A8-en.webp" width="800" alt="History Charts">                        |
-| Web Terminal        | <img src="https://b2.akz.moe/awesome-pictures/komari-screenshot/%E7%BD%91%E9%A1%B5%E7%BB%88%E7%AB%AF.webp" width="800" alt="Web Terminal">                             |
-| Customizable Themes | <img src="https://b2.akz.moe/awesome-pictures/komari-screenshot/%E4%B8%BB%E9%A2%98%E5%8F%AF%E8%87%AA%E5%AE%9A%E4%B9%89-en.webp" width="800" alt="Customizable Themes"> |
-| Theme Market        | <img src="https://b2.akz.moe/awesome-pictures/komari-screenshot/%E4%B8%BB%E9%A2%98%E5%B8%82%E5%9C%BA-en.webp" width="800" alt="Theme Market">                          |
+### 安装脚本（systemd）
 
-## Sponsors
+```bash
+sudo bash install-komari.sh
+```
 
-Interested in sponsoring Komari? Contact the developer via [email](mailto:komari@akz.moe) or [Telegram](https://t.me/mamomoe).
+安装到 `/opt/komari`、创建 `komari` systemd 服务、默认端口 `25774`。
+脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.1`，`KOMARI_REPO` 可覆盖）。
 
-| Sponsor                                                                                                                                                                                          | Description                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a href="https://whmcs.as211392.com/aff.php?aff=110"><img src="https://raw.githubusercontent.com/komari-monitor/public/refs/heads/main/images/dreamcloud.png" alt="Dream Cloud" width="180"></a> | Cost-effective Asia-Pacific hosting with direct connectivity and robust DDoS protection, backed by transparent capacity claims.                                                                                                                                               |
-| <a href="https://sharon.io"><img src="https://raw.githubusercontent.com/komari-monitor/public/refs/heads/main/images/sharon-networks.webp" alt="Sharon Networks" width="180"></a>                | Premium China-optimized connectivity from Asia-Pacific data centers, featuring low latency, high bandwidth, and Tbps-scale local DDoS mitigation. Join the [Telegram community](https://t.me/SharonNetwork) to participate in charitable initiatives and community giveaways. |
+### Docker
 
-## Contributors
+`Dockerfile` 基于 `alpine:3.21`，因此**必须使用静态链接的二进制**：
 
-Thanks to everyone who has contributed code, themes, plugins, documentation, translations, bug reports, or feedback to Komari.
+```bash
+KOMARI_STATIC=1 ./scripts/build-komari.sh          # 产出 bin/komari（静态）
+mkdir -p /tmp/komari-ctx && cp bin/komari /tmp/komari-ctx/komari-linux-amd64
+cp Dockerfile /tmp/komari-ctx/
+docker build -t komari:0.0.1 /tmp/komari-ctx
+docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.1
+```
 
-<a href="https://github.com/komari-monitor/komari/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=komari-monitor/komari" alt="Komari contributors" width="600"></a>
+> `Dockerfile` 用 `ARG TARGETOS/TARGETARCH`（默认 `linux/amd64`）定位构建上下文里的
+> `komari-${TARGETOS}-${TARGETARCH}` 文件。
 
-## Support the Project
+## 构建
 
-If Komari has been useful to you, consider buying me a coffee. Thank you for your support!
+### 普通构建（开发用）
 
-| WeChat Pay                                                                                                   | TRON Network                                                                                |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| ![WeChat Pay QR code](https://b2.akz.moe/awesome-pictures/%E5%BE%AE%E4%BF%A1%E8%B5%9E%E8%B5%8F%E7%A0%81.png) | ![TRON Network QR code](https://b2.akz.moe/awesome-pictures/PixPin_2026-08-07_15-16-52.png) |
+需要 Go ≥ 1.25 与 gcc（cgo，SQLite 驱动）。**不需要网络与 Node**——默认主题产物已随仓库下发。
+
+```bash
+./scripts/build-komari.sh        # → bin/komari
+```
+
+### 静态构建（发布用）
+
+需要 [zig](https://ziglang.org/)（用其 musl 目标做静态链接）：
+
+```bash
+KOMARI_STATIC=1 ./scripts/build-komari.sh                      # linux/amd64 静态
+KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静态
+```
+
+版本号与提交 hash 由脚本以 ldflags 注入（与上游口径一致）：
+`CurrentVersion` 默认 `0.0.1`，可用 `KOMARI_VERSION` 覆盖。
+
+### 重新生成前端产物（需要网络 + Node）
+
+```bash
+./scripts/sync-frontend.sh
+```
+
+按 `scripts/frontend-pin.env` 固定的 commit 重新构建默认主题，应用 `scripts/patches/` 下的补丁，
+校验产物哈希后原子替换 `web/public/defaultTheme/`。哈希不一致时脚本会失败——这是**可复现性门禁**，
+不要为了通过而清空哈希。
+
+### 提交前自检
+
+```bash
+GOPROXY=off ./scripts/build-komari.sh        # 离线构建（验证产物完整）
+go build ./... && go vet ./... && go test ./...
+```
+
+本仓库**没有 CI**（上游流水线已移除，避免产出与我们对不上的工件），以上命令需本地执行。
+
+## 数据与备份
+
+| 路径 | 说明 |
+|---|---|
+| `./data/komari.db` | 主库（配置、账号、节点等） |
+| `./data/metrics.db` | 指标库 |
+| `./data/theme/` | 已安装主题 |
+| `./data/backup/` | 备份归档 |
+
+- **升级自动备份**：当二进制的版本标识与库中记录不同时，启动会把整个 `./data`
+  打包到 `./data/backup/upgrade-<时间>.zip` 再继续（`database/dbcore/dbcore.go`）。
+  因此**每次以不同 commit 构建的二进制启动都可能产生一次备份**，属预期行为。
+- 后台可上传备份并自动重启以应用。
+
+## 版本与发布
+
+- 版本号形如 `0.0.x`，发版**递增 patch 位**（前端版本比较只取 `x.y.z` 三段，带后缀的 tag 不会被识别为更新）。
+- 发布流程（手动）：
+  1. `KOMARI_STATIC=1 ./scripts/build-komari.sh`
+  2. 资产命名为 `komari-linux-<arch>`（与 `install-komari.sh` 的期望一致）
+  3. `gh release create <tag> komari-linux-amd64 ...`
+
+## 来源与许可
+
+本项目以 MIT 许可发布，见 [LICENSE](./LICENSE)。第三方组件归属见 [NOTICE](./NOTICE)。
+
+派生自上游 [komari-monitor/komari](https://github.com/komari-monitor/komari) `1.4.3`
+（commit `bf6b45ec`）与 [komari-monitor/komari-web](https://github.com/komari-monitor/komari-web)
+`1.4.3`（commit `4a74e8a8`）；上游版权归其作者所有（`Copyright (c) 2025 Komari Moniter`）。
+
+维护约定、构建契约与“哪些地方故意偏离上游”记录在 [docs/MAINTAINING.md](./docs/MAINTAINING.md)。

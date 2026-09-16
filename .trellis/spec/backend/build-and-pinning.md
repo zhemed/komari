@@ -2,7 +2,8 @@
 
 本文件记录**本 fork 特有**的构建契约。上游文档不覆盖这些约定，改动构建相关文件前必读。
 
-适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`Dockerfile`、`.github/workflows/`。
+适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`Dockerfile`。
+（本仓库已无 `.github/` 流水线——上游 CI 已于 2026-09-16 移除，见 §2 末尾与 `docs/MAINTAINING.md` §4。）
 
 ---
 
@@ -23,8 +24,9 @@
 ### 1.2 前端版本以 `scripts/frontend-pin.env` 为唯一事实来源
 
 - `KOMARI_WEB_COMMIT` 固定到具体 commit（当前 `4a74e8a8…`，即 komari-web tag 1.4.3）。
-- **不要改为分支名或 `latest`**：上游 `.github/actions/build-frontend/action.yml:34` 在普通 tag 下
-  就会退化为克隆默认分支，这正是上游同 tag 二进制不可复现的原因。
+- **不要改为分支名或 `latest`**：上游 CI（`.github/actions/build-frontend/action.yml:34`，
+  **该目录已从本仓库移除**）在普通 tag 下会退化为克隆默认分支，这正是上游同 tag 二进制
+  不可复现的原因。
 - 依赖安装一律用 `npm ci`（仓库内已提交 `package-lock.json`），**不要用 `npm install`**。
 
 ### 1.3 产物必须可复现（`FRONTEND_TREE_SHA256`）
@@ -74,10 +76,16 @@
 ## 2. 构建与验证命令
 
 ```bash
-./scripts/build-komari.sh                 # 输出 bin/komari（仅需 Go）
+./scripts/build-komari.sh                 # 输出 bin/komari（仅需 Go，动态链接 glibc）
 ./scripts/sync-frontend.sh                # 重新生成前端产物（需网络 + Node）
 KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
+KOMARI_STATIC=1 ./scripts/build-komari.sh                      # 发布用：linux/amd64 静态（需 zig）
+KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
 ```
+
+**静态构建是发布的前提**：`Dockerfile` 基于 `alpine:3.21`（musl），glibc 动态二进制在其中
+无法运行；glibc 静态虽能链接，但 `getaddrinfo`/NSS 依赖宿主共享库，不作为发布形态。
+zig 缺失时 `KOMARI_STATIC=1` 必须**明确报错**，不得静默退化为动态链接。
 
 改构建相关文件后的最小验证：
 
@@ -87,6 +95,12 @@ KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
    且 JS 字节数与 `web/public/defaultTheme/dist/` 下同名文件一致。
 4. `grep -r "komari-monitor/komari/releases" web/public/defaultTheme/` 必须无结果。
 5. `go build ./... && go vet ./... && go test ./...` 全绿。
+6. 发布产物另需 `KOMARI_STATIC=1 ./scripts/build-komari.sh`，并用 `file` 确认输出为
+   `statically linked`。
+
+**本仓库没有 CI**：上游 `.github/workflows`（10 个 workflow）只做前端构建 + `go build`，
+且会从前端默认分支构建、向 `ghcr.io/komari-monitor` 推镜像，因此已整体移除。
+上述验证必须**本地手动执行**，发布同样手动（见 `docs/MAINTAINING.md` §3.4）。
 
 ## 3. 禁止事项
 

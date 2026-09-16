@@ -12,8 +12,8 @@
 | lint 配置 | **不存在** `.golangci.yml` / `.golangci.yaml` / `.editorconfig` / `Makefile` / `.gofmt` |
 | pre-commit 钩子 | 无 |
 | `gofmt` 一致性 | **当前树并非 gofmt-clean**：`gofmt -l` 列出 14 个文件（见 §3） |
-| CI 测试 | `.github/workflows/` 下 10 个 workflow 全部只做前端构建 + `go build`，**无 `go test` / `go vet`** |
-| README 构建说明 | `README.md` / `README_zh-cn.md` 里**没有任何** `go build` / `go test` / `npm` 命令 |
+| CI 测试 | **本仓库没有 CI**：上游 `.github/workflows/`（10 个 workflow，只做前端构建 + `go build`，**无 `go test` / `go vet`**）已于 2026-09-16 整体移除 |
+| README 构建说明 | 上游 README 已删除；我们的 `README.md` **有**构建与自检命令（普通/静态构建、`go build`/`vet`/`test`、离线构建） |
 | `CONTRIBUTING.md` | 不存在 |
 
 所以：**质量靠自己跑命令 + code review**，不要假设推上去会被拦住。
@@ -24,7 +24,8 @@
 go build ./... && go vet ./... && go test ./...
 ```
 
-这条命令集的唯一第一方出处是 `.trellis/spec/backend/build-and-pinning.md:89`（§2 验证清单第 5 条）。
+这条命令集的唯一第一方出处是 `.trellis/spec/backend/build-and-pinning.md` §2「验证清单」第 5 条
+（跨文件引用用章节而非行号，避免行号漂移后失效）。
 历史任务把它当验收门禁（`.trellis/tasks/archive/2026-09/09-16-rebase-0.0.1-drop-plugins/prd.md:69`、
 `.trellis/tasks/archive/2026-09/09-16-rebase-0.0.1-drop-plugins/implement.md:29`、`:57`）。
 
@@ -32,8 +33,9 @@ go build ./... && go vet ./... && go test ./...
 （`GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh`、启动校验版本行、`curl` 关键路径等）。
 
 工具链事实：`go.mod:3` 是 `go 1.25.0`，`docs/MAINTAINING.md:36-37` 要求 Go ≥ 1.25.0 + gcc（CGO 必需）。
-⚠️ CI 里 7 个 workflow 写的是 `go-version: "1.23"`（`.github/workflows/build.yml:81`、`.github/workflows/release.yml:105` 等），
-与 `go.mod` 不一致；`docs/MAINTAINING.md:40-41` 明确裁定**以 `go.mod` 为准**。
+⚠️ 上游 CI 有 7 个 workflow 写的是 `go-version: "1.23"`（如 `.github/workflows/build.yml:81`、
+`.github/workflows/release.yml:105`——该目录已移除，此处仅作历史说明），与 `go.mod` 不一致；
+`docs/MAINTAINING.md` §2 明确裁定**以 `go.mod` 为准**。
 
 ## 3. 格式与静态检查
 
@@ -209,7 +211,7 @@ if apiResponse.Code != http.StatusNotFound { ... }
 5. **不要把 Go 依赖说成"vendor"**：仓库根**没有** `vendor/` 目录，`.gitignore:26` 的 `# vendor/` 是注释掉的；
    Go 依赖走 module cache。本仓库说的 "vendored" **专指前端产物** `web/public/defaultTheme/`。
 6. **不要用 `npm install`** 替代 `npm ci`（`scripts/sync-frontend.sh:80`）。
-   注意上游 `.github/actions/build-frontend/action.yml:37` 用的是 `npm install`，**不要照抄**。
+   注意上游 CI（`.github/actions/build-frontend/action.yml:37`，该目录已移除）用的是 `npm install`，**不要照抄**。
 7. **不要改版本号语义**：发版必须递增 patch 位（`0.0.1` → `0.0.2`），带后缀的 tag 前端永远识别不到更新。
 
 ## 7. Code review 关注点
