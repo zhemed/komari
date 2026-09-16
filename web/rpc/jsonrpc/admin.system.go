@@ -19,7 +19,6 @@ import (
 	v2 "github.com/komari-monitor/komari/protocol/v2"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/geoip"
-	"github.com/komari-monitor/komari/utils/messageSender"
 	agent_runtime "github.com/komari-monitor/komari/web/agent"
 	"gorm.io/gorm"
 )
@@ -40,7 +39,6 @@ func init() {
 	})
 	reg("exec", adminExec, "Execute a command on clients")
 
-	reg("testSendMessage", adminTestSendMessage, "Send a test notification")
 	reg("testGeoip", adminTestGeoip, "Test GeoIP lookup")
 	// 远程命令执行属敏感操作：除 admin 角色外，还需通过敏感操作二次验证。
 	rpc.MarkSensitive("admin:exec")
@@ -163,17 +161,6 @@ func adminExec(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 		"clients":        onlineClients,
 		"queued_clients": queuedClients,
 	}, nil
-}
-
-func adminTestSendMessage(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
-	if err := messageSender.SendNotification(models.EventMessage{
-		Event:   "Test",
-		Time:    time.Now().UTC(),
-		Message: "This is a test message from Komari.",
-	}); err != nil {
-		return nil, rpc.MakeError(rpc.InternalError, "Failed to send message: "+err.Error(), nil)
-	}
-	return nil, nil
 }
 
 func adminTestGeoip(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {

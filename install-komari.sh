@@ -36,7 +36,7 @@ LISTEN_PORT=""
 # 本 fork 只维护自有的 0.0.x 版本线：安装/升级一律走自有仓库，避免落到上游 latest（已是 1.5.x）。
 REPO="${KOMARI_REPO:-zhemed/komari}"
 # 自有发布 tag。本 fork 只维护自有版本线，故锁定 tag 而非使用 latest。
-REPO_TAG="${KOMARI_TAG:-0.0.2}"
+REPO_TAG="${KOMARI_TAG:-0.0.3}"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
 # TUI 工具: whiptail / dialog / 空（回退纯文本）
@@ -290,7 +290,7 @@ get_download_url() {
         log_info "最新 snapshot 版本: $latest_snapshot" >&2
         echo "https://github.com/${REPO}/releases/download/${latest_snapshot}/${file_name}"
     else
-        # 稳定版：锁定自有 tag（默认 0.0.2）。
+        # 稳定版：锁定自有 tag（默认 0.0.3）。
         # 不能用 releases/latest——上游 latest 已是 1.5.x，与本 fork 维护目标不符。
         echo "https://github.com/${REPO}/releases/download/${REPO_TAG}/${file_name}"
     fi

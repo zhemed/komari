@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/komari-monitor/komari/database/clients"
 	v2 "github.com/komari-monitor/komari/protocol/v2"
-	"github.com/komari-monitor/komari/utils/notifier"
 	agent_runtime "github.com/komari-monitor/komari/web/agent"
 	"github.com/komari-monitor/komari/web/api"
 	"github.com/komari-monitor/komari/web/connection"
@@ -141,10 +140,10 @@ func WebSocketV2RPC(c *gin.Context) {
 	}
 	agent_runtime.SetConnectedClients(uuid, conn)
 	agent_runtime.SetClientProtocolVersion(uuid, 2)
-	go notifierOnline(uuid, conn.ID)
+	logger.Infof("client-api", "Client %s online (v2), connID: %d", uuid, conn.ID)
 	defer func() {
 		agent_runtime.DeleteClientConditionally(uuid, conn)
-		notifierOffline(uuid, conn.ID)
+		logger.Infof("client-api", "Client %s offline (v2), connID: %d", uuid, conn.ID)
 	}()
 	if !pushQueuedV2Events(conn, uuid) {
 		return
@@ -206,16 +205,4 @@ func clientUUIDFromContext(c *gin.Context) (string, bool) {
 	}
 	uuid, err := clients.GetClientUUIDByToken(token)
 	return uuid, err == nil && uuid != ""
-}
-
-func notifierOnline(uuid string, connID int64) {
-	go func() {
-		defer func() { _ = recover() }()
-		notifier.OnlineNotification(uuid, connID)
-	}()
-}
-
-func notifierOffline(uuid string, connID int64) {
-	defer func() { _ = recover() }()
-	notifier.OfflineNotification(uuid, connID)
 }

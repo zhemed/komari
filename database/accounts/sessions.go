@@ -3,16 +3,12 @@ package accounts
 import (
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
+	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
-	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
-	"github.com/komari-monitor/komari/internal/config"
 	"github.com/komari-monitor/komari/utils"
-	"github.com/komari-monitor/komari/utils/geoip"
-	"github.com/komari-monitor/komari/utils/messageSender"
 )
 
 // GetAllSessions 获取所有会话
@@ -39,28 +35,12 @@ func CreateSession(uuid string, expires int, userAgent, ip, login_method string)
 		LoginMethod:  login_method,
 		LatestOnline: time.Now().UTC(),
 	}
-	go func() {
-		LoginNotification, _ := config.GetAs[bool](config.LoginNotificationKey, false)
-		if LoginNotification {
-			ipAddr := net.ParseIP(ip)
-			ipinfo, _ := geoip.GetGeoInfo(ipAddr)
-			loc := "unknown"
-			if ipinfo != nil && ipinfo.Name != "" {
-				loc = ipinfo.Name
-			}
-			_ = messageSender.SendNotification(models.EventMessage{
-				Event:   messageevent.Login,
-				Time:    time.Now().UTC(),
-				Message: fmt.Sprintf("%s: %s (%s)\n%s", login_method, ip, loc, userAgent),
-				Emoji:   "🔑",
-			})
-		}
-	}()
-
 	err := db.Create(&sessionRecord).Error
 	if err != nil {
 		return "", err
 	}
+	// 登录通知已随通知系统移除（0.0.3），这里保留审计记录，避免登录行为完全无迹可循。
+	auditlog.EventLog("auth", fmt.Sprintf("%s login: %s (%s)", login_method, ip, userAgent))
 	return session, nil
 }
 

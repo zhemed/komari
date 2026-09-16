@@ -1,0 +1,2544 @@
+diff --git a/src/config/menuConfig.json b/src/config/menuConfig.json
+index d522f2c..6efbe84 100644
+--- a/src/config/menuConfig.json
++++ b/src/config/menuConfig.json
+@@ -32,38 +32,6 @@
+         }
+       ]
+     },
+-    {
+-      "labelKey": "notification.title",
+-      "path": "/admin/notification/channels",
+-      "icon": "Bell",
+-      "children": [
+-        {
+-          "labelKey": "notification.channels.title",
+-          "path": "/admin/notification/channels",
+-          "icon": "MessageCircleMore"
+-        },
+-        {
+-          "labelKey": "notification.general.title",
+-          "path": "/admin/notification/general",
+-          "icon": "Ellipsis"
+-        },
+-        {
+-          "labelKey": "notification.offline.title",
+-          "path": "/admin/notification/offline",
+-          "icon": "Unplug"
+-        },
+-        {
+-          "labelKey": "loadAlert.title",
+-          "path": "/admin/notification/load",
+-          "icon": "TrendingUp"
+-        },
+-        {
+-          "labelKey": "notification.traffic_report.title",
+-          "path": "/admin/notification/traffic-report",
+-          "icon": "BarChart2"
+-        }
+-      ]
+-    },
+     {
+       "labelKey": "theme.menu",
+       "path": "/admin/themes",
+diff --git a/src/contexts/TrafficReportContext.tsx b/src/contexts/TrafficReportContext.tsx
+deleted file mode 100644
+index 5b497ec..0000000
+--- a/src/contexts/TrafficReportContext.tsx
++++ /dev/null
+@@ -1,75 +0,0 @@
+-import React from "react";
+-import { useTranslation } from "react-i18next";
+-
+-export type TrafficReportNotification = {
+-  client: string;
+-  enable: boolean;
+-  daily: boolean;
+-  weekly: boolean;
+-  monthly: boolean;
+-};
+-
+-interface TrafficReportNotificationContextType {
+-  trafficReportNotification: TrafficReportNotification[];
+-  loading?: boolean;
+-  error?: Error | null;
+-  refresh: () => Promise<void>;
+-}
+-
+-const TrafficReportContext = React.createContext<
+-  TrafficReportNotificationContextType | undefined
+->(undefined);
+-
+-export const TrafficReportNotificationProvider: React.FC<{
+-  children: React.ReactNode;
+-}> = ({ children }) => {
+-  const { t } = useTranslation();
+-  const [trafficReportNotification, setTrafficReportNotification] =
+-    React.useState<TrafficReportNotification[]>([]);
+-  const [loading, setLoading] = React.useState<boolean>(false);
+-  const firstLoad = React.useRef(true);
+-  const [error, setError] = React.useState<Error | null>(null);
+-
+-  const refresh = async () => {
+-    if (firstLoad.current) setLoading(true);
+-    try {
+-      setError(null);
+-      const response = await fetch("/api/admin/notification/traffic-report/");
+-      if (!response.ok) {
+-        throw new Error(t("notification.traffic_report.errors.fetch_failed"));
+-      }
+-      const data = await response.json();
+-      setTrafficReportNotification(data.data || []);
+-    } catch (err) {
+-      console.error("Error fetching traffic report notifications:", err);
+-      setError(err instanceof Error ? err : new Error(String(err)));
+-    } finally {
+-      if (firstLoad.current) {
+-        setLoading(false);
+-        firstLoad.current = false;
+-      }
+-    }
+-  };
+-
+-  React.useEffect(() => {
+-    refresh();
+-  }, []);
+-
+-  return (
+-    <TrafficReportContext.Provider
+-      value={{ trafficReportNotification, refresh, loading, error }}
+-    >
+-      {children}
+-    </TrafficReportContext.Provider>
+-  );
+-};
+-
+-export const useTrafficReportNotification = () => {
+-  const context = React.useContext(TrafficReportContext);
+-  if (!context) {
+-    throw new Error(
+-      "useTrafficReportNotification must be used within a TrafficReportNotificationProvider"
+-    );
+-  }
+-  return context;
+-};
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index 109ed66..0f1d48b 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -147,17 +147,6 @@
+       "setToLongTerm": "Set to Long term",
+       "submit": "submit",
+       "submitting": "wait"
+-    },
+-    "notification": {
+-      "expire_enable": "Enable Expiration Reminder",
+-      "expire_enable_description": "If enabled, the system will send reminder notifications before expiration.",
+-      "expire_time": "Days in Advance to Remind",
+-      "expire_time_description": "Set how many days in advance to start sending reminder notifications before expiration.",
+-      "expire_title": "Expire notification",
+-      "login": "Login Notification",
+-      "login_description": "Send a notification when a new session logs into Komari.",
+-      "traffic": "Traffic Usage",
+-      "traffic_description": "Komari will send notifications when the server reaches the specified percentage of traffic usage, with reminders at 5% increments. If no traffic threshold is set, no notifications will be sent. Set to 0 to disable traffic reminders."
+     }
+   },
+   "chart": {
+@@ -514,12 +503,6 @@
+     "welcome_title": "Welcome to Komari"
+   },
+   "just_now": "Just now",
+-  "loadAlert": {
+-    "metric": "Metric",
+-    "ratio": "Ratio",
+-    "threshold_placeholder": "'80' for 80%",
+-    "title": "Load Alert"
+-  },
+   "loading": "Loading",
+   "log": {
+     "title": "Log"
+@@ -627,45 +610,6 @@
+   "nodes": {
+     "empty": "No server data available"
+   },
+-  "notification": {
+-    "channels": {
+-      "title": "Notification Channels"
+-    },
+-    "general": {
+-      "title": "General Events"
+-    },
+-    "load": {
+-      "title": "Load"
+-    },
+-    "offline": {
+-      "cooldown": "Cooldown Period",
+-      "full_title": "Offline Alerts Configuration",
+-      "grace_period": "Grace Period",
+-      "grace_period_tip": "A grace period of less than 45 seconds may not trigger online notifications in time.",
+-      "last_notified": "Last notified",
+-      "never_triggered": "Never triggered",
+-      "tips": "To prevent frequent notifications, we use a grace period:</br> <b>Grace Period</b>: If a client goes offline and doesn't reconnect within this time, an offline notification will be sent.",
+-      "title": "Offline"
+-    },
+-    "title": "Notification",
+-    "traffic_report": {
+-      "daily": "Daily",
+-      "deprecation_notice": "Komari's built-in traffic reports will be removed in version 1.5.0. Please migrate to the Scheduled Traffic Reports plugin as soon as possible.",
+-      "errors": {
+-        "fetch_failed": "Failed to fetch traffic report notifications",
+-        "save_failed": "Failed to save traffic report settings",
+-        "select_cadence": "Select at least one report cadence when enabling traffic reports",
+-        "update_failed": "Failed to update traffic report notifications"
+-      },
+-      "full_title": "Scheduled Traffic Report",
+-      "monthly": "Monthly",
+-      "report_type": "Report Type",
+-      "separator": ", ",
+-      "title": "Traffic Report",
+-      "visit_plugin_market": "Visit Plugin Market",
+-      "weekly": "Weekly"
+-    }
+-  },
+   "operations": {
+     "title": "Operations"
+   },
+@@ -1164,41 +1108,6 @@
+       "title": "Database"
+     },
+     "missing_required_fields": "Please fill in the required fields: {{fieldNames}}",
+-    "notification": {
+-      "email": {
+-        "host": "SMTP Server",
+-        "password": "Password",
+-        "port": "Port",
+-        "receiver": "Receiver Email",
+-        "sender": "Sender Email",
+-        "use_ssl": "Enable SSL",
+-        "username": "Username"
+-      },
+-      "enable": "Enable Notifications",
+-      "enable_description": "Enable to get updates via your preferred method.",
+-      "Javascript": {
+-        "script": "JavaScript code",
+-        "script_help": "JavaScript code that implements the sendMessage(message, title) and optional sendEvent(event) functions (partially supports ES6). Both should return a Promise or a boolean value. Available APIs: fetch(), xhr(), console.log(). Guide: https://komari-document.pages.dev/faq/notification-template.html"
+-      },
+-      "method": "Delivery Method",
+-      "method_description": "Pick your preferred platform for alerts.",
+-      "moved": "Looking for expired notifications? Moved to notification-general",
+-      "provider_fetch_failed": "Failed to load notification provider information",
+-      "provider_fields": "Send Settings",
+-      "provider_fields_description": "Detailed settings for the information sending channel you choose",
+-      "provider_settings_fetch_failed": "Failed to load notification settings",
+-      "telegram": {
+-        "bot_token": "Telegram Bot Token",
+-        "chat_id": "Chat ID",
+-        "endpoint": "Request Endpoint",
+-        "endpoint_help": "Request endpoint for the Telegram Bot API, usually `https://api.telegram.org/bot`"
+-      },
+-      "template": "Notification template",
+-      "template_description": "Komari will send notifications according to the notification template",
+-      "test_description": "Send a test message",
+-      "test_title": "Send test message",
+-      "title": "Notifications"
+-    },
+     "settings_save_failed": "Failed to Save Settings",
+     "settings_saved": "Settings Saved",
+     "sign_on": {
+diff --git a/src/i18n/locales/id_ID.json b/src/i18n/locales/id_ID.json
+index a988844..a1f55ad 100644
+--- a/src/i18n/locales/id_ID.json
++++ b/src/i18n/locales/id_ID.json
+@@ -147,17 +147,6 @@
+       "setToLongTerm": "Atur ke Jangka Panjang",
+       "submit": "Kirim",
+       "submitting": "Menunggu..."
+-    },
+-    "notification": {
+-      "expire_enable": "Aktifkan Pengingat Kedaluwarsa",
+-      "expire_enable_description": "Jika diaktifkan, sistem akan mengirimkan notifikasi pengingat sebelum masa kedaluwarsa.",
+-      "expire_time": "Hari Sebelum Pengingat",
+-      "expire_time_description": "Atur berapa hari sebelumnya notifikasi pengingat akan dikirim sebelum masa kedaluwarsa.",
+-      "expire_title": "Notifikasi Kedaluwarsa",
+-      "login": "Notifikasi Masuk",
+-      "login_description": "Kirim notifikasi saat sesi baru masuk ke Komari.",
+-      "traffic": "Penggunaan Trafik",
+-      "traffic_description": "Komari akan mengirim notifikasi ketika penggunaan trafik server mencapai persentase tertentu, dengan pengingat setiap kenaikan 5%. Jika tidak ada batas trafik yang ditetapkan, maka tidak ada notifikasi yang dikirim. Atur ke 0 untuk menonaktifkan pengingat trafik."
+     }
+   },
+   "chart": {
+@@ -514,12 +503,6 @@
+     "welcome_title": "Selamat datang di Komari"
+   },
+   "just_now": "Baru saja",
+-  "loadAlert": {
+-    "metric": "Metrik",
+-    "ratio": "Rasio",
+-    "threshold_placeholder": "'80' untuk 80%",
+-    "title": "Peringatan Beban"
+-  },
+   "loading": "Memuat",
+   "log": {
+     "title": "Log"
+@@ -627,45 +610,6 @@
+   "nodes": {
+     "empty": "Tidak ada data server"
+   },
+-  "notification": {
+-    "channels": {
+-      "title": "Saluran Notifikasi"
+-    },
+-    "general": {
+-      "title": "Peristiwa Umum"
+-    },
+-    "load": {
+-      "title": "Beban"
+-    },
+-    "offline": {
+-      "cooldown": "Masa Tunda",
+-      "full_title": "Konfigurasi Peringatan Offline",
+-      "grace_period": "Masa Tenggang",
+-      "grace_period_tip": "Masa tenggang kurang dari 45 detik dapat menyebabkan notifikasi Hidup terlambat muncul.",
+-      "last_notified": "Terakhir Diberitahu",
+-      "never_triggered": "Belum Pernah Dipicu",
+-      "tips": "Untuk mencegah notifikasi terlalu sering, kami menggunakan masa tenggang:</br> <b>Masa Tenggang</b>: Jika klien offline dan tidak terhubung kembali dalam waktu ini, notifikasi offline akan dikirim.",
+-      "title": "Mati"
+-    },
+-    "title": "Notifikasi",
+-    "traffic_report": {
+-      "daily": "Harian",
+-      "deprecation_notice": "Laporan trafik bawaan Komari akan dihapus pada versi 1.5.0. Segera migrasikan ke plugin Scheduled Traffic Reports.",
+-      "errors": {
+-        "fetch_failed": "Gagal memuat pengaturan laporan trafik",
+-        "save_failed": "Gagal menyimpan pengaturan laporan trafik",
+-        "select_cadence": "Pilih setidaknya satu periode laporan saat mengaktifkan laporan trafik",
+-        "update_failed": "Gagal memperbarui pengaturan laporan trafik"
+-      },
+-      "full_title": "Laporan Trafik Terjadwal",
+-      "monthly": "Bulanan",
+-      "report_type": "Tipe Laporan",
+-      "separator": ", ",
+-      "title": "Laporan Trafik",
+-      "visit_plugin_market": "Kunjungi Pasar Plugin",
+-      "weekly": "Mingguan"
+-    }
+-  },
+   "operations": {
+     "title": "Operasional"
+   },
+@@ -1164,41 +1108,6 @@
+       "title": "Basis Data"
+     },
+     "missing_required_fields": "Silakan isi kolom yang wajib: {{fieldNames}}",
+-    "notification": {
+-      "email": {
+-        "host": "Server SMTP",
+-        "password": "Kata Sandi",
+-        "port": "Port",
+-        "receiver": "Email Penerima",
+-        "sender": "Email Pengirim",
+-        "use_ssl": "Aktifkan SSL",
+-        "username": "Nama Pengguna"
+-      },
+-      "enable": "Aktifkan Notifikasi",
+-      "enable_description": "Aktifkan untuk mendapatkan pembaruan melalui metode pilihan Anda.",
+-      "Javascript": {
+-        "script": "Kode JavaScript",
+-        "script_help": "Kode JavaScript yang mengimplementasikan fungsi sendMessage(message, title) dan sendEvent(event) yang bersifat opsional (dukungan sebagian untuk ES6). Keduanya harus mengembalikan Promise atau nilai boolean. API yang tersedia: fetch(), xhr(), console.log(). Panduan: https://komari-document.pages.dev/faq/notification-template.html"
+-      },
+-      "method": "Metode Pengiriman",
+-      "method_description": "Pilih platform favorit Anda untuk peringatan.",
+-      "moved": "Mencari notifikasi kedaluwarsa? Pindah ke notification-general",
+-      "provider_fetch_failed": "Gagal memuat informasi penyedia notifikasi",
+-      "provider_fields": "Pengaturan Pengiriman",
+-      "provider_fields_description": "Pengaturan detail untuk saluran pengiriman informasi yang Anda pilih",
+-      "provider_settings_fetch_failed": "Gagal memuat pengaturan notifikasi",
+-      "telegram": {
+-        "bot_token": "Token Bot Telegram",
+-        "chat_id": "ID Chat",
+-        "endpoint": "Endpoint Permintaan",
+-        "endpoint_help": "Endpoint permintaan untuk API Bot Telegram, biasanya `https://api.telegram.org/bot`"
+-      },
+-      "template": "Template pemberitahuan pesan",
+-      "template_description": "Komari akan mengirim pemberitahuan sesuai dengan template pemberitahuan pesan",
+-      "test_description": "Kirim pesan uji coba",
+-      "test_title": "Kirim pesan uji coba",
+-      "title": "Notifikasi"
+-    },
+     "settings_save_failed": "Gagal menyimpan pengaturan",
+     "settings_saved": "Pengaturan berhasil disimpan",
+     "sign_on": {
+diff --git a/src/i18n/locales/ja_JP.json b/src/i18n/locales/ja_JP.json
+index ae31fe0..9bbc0ea 100644
+--- a/src/i18n/locales/ja_JP.json
++++ b/src/i18n/locales/ja_JP.json
+@@ -147,17 +147,6 @@
+       "setToLongTerm": "長期に設定",
+       "submit": "送信",
+       "submitting": "待機中"
+-    },
+-    "notification": {
+-      "expire_enable": "期限切れ通知を有効にしますか",
+-      "expire_enable_description": "有効にすると、Komariは期限前に通知を送信します。",
+-      "expire_time": "何日前から通知を開始しますか",
+-      "expire_time_description": "期限前に何日前から通知を送信するかを設定します。",
+-      "expire_title": "期限切れ通知",
+-      "login": "ログイン通知",
+-      "login_description": "新しいセッションがKomariにログインしたときに通知を送信します。",
+-      "traffic": "トラフィック使用量",
+-      "traffic_description": "Komariは、サーバーが指定されたトラフィック使用率に達したときに通知を送信し、5%の間隔で継続的にリマインダーを表示します。サーバーにトラフィック閾値が設定されていない場合、通知は送信されません。0に設定するとトラフィックリマインダーが無効になります。"
+     }
+   },
+   "chart": {
+@@ -514,12 +503,6 @@
+     "welcome_title": "Komari へようこそ"
+   },
+   "just_now": "たった今",
+-  "loadAlert": {
+-    "metric": "監視項目",
+-    "ratio": "時間の割合",
+-    "threshold_placeholder": "パーセンテージ、例えば80は80%を表します",
+-    "title": "負荷アラート"
+-  },
+   "loading": "読み込み中...",
+   "log": {
+     "title": "ログ"
+@@ -627,45 +610,6 @@
+   "nodes": {
+     "empty": "サーバーデータはありません"
+   },
+-  "notification": {
+-    "channels": {
+-      "title": "通知チャンネル"
+-    },
+-    "general": {
+-      "title": "一般イベント"
+-    },
+-    "load": {
+-      "title": "負荷通知"
+-    },
+-    "offline": {
+-      "cooldown": "クールダウン期間",
+-      "full_title": "オフライン通知設定",
+-      "grace_period": "猶予期間",
+-      "grace_period_tip": "45秒未満の猶予期間では、オンライン通知が適時にトリガーされない可能性があります",
+-      "last_notified": "最後の通知",
+-      "never_triggered": "一度もトリガーされていません",
+-      "tips": "頻繁な通知を避けるために、猶予期間を設定しました：</br> <b>猶予期間</b>：クライアントがオフラインになった後、この期間内に再度オンラインにならなければ、オフライン通知が送信されます。",
+-      "title": "オフライン通知"
+-    },
+-    "title": "通知",
+-    "traffic_report": {
+-      "daily": "日次レポート",
+-      "deprecation_notice": "Komari 内蔵のトラフィックレポートは 1.5.0 で削除される予定です。できるだけ早く「定期トラフィックレポート」プラグインへ移行してください。",
+-      "errors": {
+-        "fetch_failed": "トラフィックレポート設定の取得に失敗しました",
+-        "save_failed": "トラフィックレポート設定の保存に失敗しました",
+-        "select_cadence": "トラフィックレポートを有効にする場合は、少なくとも 1 つの周期を選択してください",
+-        "update_failed": "トラフィックレポート設定の更新に失敗しました"
+-      },
+-      "full_title": "定期トラフィックレポート設定",
+-      "monthly": "月次レポート",
+-      "report_type": "レポートタイプ",
+-      "separator": "、",
+-      "title": "トラフィックレポート",
+-      "visit_plugin_market": "プラグインマーケットへ移動",
+-      "weekly": "週次レポート"
+-    }
+-  },
+   "operations": {
+     "title": "運用"
+   },
+@@ -1164,41 +1108,6 @@
+       "title": "データベース"
+     },
+     "missing_required_fields": "必須フィールドを入力してください: {{fieldNames}}",
+-    "notification": {
+-      "email": {
+-        "host": "SMTP サーバー",
+-        "password": "パスワード",
+-        "port": "ポート",
+-        "receiver": "受信者メールアドレス",
+-        "sender": "送信者メールアドレス",
+-        "use_ssl": "SSL を有効にする",
+-        "username": "ユーザー名"
+-      },
+-      "enable": "通知を有効にする",
+-      "enable_description": "好みの方法でタイムリーな通知を受け取ります。",
+-      "Javascript": {
+-        "script": "JavaScript コード",
+-        "script_help": "sendMessage(message, title) およびオプションの sendEvent(event) 関数を実装する JavaScript コード（ES6 の一部をサポート）。両方とも Promise またはブール値を返す必要があります。使用可能な API：fetch()、xhr()、console.log()。ガイド: https://komari-document.pages.dev/faq/notification-template.html"
+-      },
+-      "method": "通知チャネル",
+-      "method_description": "通知プラットフォームを選択してください",
+-      "moved": "期限切れの通知を探していますか？通知-一般に移行されました",
+-      "provider_fetch_failed": "通知プロバイダー情報の読み込みに失敗しました",
+-      "provider_fields": "送信設定",
+-      "provider_fields_description": "選択した情報送信チャネルの詳細設定",
+-      "provider_settings_fetch_failed": "通知設定の読み込みに失敗しました",
+-      "telegram": {
+-        "bot_token": "Telegramボットトークン",
+-        "chat_id": "チャットID",
+-        "endpoint": "リクエストエンドポイント",
+-        "endpoint_help": "Telegram ボット API のリクエストエンドポイント、通常は `https://api.telegram.org/bot`"
+-      },
+-      "template": "メッセージ通知テンプレート",
+-      "template_description": "Komariはメッセージ通知テンプレートに従って通知を送信します",
+-      "test_description": "テストメッセージを送信",
+-      "test_title": "テストメッセージを送信",
+-      "title": "通知"
+-    },
+     "settings_save_failed": "設定の保存に失敗しました",
+     "settings_saved": "設定が保存されました",
+     "sign_on": {
+diff --git a/src/i18n/locales/zh_CN.json b/src/i18n/locales/zh_CN.json
+index 6d00d5d..75c76b7 100644
+--- a/src/i18n/locales/zh_CN.json
++++ b/src/i18n/locales/zh_CN.json
+@@ -147,17 +147,6 @@
+       "setToLongTerm": "设置为长期",
+       "submit": "提交",
+       "submitting": "等待"
+-    },
+-    "notification": {
+-      "expire_enable": "是否启用过期提醒",
+-      "expire_enable_description": "启用后，Komari将在到期前发送提醒通知。",
+-      "expire_time": "提前多少天开始提醒",
+-      "expire_time_description": "设置在到期前多少天开始发送提醒通知。",
+-      "expire_title": "过期提醒",
+-      "login": "登录通知",
+-      "login_description": "当有新的会话登录到Komari时，向您发送通知",
+-      "traffic": "流量用量",
+-      "traffic_description": "Komari将会在服务器到达指定的流量使用百分比时发送通知，并以5%为梯度持续提醒。如果服务器没有设置流量阈值，不发送通知。设置为0禁用流量提醒。"
+     }
+   },
+   "chart": {
+@@ -514,12 +503,6 @@
+     "welcome_title": "欢迎使用 Komari"
+   },
+   "just_now": "刚刚",
+-  "loadAlert": {
+-    "metric": "监控项",
+-    "ratio": "时间占比",
+-    "threshold_placeholder": "百分比，例如80代表80%",
+-    "title": "负载警报"
+-  },
+   "loading": "加载中...",
+   "log": {
+     "title": "日志"
+@@ -627,45 +610,6 @@
+   "nodes": {
+     "empty": "暂无服务器数据"
+   },
+-  "notification": {
+-    "channels": {
+-      "title": "通知渠道"
+-    },
+-    "general": {
+-      "title": "通用事件"
+-    },
+-    "load": {
+-      "title": "负载通知"
+-    },
+-    "offline": {
+-      "cooldown": "冷静期",
+-      "full_title": "离线通知设置",
+-      "grace_period": "宽限期",
+-      "grace_period_tip": "低于45秒的宽限期可能会无法及时触发在线通知",
+-      "last_notified": "最后通知",
+-      "never_triggered": "从未触发",
+-      "tips": "为了避免频繁发送通知，我们设置了宽限期：</br> <b>宽限期</b>：客户端离线后，如果在这段时间内没有重新上线，就会发送离线通知",
+-      "title": "离线通知"
+-    },
+-    "title": "通知",
+-    "traffic_report": {
+-      "daily": "日报",
+-      "deprecation_notice": "Komari 内置的流量报告即将在 1.5.0 版本移除，请尽快迁移至插件“流量定期报告”。",
+-      "errors": {
+-        "fetch_failed": "获取流量定时报告配置失败",
+-        "save_failed": "保存流量定时报告配置失败",
+-        "select_cadence": "启用流量定时报告时，至少选择一种报告周期",
+-        "update_failed": "更新流量定时报告配置失败"
+-      },
+-      "full_title": "流量定时报告设置",
+-      "monthly": "月报",
+-      "report_type": "定时类型",
+-      "separator": "、",
+-      "title": "流量定时报告",
+-      "visit_plugin_market": "访问插件市场",
+-      "weekly": "周报"
+-    }
+-  },
+   "operations": {
+     "title": "运维"
+   },
+@@ -1164,41 +1108,6 @@
+       "title": "数据库"
+     },
+     "missing_required_fields": "请填写必填字段: {{fieldNames}}",
+-    "notification": {
+-      "email": {
+-        "host": "SMTP 服务器",
+-        "password": "密码",
+-        "port": "端口",
+-        "receiver": "收件人邮箱",
+-        "sender": "发件人邮箱",
+-        "use_ssl": "启用 SSL",
+-        "username": "用户名"
+-      },
+-      "enable": "开启通知",
+-      "enable_description": "通过首选方式获取及时通知。",
+-      "Javascript": {
+-        "script": "JavaScript 代码",
+-        "script_help": "实现 sendMessage(message, title) 及可选的 sendEvent(event) 函数的 JavaScript 代码（部分支持 ES6）。两者均应返回 Promise 或布尔值。可用 API：fetch()、xhr()、console.log()。指南: https://komari-document.pages.dev/faq/notification-template.html"
+-      },
+-      "method": "通知渠道",
+-      "method_description": "选择您偏好的通知平台",
+-      "moved": "正在寻找过期通知？已经迁移到通知-通用",
+-      "provider_fetch_failed": "加载通知渠道信息失败",
+-      "provider_fields": "发送设置",
+-      "provider_fields_description": "详细设置您选择的信息发送渠道",
+-      "provider_settings_fetch_failed": "加载通知设置失败",
+-      "telegram": {
+-        "bot_token": "Telegram Bot Token",
+-        "chat_id": "Chat ID",
+-        "endpoint": "请求端点",
+-        "endpoint_help": "Telegram Bot API 的请求端点，通常为 `https://api.telegram.org/bot`"
+-      },
+-      "template": "消息通知模板",
+-      "template_description": "Komari 将按照消息通知模板发送通知",
+-      "test_description": "发送测试消息",
+-      "test_title": "发送测试消息",
+-      "title": "通知"
+-    },
+     "settings_save_failed": "保存设置失败",
+     "settings_saved": "设置已保存",
+     "sign_on": {
+diff --git a/src/i18n/locales/zh_TW.json b/src/i18n/locales/zh_TW.json
+index c6ef1e7..dbfdab0 100644
+--- a/src/i18n/locales/zh_TW.json
++++ b/src/i18n/locales/zh_TW.json
+@@ -147,17 +147,6 @@
+       "setToLongTerm": "設定為長期",
+       "submit": "提交",
+       "submitting": "等待"
+-    },
+-    "notification": {
+-      "expire_enable": "是否啟用過期提醒",
+-      "expire_enable_description": "啟用後，Komari將在到期前傳送提醒通知。",
+-      "expire_time": "提前多少天開始提醒",
+-      "expire_time_description": "設定在到期前多少天開始傳送提醒通知。",
+-      "expire_title": "過期提醒",
+-      "login": "登入通知",
+-      "login_description": "當有新的會話登入到Komari時，向您傳送通知",
+-      "traffic": "流量用量",
+-      "traffic_description": "Komari將會在伺服器到達指定的流量使用百分比時傳送通知，並以5%為梯度持續提醒。如果伺服器沒有設定流量閾值，不傳送通知。設定為0停用流量提醒。"
+     }
+   },
+   "chart": {
+@@ -514,12 +503,6 @@
+     "welcome_title": "歡迎使用 Komari"
+   },
+   "just_now": "剛剛",
+-  "loadAlert": {
+-    "metric": "監控項",
+-    "ratio": "時間佔比",
+-    "threshold_placeholder": "百分比，例如80代表80%",
+-    "title": "負載警報"
+-  },
+   "loading": "載入中...",
+   "log": {
+     "title": "日誌"
+@@ -627,45 +610,6 @@
+   "nodes": {
+     "empty": "暫無伺服器資料"
+   },
+-  "notification": {
+-    "channels": {
+-      "title": "通知頻道"
+-    },
+-    "general": {
+-      "title": "通用事件"
+-    },
+-    "load": {
+-      "title": "負載通知"
+-    },
+-    "offline": {
+-      "cooldown": "冷靜期",
+-      "full_title": "離線通知設定",
+-      "grace_period": "寬限期",
+-      "grace_period_tip": "低於45秒的寬限期可能會無法及時觸發線上通知",
+-      "last_notified": "最後通知",
+-      "never_triggered": "從未觸發",
+-      "tips": "為了避免頻繁傳送通知，我們設定了寬限期：</br> <b>寬限期</b>：客戶端離線後，如果在這段時間內沒有重新上線，就會傳送離線通知",
+-      "title": "離線通知"
+-    },
+-    "title": "通知",
+-    "traffic_report": {
+-      "daily": "日報",
+-      "deprecation_notice": "Komari 內建的流量報告將在 1.5.0 版本移除，請儘快遷移至「流量定期報告」外掛。",
+-      "errors": {
+-        "fetch_failed": "取得流量定時報告設定失敗",
+-        "save_failed": "儲存流量定時報告設定失敗",
+-        "select_cadence": "啟用流量定時報告時，至少選擇一種報告週期",
+-        "update_failed": "更新流量定時報告設定失敗"
+-      },
+-      "full_title": "流量定時報告設定",
+-      "monthly": "月報",
+-      "report_type": "定時型別",
+-      "separator": "、",
+-      "title": "流量定時報告",
+-      "visit_plugin_market": "造訪外掛市集",
+-      "weekly": "週報"
+-    }
+-  },
+   "operations": {
+     "title": "維運"
+   },
+@@ -1164,41 +1108,6 @@
+       "title": "資料庫"
+     },
+     "missing_required_fields": "請填寫必填欄位: {{fieldNames}}",
+-    "notification": {
+-      "email": {
+-        "host": "SMTP 伺服器",
+-        "password": "密碼",
+-        "port": "埠",
+-        "receiver": "收件人郵箱",
+-        "sender": "發件人郵箱",
+-        "use_ssl": "啟用 SSL",
+-        "username": "使用者名稱"
+-      },
+-      "enable": "開啟通知",
+-      "enable_description": "透過首選方式獲取及時通知。",
+-      "Javascript": {
+-        "script": "JavaScript 程式碼",
+-        "script_help": "實現 sendMessage(message, title) 及可選的 sendEvent(event) 函式的 JavaScript 程式碼（部分支援 ES6）。兩者均應返回 Promise 或布林值。可用 API：fetch()、xhr()、console.log()。指南: https://komari-document.pages.dev/faq/notification-template.html"
+-      },
+-      "method": "通知渠道",
+-      "method_description": "選擇您偏好的通知平臺",
+-      "moved": "正在尋找過期通知？已經遷移到通知-通用",
+-      "provider_fetch_failed": "載入通知渠道資訊失敗",
+-      "provider_fields": "傳送設定",
+-      "provider_fields_description": "詳細設定您選擇的資訊傳送渠道",
+-      "provider_settings_fetch_failed": "載入通知設定失敗",
+-      "telegram": {
+-        "bot_token": "Telegram Bot Token",
+-        "chat_id": "Chat ID",
+-        "endpoint": "請求端點",
+-        "endpoint_help": "Telegram Bot API 的請求端點，通常為 `https://api.telegram.org/bot`"
+-      },
+-      "template": "訊息通知模板",
+-      "template_description": "Komari 將按照訊息通知模板傳送通知",
+-      "test_description": "傳送測試訊息",
+-      "test_title": "傳送測試訊息",
+-      "title": "通知"
+-    },
+     "settings_save_failed": "儲存設定失敗",
+     "settings_saved": "設定已儲存",
+     "sign_on": {
+diff --git a/src/pages/admin/notification/channels.tsx b/src/pages/admin/notification/channels.tsx
+deleted file mode 100644
+index fd22c57..0000000
+--- a/src/pages/admin/notification/channels.tsx
++++ /dev/null
+@@ -1,196 +0,0 @@
+-import { useTranslation } from "react-i18next";
+-import { Text } from "@radix-ui/themes";
+-import { updateSettingsWithToast, useSettings } from "@/lib/api";
+-import {
+-  SettingCardButton,
+-  SettingCardLabel,
+-  SettingCardLongTextInput,
+-  SettingCardSelect,
+-  SettingCardSwitch,
+-} from "@/components/admin/SettingCard";
+-import { toast } from "sonner";
+-import Loading from "@/components/loading";
+-import React from "react";
+-import { renderProviderInputs } from "@/utils/renderProviders";
+-import { SquareArrowOutUpRight } from "lucide-react";
+-import { Link } from "react-router-dom";
+-
+-const NotificationSettings = () => {
+-  const { t } = useTranslation();
+-  const { settings, loading, error } = useSettings();
+-  const [messageDefs, setMessageDefs] = React.useState<any>({});
+-  const [messageList, setMessageList] = React.useState<string[]>([]);
+-  const [currentMessageSender, setCurrentMessageSender] = React.useState<string>("");
+-  const [messageValues, setMessageValues] = React.useState<any>({});
+-  const [messageLoading, setMessageLoading] = React.useState(false);
+-  const [messageError, setMessageError] = React.useState("");
+-
+-  // 拉取所有 message sender 及字段定义
+-  React.useEffect(() => {
+-    if (loading) return;
+-    setMessageLoading(true);
+-    fetch("/api/admin/settings/message-sender")
+-      .then((res) => res.json())
+-      .then((data) => {
+-        if (data.status === "success" && data.data) {
+-          setMessageDefs(data.data);
+-          const senders = Object.keys(data.data);
+-          setMessageList(senders);
+-          const initialSender =
+-            settings.notification_method && senders.includes(settings.notification_method)
+-              ? settings.notification_method
+-              : "";
+-          setCurrentMessageSender(initialSender);
+-        } else {
+-          setMessageError(data.message || t("settings.notification.provider_fetch_failed"));
+-        }
+-      })
+-      .catch(() => setMessageError(t("settings.notification.provider_fetch_failed")))
+-      .finally(() => setMessageLoading(false));
+-  }, [loading, settings.notification_method, t]);
+-
+-  // 拉取当前 message sender 的设置
+-  React.useEffect(() => {
+-    if (!currentMessageSender) return;
+-    setMessageLoading(true);
+-    fetch(`/api/admin/settings/message-sender?provider=${currentMessageSender}`)
+-      .then((res) => res.json())
+-      .then((data) => {
+-        if (data.status === "success" && data.data) {
+-          try {
+-            setMessageValues(JSON.parse(data.data.addition || "{}"));
+-          } catch {
+-            setMessageValues({});
+-          }
+-        } else {
+-          setMessageError(data.message || t("settings.notification.provider_settings_fetch_failed"));
+-        }
+-      })
+-      .catch(() => setMessageError(t("settings.notification.provider_settings_fetch_failed")))
+-      .finally(() => setMessageLoading(false));
+-  }, [currentMessageSender, t]);
+-
+-  // 处理保存
+-  const handleMessageSave = async (values: any) => {
+-    setMessageLoading(true);
+-    setMessageError("");
+-    const body = {
+-      name: currentMessageSender,
+-      addition: JSON.stringify(values),
+-    };
+-    try {
+-      const res = await fetch("/api/admin/settings/message-sender", {
+-        method: "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body: JSON.stringify(body),
+-      });
+-      const data = await res.json();
+-      if (data.status !== "success") {
+-        throw new Error(data.message || t("common.error"));
+-      } else {
+-        setMessageValues(values);
+-      }
+-      toast.success(t("common.success"));
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    }
+-    setMessageLoading(false);
+-  };
+-  if (loading || (!messageLoading && messageList.length === 0 && !messageError)) {
+-    return <Loading />;
+-  }
+-  if (error) {
+-    return <Text color="red">{error}</Text>;
+-  }
+-  if (messageError) {
+-    return <Text color="red">{messageError}</Text>;
+-  }
+-
+-  return (
+-    <>
+-      <SettingCardLabel>{t("settings.notification.title")}</SettingCardLabel>
+-      <SettingCardSwitch
+-        title={t("settings.notification.enable")}
+-        description={t("settings.notification.enable_description")}
+-        defaultChecked={settings.notification_enabled}
+-        onChange={async (checked) => {
+-          await updateSettingsWithToast({ notification_enabled: checked }, t);
+-        }}
+-        className="km-page-admin-settings-notification km-setting-card"
+-      />
+-      <SettingCardLongTextInput
+-        title={t("settings.notification.template")}
+-        description={t("settings.notification.template_description")}
+-        defaultValue={settings.notification_template}
+-        OnSave={
+-          async (value) => {
+-            await updateSettingsWithToast({ notification_template: value }, t);
+-          }}
+-      />
+-      <SettingCardSelect
+-        title={t("settings.notification.method")}
+-        description={t("settings.notification.method_description")}
+-        options={messageList.map((sender) => ({ value: sender, label: sender }))}
+-        value={currentMessageSender}
+-        OnSave={async (val: string) => {
+-          if (val === currentMessageSender) return;
+-          await updateSettingsWithToast({ notification_method: val }, t);
+-          setCurrentMessageSender(val);
+-        }}
+-      />
+-      {messageLoading ? <Loading /> : renderProviderInputs({
+-        currentProvider: currentMessageSender,
+-        providerDefs: messageDefs,
+-        providerValues: messageValues,
+-        translationPrefix: `settings.notification.${currentMessageSender}`,
+-        title: t("settings.notification.provider_fields"),
+-        description: t("settings.notification.provider_fields_description"),
+-        setProviderValues: setMessageValues,
+-        handleSave: handleMessageSave,
+-        t,
+-      })}
+-      <SettingCardButton
+-        title={t("settings.notification.test_title")}
+-        description={t("settings.notification.test_description")}
+-        onClick={async () => {
+-          try {
+-            const res = await fetch("/api/admin/test/sendMessage", {
+-              method: "POST",
+-            });
+-            let data;
+-            try {
+-              data = await res.json();
+-            } catch {
+-              toast.error(t("common.error"));
+-              return;
+-            }
+-            if (data && data.message && data.code !== 200) {
+-              toast.error(data.message);
+-              return;
+-            }
+-            toast.success(t("common.success"));
+-          } catch (error) {
+-            toast.error(
+-              t("common.error") +
+-              ": " +
+-              (error instanceof Error ? error.message : String(error))
+-            );
+-          }
+-        }}
+-        className="km-setting-card"
+-      >
+-        GO
+-      </SettingCardButton>
+-      <label className="text-muted-foreground text-sm flex flex-row items-center gap-1">
+-        {t("settings.notification.moved")}
+-        <Link
+-          to="/admin/notification/general"
+-        >
+-          <SquareArrowOutUpRight size={16} />
+-        </Link>
+-      </label>
+-    </>
+-  );
+-};
+-
+-export default NotificationSettings;
+diff --git a/src/pages/admin/notification/general.tsx b/src/pages/admin/notification/general.tsx
+deleted file mode 100644
+index 7f35451..0000000
+--- a/src/pages/admin/notification/general.tsx
++++ /dev/null
+@@ -1,93 +0,0 @@
+-import { Flex } from "@radix-ui/themes";
+-import { useTranslation } from "react-i18next";
+-import { Text } from "@radix-ui/themes";
+-import { updateSettingsWithToast, useSettings } from "@/lib/api";
+-import Loading from "@/components/loading";
+-import {
+-  SettingCardLabel,
+-  SettingCardShortTextInput,
+-  SettingCardSwitch,
+-} from "@/components/admin/SettingCard";
+-import { toast } from "sonner";
+-const GeneralNotification = () => {
+-  return (
+-    <Flex direction="column" gap="3" className="km-page-admin-notification-general km-notification-general-form p-0 md:p-4">
+-      <Inner />
+-    </Flex>
+-  );
+-};
+-
+-const Inner = () => {
+-  const { t } = useTranslation();
+-  const { settings, loading, error } = useSettings();
+-
+-  if (loading) {
+-    return <Loading />;
+-  }
+-
+-  if (error) {
+-    return <Text color="red">{error}</Text>;
+-  }
+-  return (
+-    <>
+-      <SettingCardLabel>
+-        {t("admin.notification.expire_title")}
+-      </SettingCardLabel>
+-      <SettingCardSwitch
+-        defaultChecked={settings.expire_notification_enabled}
+-        title={t("admin.notification.expire_enable")}
+-        description={t("admin.notification.expire_enable_description")}
+-        onChange={async (checked) => {
+-          await updateSettingsWithToast(
+-            { expire_notification_enabled: checked },
+-            t
+-          );
+-        }}
+-      />
+-      <SettingCardShortTextInput
+-        type="number"
+-        title={t("admin.notification.expire_time")}
+-        description={t("admin.notification.expire_time_description")}
+-        defaultValue={settings.expire_notification_lead_days}
+-        OnSave={async (value) => {
+-          const numValue = Number(value);
+-          if (isNaN(numValue) || numValue < 0) {
+-            toast.error("Please enter a valid non-negative number");
+-            return;
+-          }
+-          await updateSettingsWithToast(
+-            { expire_notification_lead_days: numValue },
+-            t
+-          );
+-        }}
+-      />
+-      <SettingCardLabel>{t("admin.notification.login")}</SettingCardLabel>
+-      <SettingCardSwitch
+-        title={t("admin.notification.login")}
+-        description={t("admin.notification.login_description")}
+-        defaultChecked={settings.login_notification}
+-        onChange={async (checked) => {
+-          await updateSettingsWithToast(
+-            { login_notification: checked },
+-            t
+-          );
+-        }}
+-      />
+-      <SettingCardLabel>{t("admin.notification.traffic")}</SettingCardLabel>
+-      <SettingCardShortTextInput
+-        title={t("admin.notification.traffic")}
+-        description={t("admin.notification.traffic_description")}
+-        defaultValue={settings.traffic_limit_percentage}
+-        type="number"
+-        OnSave={async (value) => {
+-          await updateSettingsWithToast(
+-            { traffic_limit_percentage: Number(value) },
+-            t
+-          );
+-        }}
+-      />
+-    </>
+-  );
+-};
+-
+-export default GeneralNotification;
+diff --git a/src/pages/admin/notification/load.tsx b/src/pages/admin/notification/load.tsx
+deleted file mode 100644
+index 614a083..0000000
+--- a/src/pages/admin/notification/load.tsx
++++ /dev/null
+@@ -1,489 +0,0 @@
+-import Loading from "@/components/loading";
+-import NodeSelectorDialog from "@/components/NodeSelectorDialog";
+-import {
+-  Table,
+-  TableBody,
+-  TableCell,
+-  TableHead,
+-  TableHeader,
+-  TableRow,
+-} from "@/components/ui/table";
+-import {
+-  LoadAlertProvider,
+-  useLoadAlert,
+-  type LoadAlert,
+-} from "@/contexts/LoadAlertContext";
+-import {
+-  NodeDetailsProvider,
+-  useNodeDetails,
+-} from "@/contexts/NodeDetailsContext";
+-
+-import {
+-  Button,
+-  Dialog,
+-  Flex,
+-  IconButton,
+-  Select,
+-  TextField,
+-} from "@radix-ui/themes";
+-import { MoreHorizontal, Pencil, Trash } from "lucide-react";
+-import React from "react";
+-import { useTranslation } from "react-i18next";
+-import { toast } from "sonner";
+-
+-const LoadPage = () => {
+-  return (
+-    <LoadAlertProvider>
+-      <NodeDetailsProvider>
+-        <InnerLayout />
+-      </NodeDetailsProvider>
+-    </LoadAlertProvider>
+-  );
+-};
+-
+-const InnerLayout = () => {
+-  const { loadAlerts, isLoading, error } = useLoadAlert();
+-  const { isLoading: nodeDetailLoading, error: nodeDetailError } =
+-    useNodeDetails();
+-  const { t } = useTranslation();
+-  if (isLoading || nodeDetailLoading) {
+-    return <Loading />;
+-  }
+-  if (error || nodeDetailError) {
+-    return <div>{error || nodeDetailError}</div>;
+-  }
+-  return (
+-    <Flex direction="column" gap="4" className="km-page-admin-notification-load p-4">
+-      <div className="flex justify-between items-center">
+-        <label className="text-2xl font-bold">
+-          {t("notification.load.title")}
+-        </label>
+-        <AddButton />
+-      </div>
+-
+-      <div className="rounded-xl overflow-hidden">
+-        <Table>
+-          <TableHeader>
+-            <TableHead>{t("common.name")}</TableHead>
+-            <TableHead>{t("common.server")}</TableHead>
+-            <TableHead>{t("loadAlert.metric")}</TableHead>
+-            <TableHead>{t("common.threshold")}</TableHead>
+-            <TableHead>{t("loadAlert.ratio")}</TableHead>
+-            <TableHead>{t("ping.interval")}</TableHead>
+-            <TableHead>{t("common.action")}</TableHead>
+-          </TableHeader>
+-          <TableBody>
+-            {loadAlerts
+-              ?.slice()
+-              .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
+-              .map((alert) => (
+-                <Row key={alert.id} alert={alert} />
+-              ))}
+-          </TableBody>
+-        </Table>
+-      </div>
+-    </Flex>
+-  );
+-};
+-
+-const Row = ({ alert }: { alert: LoadAlert }) => {
+-  const { t } = useTranslation();
+-  const { refresh } = useLoadAlert();
+-  const { nodeDetail } = useNodeDetails();
+-  const [editOpen, setEditOpen] = React.useState(false);
+-  const [editSaving, setEditSaving] = React.useState(false);
+-  const [deleteOpen, setDeleteOpen] = React.useState(false);
+-  const [deleteLoading, setDeleteLoading] = React.useState(false);
+-  const [form, setForm] = React.useState({
+-    name: alert.name || "",
+-    metric: alert.metric || "cpu",
+-    threshold: alert.threshold || 80,
+-    ratio: alert.ratio || 0.8,
+-    clients: alert.clients || [],
+-    interval: alert.interval || 15,
+-  });
+-
+-  const submitEdit = (newForm: typeof form) => {
+-    setEditSaving(true);
+-    fetch("/api/admin/notification/load/edit", {
+-      method: "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body: JSON.stringify({
+-        notifications: [
+-          {
+-            id: alert.id,
+-            name: newForm.name,
+-            metric: newForm.metric,
+-            threshold: newForm.threshold,
+-            ratio: newForm.ratio,
+-            clients: newForm.clients,
+-            interval: newForm.interval,
+-          },
+-        ],
+-      }),
+-    })
+-      .then((res) => {
+-        if (!res.ok) {
+-          return res.json().then((data) => {
+-            throw new Error(data?.message || t("common.error"));
+-          });
+-        }
+-        return res.json();
+-      })
+-      .then(() => {
+-        setEditOpen(false);
+-        toast.success(t("common.updated_successfully"));
+-        refresh();
+-      })
+-      .catch((error) => {
+-        toast.error(error.message);
+-      })
+-      .finally(() => setEditSaving(false));
+-  };
+-
+-  // 编辑提交
+-  const handleEdit = (e: React.FormEvent<HTMLFormElement>) => {
+-    e.preventDefault();
+-    submitEdit(form);
+-  };
+-
+-  // 删除
+-  const handleDelete = () => {
+-    setDeleteLoading(true);
+-    fetch("/api/admin/notification/load/delete", {
+-      method: "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body: JSON.stringify({ id: [alert.id] }),
+-    })
+-      .then((res) => {
+-        if (!res.ok) {
+-          return res.json().then((data) => {
+-            throw new Error(data?.message || t("common.error"));
+-          });
+-        }
+-        return res.json();
+-      })
+-      .then(() => {
+-        setDeleteOpen(false);
+-        toast.success(t("common.deleted_successfully"));
+-        refresh();
+-      })
+-      .catch((error) => {
+-        toast.error(error.message);
+-      })
+-      .finally(() => setDeleteLoading(false));
+-  };
+-
+-  return (
+-    <TableRow key={alert.id}>
+-      <TableCell>{alert.name}</TableCell>
+-      <TableCell>
+-        <Flex gap="2" align="center">
+-          {alert.clients && alert.clients.length > 0
+-            ? (() => {
+-                const names = alert.clients.map((uuid) => {
+-                  const name =
+-                    nodeDetail.find((node) => node.uuid === uuid)?.name || uuid;
+-                  return name;
+-                });
+-                const joined = names.join(", ");
+-                return joined.length > 40
+-                  ? joined.slice(0, 40) + "..."
+-                  : joined;
+-              })()
+-            : t("common.none")}
+-          <NodeSelectorDialog
+-            value={form.clients ?? []}
+-            hiddenUuidOnlyClient
+-            onChange={(uuids) => {
+-              setForm((f) => ({ ...f, clients: uuids }));
+-              submitEdit({ ...form, clients: uuids });
+-            }}
+-          >
+-            <IconButton
+-              variant="ghost"
+-              title={t("common.select_clients", "Select clients")}
+-              aria-label={t("common.select_clients", "Select clients")}
+-            >
+-              <MoreHorizontal size="16" />
+-            </IconButton>
+-          </NodeSelectorDialog>
+-        </Flex>
+-      </TableCell>
+-      <TableCell>{alert.metric?.toUpperCase()}</TableCell>
+-      <TableCell>{alert.threshold}%</TableCell>
+-      <TableCell>{alert.ratio}</TableCell>
+-      <TableCell>
+-        {alert.interval} {t("time.minute")}
+-      </TableCell>
+-      <TableCell className="flex items-center gap-2">
+-        {/* 编辑按钮 */}
+-        <Dialog.Root open={editOpen} onOpenChange={setEditOpen}>
+-          <Dialog.Trigger>
+-            <IconButton
+-              variant="soft"
+-              title={t("common.edit", "Edit")}
+-              aria-label={t("common.edit", "Edit")}
+-            >
+-              <Pencil size="16" />
+-            </IconButton>
+-          </Dialog.Trigger>
+-          <Dialog.Content>
+-            <Dialog.Title>{t("common.edit")}</Dialog.Title>
+-            <form onSubmit={handleEdit} className="flex flex-col gap-2">
+-              <label>{t("common.name")}</label>
+-              <TextField.Root
+-                value={form.name}
+-                onChange={(e) =>
+-                  setForm((f) => ({ ...f, name: e.target.value }))
+-                }
+-                required
+-              />
+-              <label>{t("loadAlert.metric")}</label>
+-              <Select.Root
+-                value={form.metric}
+-                onValueChange={(v) =>
+-                  setForm((f) => ({ ...f, metric: v as any }))
+-                }
+-              >
+-                <Select.Trigger />
+-                <Select.Content>
+-                  <Select.Item value="cpu">CPU</Select.Item>
+-                  <Select.Item value="ram">RAM</Select.Item>
+-                  <Select.Item value="disk">Disk</Select.Item>
+-                  <Select.Item value="net_in">Net In</Select.Item>
+-                  <Select.Item value="net_out">Net Out</Select.Item>
+-                </Select.Content>
+-              </Select.Root>
+-              <label>{t("common.threshold")} (%)</label>
+-              <TextField.Root
+-                type="number"
+-                value={form.threshold}
+-                onChange={(e) =>
+-                  setForm((f) => ({ ...f, threshold: Number(e.target.value) }))
+-                }
+-                required
+-              />
+-              <label>{t("loadAlert.ratio")}</label>
+-              <TextField.Root
+-                type="number"
+-                step="0.1"
+-                min="0"
+-                max="1"
+-                value={form.ratio}
+-                onChange={(e) =>
+-                  setForm((f) => ({ ...f, ratio: Number(e.target.value) }))
+-                }
+-                required
+-              />
+-              <label>{t("common.server")}</label>
+-              <Flex>
+-                <NodeSelectorDialog
+-                  value={form.clients}
+-                  hiddenUuidOnlyClient
+-                  onChange={(v) => setForm((f) => ({ ...f, clients: v }))}
+-                />
+-              </Flex>
+-              <label>
+-                {t("ping.interval")} ({t("time.minute")})
+-              </label>
+-              <TextField.Root
+-                type="number"
+-                value={form.interval}
+-                onChange={(e) =>
+-                  setForm((f) => ({ ...f, interval: Number(e.target.value) }))
+-                }
+-                required
+-              />
+-              <Flex gap="2" justify="end" className="mt-4">
+-                <Dialog.Close>
+-                  <Button
+-                    variant="soft"
+-                    color="gray"
+-                    type="button"
+-                    onClick={() => setEditOpen(false)}
+-                  >
+-                    {t("common.cancel")}
+-                  </Button>
+-                </Dialog.Close>
+-                <Button variant="solid" type="submit" disabled={editSaving}>
+-                  {t("common.save")}
+-                </Button>
+-              </Flex>
+-            </form>
+-          </Dialog.Content>
+-        </Dialog.Root>
+-        {/* 删除按钮 */}
+-        <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
+-          <Dialog.Trigger>
+-            <IconButton
+-              variant="soft"
+-              color="red"
+-              title={t("common.delete", "Delete")}
+-              aria-label={t("common.delete", "Delete")}
+-            >
+-              <Trash size="16" />
+-            </IconButton>
+-          </Dialog.Trigger>
+-          <Dialog.Content>
+-            <Dialog.Title>{t("common.delete")}</Dialog.Title>
+-            <Flex gap="2" justify="end" className="mt-4">
+-              <Dialog.Close>
+-                <Button
+-                  variant="soft"
+-                  color="gray"
+-                  type="button"
+-                  onClick={() => setDeleteOpen(false)}
+-                >
+-                  {t("common.cancel")}
+-                </Button>
+-              </Dialog.Close>
+-              <Button
+-                variant="solid"
+-                color="red"
+-                onClick={handleDelete}
+-                disabled={deleteLoading}
+-              >
+-                {t("common.delete")}
+-              </Button>
+-            </Flex>
+-          </Dialog.Content>
+-        </Dialog.Root>
+-      </TableCell>
+-    </TableRow>
+-  );
+-};
+-
+-const AddButton: React.FC = () => {
+-  const { t } = useTranslation();
+-  const [isOpen, setIsOpen] = React.useState(false);
+-  const [selected, setSelected] = React.useState<string[]>([]);
+-  const { refresh } = useLoadAlert();
+-  const [selectedType, setSelectedType] = React.useState<
+-    "cpu" | "ram" | "disk" | "net_in" | "net_out"
+-  >("cpu");
+-  const [saving, setSaving] = React.useState(false);
+-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+-    e.preventDefault();
+-    const payload = {
+-      name: e.currentTarget.load_name.value,
+-      metric: selectedType,
+-      threshold: parseFloat(e.currentTarget.threshold.value),
+-      ratio: parseFloat(e.currentTarget.ratio.value),
+-      clients: selected,
+-      interval: parseInt(e.currentTarget.interval.value, 10),
+-    };
+-    setSaving(true);
+-    fetch("/api/admin/notification/load/add", {
+-      method: "POST",
+-      headers: {
+-        "Content-Type": "application/json",
+-      },
+-      body: JSON.stringify(payload),
+-    })
+-      .then((response) => {
+-        if (response.ok) {
+-          setIsOpen(false);
+-          setSelected([]);
+-          setSelectedType("cpu");
+-          toast.success(t("common.success"));
+-        } else {
+-          response
+-            .json()
+-            .then((data) => {
+-              toast.error(data?.message || t("common.error"));
+-            })
+-            .catch((error) => {
+-              toast.error(error.message);
+-            });
+-        }
+-      })
+-      .catch((error) => {
+-        console.error("Error adding load alert:", error);
+-        toast.error(error.message);
+-      })
+-      .finally(() => {
+-        setSaving(false);
+-        refresh();
+-      });
+-  };
+-  return (
+-    <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
+-      <Dialog.Trigger>
+-        <Button>{t("common.add")}</Button>
+-      </Dialog.Trigger>
+-      <Dialog.Content>
+-        <Dialog.Title>{t("common.add")}</Dialog.Title>
+-        <form onSubmit={handleSubmit} className="km-notification-load-form">
+-          <Flex direction="column" justify="end" gap="2" className="font-bold">
+-            <label htmlFor="load_name">{t("common.name")}</label>
+-            <TextField.Root id="load_name" name="load_name" />
+-            <label htmlFor="type">{t("loadAlert.metric")}</label>
+-            <Select.Root
+-              value={selectedType}
+-              onValueChange={(value) =>
+-                setSelectedType(
+-                  value as "cpu" | "ram" | "disk" | "net_in" | "net_out",
+-                )
+-              }
+-            >
+-              <Select.Trigger id="type" name="type" />
+-              <Select.Content>
+-                <Select.Item value="cpu">CPU</Select.Item>
+-                <Select.Item value="ram">RAM</Select.Item>
+-                <Select.Item value="disk">Disk</Select.Item>
+-                <Select.Item value="net_in">Net In(Mbps)</Select.Item>
+-                <Select.Item value="net_out">Net Out(Mbps)</Select.Item>
+-              </Select.Content>
+-            </Select.Root>
+-            <label htmlFor="threshold">{t("common.threshold")} (%/Mbps)</label>
+-            <TextField.Root
+-              id="threshold"
+-              name="threshold"
+-              type="number"
+-              defaultValue={80}
+-              step="0.1"
+-            />
+-            <label htmlFor="ratio">{t("loadAlert.ratio")}</label>
+-            <TextField.Root
+-              id="ratio"
+-              name="ratio"
+-              type="number"
+-              step="0.1"
+-              min="0"
+-              max="1"
+-              defaultValue={0.8}
+-            />
+-            <label htmlFor="select">{t("common.server")}</label>
+-            <div className="flex items-center justify-start gap-2">
+-              <NodeSelectorDialog value={selected} onChange={setSelected} />
+-              <label className="text-md font-normal">
+-                {t("common.selected", { count: selected.length })}
+-              </label>
+-            </div>
+-            <label htmlFor="interval">
+-              {t("ping.interval")} ({t("time.minute")})
+-            </label>
+-            <TextField.Root
+-              id="interval"
+-              name="interval"
+-              defaultValue={15}
+-              type="number"
+-              placeholder="15"
+-            />
+-            <div className="flex justify-end gap-2">
+-              <Dialog.Close>
+-                <Button variant="soft">{t("common.close")}</Button>
+-              </Dialog.Close>
+-              <Button disabled={saving} type="submit">
+-                {t("common.add")}
+-              </Button>
+-            </div>
+-          </Flex>
+-        </form>
+-      </Dialog.Content>
+-    </Dialog.Root>
+-  );
+-};
+-
+-export default LoadPage;
+diff --git a/src/pages/admin/notification/offline.tsx b/src/pages/admin/notification/offline.tsx
+deleted file mode 100644
+index b62497f..0000000
+--- a/src/pages/admin/notification/offline.tsx
++++ /dev/null
+@@ -1,441 +0,0 @@
+-import { Checkbox } from "@/components/ui/checkbox";
+-import {
+-  Table,
+-  TableBody,
+-  TableCell,
+-  TableHead,
+-  TableHeader,
+-  TableRow,
+-} from "@/components/ui/table";
+-import {
+-  NodeDetailsProvider,
+-  useNodeDetails,
+-} from "@/contexts/NodeDetailsContext";
+-import {
+-  OfflineNotificationProvider,
+-  useOfflineNotification,
+-  type OfflineNotification,
+-} from "@/contexts/NotificationContext";
+-import React from "react";
+-import { Pencil, Search } from "lucide-react";
+-import { useTranslation } from "react-i18next";
+-import {
+-  Badge,
+-  Button,
+-  Dialog,
+-  Flex,
+-  IconButton,
+-  Switch,
+-  TextField,
+-} from "@radix-ui/themes";
+-import { toast } from "sonner";
+-import Loading from "@/components/loading";
+-import Tips from "@/components/ui/tips";
+-
+-const OfflinePage = () => {
+-  return (
+-    <OfflineNotificationProvider>
+-      <NodeDetailsProvider>
+-        <InnerLayout />
+-      </NodeDetailsProvider>
+-    </OfflineNotificationProvider>
+-  );
+-};
+-const NotificationEditForm = ({
+-  initialValues,
+-  onSubmit,
+-  loading,
+-  onCancel,
+-}: {
+-  initialValues: { enable: boolean; cooldown: number; grace_period: number };
+-  onSubmit: (values: {
+-    enable: boolean;
+-    cooldown: number;
+-    grace_period: number;
+-  }) => void;
+-  loading?: boolean;
+-  onCancel?: () => void;
+-}) => {
+-  const { t } = useTranslation();
+-  const [enabled, setEnabled] = React.useState(initialValues.enable);
+-  // const [cooldown, setCooldown] = React.useState(initialValues.cooldown);
+-  const [grace, setGrace] = React.useState(initialValues.grace_period);
+-  return (
+-    <form
+-      onSubmit={(e) => {
+-        e.preventDefault();
+-        onSubmit({ enable: enabled, cooldown: 3000, grace_period: grace });
+-      }}
+-      className="km-notification-offline-form flex flex-col gap-2"
+-    >
+-      <label htmlFor="status">{t("common.status")}</label>
+-      <Switch
+-        id="status"
+-        name="status"
+-        checked={enabled}
+-        onCheckedChange={setEnabled}
+-      />
+-      {/* <label htmlFor="cooldown">{t("notification.offline.cooldown")}</label>
+-      <TextField.Root
+-        type="number"
+-        min={0}
+-        value={cooldown}
+-        onChange={e => setCooldown(Number(e.target.value))}
+-        id="cooldown"
+-        name="cooldown"
+-      /> */}
+-      <label htmlFor="grace_period" className="flex items-center gap-2">
+-        {t("notification.offline.grace_period")}<Tips>{t("notification.offline.grace_period_tip")}</Tips>
+-      </label>
+-      <TextField.Root
+-        type="number"
+-        min={0}
+-        value={grace}
+-        onChange={(e) => setGrace(Number(e.target.value))}
+-        id="grace_period"
+-        name="grace_period"
+-      />
+-      <Flex gap="2" justify="end" className="mt-4">
+-        {onCancel && (
+-          <Dialog.Close>
+-            <Button
+-              variant="soft"
+-              color="gray"
+-              type="button"
+-              onClick={onCancel}
+-            >
+-              {t("common.cancel")}
+-            </Button>
+-          </Dialog.Close>
+-        )}
+-        <Button variant="solid" type="submit" disabled={loading}>
+-          {t("common.save")}
+-        </Button>
+-      </Flex>
+-    </form>
+-  );
+-};
+-
+-const InnerLayout = () => {
+-  const [search, setSearch] = React.useState("");
+-  const [selected, setSelected] = React.useState<string[]>([]);
+-  const {
+-    loading: onLoading,
+-    error: onError,
+-    offlineNotification,
+-    refresh,
+-  } = useOfflineNotification();
+-  const { isLoading: onNodeLoading, error: onNodeError } = useNodeDetails();
+-  const { t } = useTranslation();
+-  const [batchLoading, setBatchLoading] = React.useState(false);
+-  const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
+-  const [batchForm, setBatchForm] = React.useState({
+-    enable: true,
+-    cooldown: 1800,
+-    grace_period: 300,
+-  });
+-
+-  // 批量修改
+-  const handleBatchEdit = (values: {
+-    enable: boolean;
+-    cooldown: number;
+-    grace_period: number;
+-  }) => {
+-    setBatchLoading(true);
+-    const payload = selected.map((id) => ({
+-      client: id,
+-      enable: values.enable,
+-      cooldown: values.cooldown,
+-      grace_period: values.grace_period,
+-    }));
+-    fetch("/api/admin/notification/offline/edit", {
+-      method: "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body: JSON.stringify(payload),
+-    })
+-      .then((res) => {
+-        if (!res.ok) {
+-          toast.error(
+-            "Failed to update offline notifications: " + res.statusText
+-          );
+-        } else {
+-          toast.success(t("common.updated_successfully"));
+-        }
+-        return res.json();
+-      })
+-      .then(() => {
+-        setBatchLoading(false);
+-        setBatchDialogOpen(false);
+-        refresh();
+-      })
+-      .catch((error) => {
+-        console.error("Error updating offline notifications:", error);
+-        toast.error(t("common.error", { message: error.message }));
+-        setBatchLoading(false);
+-      });
+-  };
+-
+-  if (onLoading || onNodeLoading) {
+-    return <Loading text="(o゜▽゜)o☆" />;
+-  }
+-  if (onError || onNodeError) {
+-    return <div>Error: {onError?.message || onNodeError}</div>;
+-  }
+-  return (
+-    <div className="km-page-admin-notification-offline flex flex-col gap-4 md:p-4 p-1">
+-      <Flex justify="between" align="center" wrap="wrap">
+-        <label className="text-2xl font-semibold">
+-          {t("notification.offline.full_title", "离线通知设置")}
+-        </label>
+-        <TextField.Root
+-          type="text"
+-          className="max-w-64"
+-          placeholder={t("common.search")}
+-          value={search}
+-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+-            setSearch(e.target.value)
+-          }
+-        >
+-          <TextField.Slot>
+-            <Search size={16} />
+-          </TextField.Slot>
+-        </TextField.Root>
+-      </Flex>
+-      <OfflineNotificationTable
+-        search={search}
+-        selected={selected}
+-        onSelectionChange={setSelected}
+-      />
+-      <label className="text-sm text-muted-foreground">
+-        {t("common.selected", {
+-          count: selected.length,
+-        })}
+-      </label>
+-      <Flex gap="2" align="center">
+-        <Dialog.Root open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+-          <Dialog.Trigger>
+-            <Button
+-              variant="soft"
+-              onClick={() => {
+-                // 默认取第一个选中项的配置作为初始值
+-                const first = offlineNotification.find(
+-                  (n) => n.client === selected[0]
+-                );
+-                setBatchForm({
+-                  enable: first?.enable ?? true,
+-                  cooldown: first?.cooldown ?? 1800,
+-                  grace_period: first?.grace_period ?? 300,
+-                });
+-              }}
+-              disabled={batchLoading || selected.length === 0}
+-            >
+-              {t("common.batch_edit")}
+-            </Button>
+-          </Dialog.Trigger>
+-          <Dialog.Content>
+-            <Dialog.Title>{t("common.batch_edit")}</Dialog.Title>
+-            <NotificationEditForm
+-              initialValues={batchForm}
+-              loading={batchLoading}
+-              onSubmit={handleBatchEdit}
+-              onCancel={() => setBatchDialogOpen(false)}
+-            />
+-          </Dialog.Content>
+-        </Dialog.Root>
+-      </Flex>
+-      <label className="km-notification-offline-preview text-sm text-muted-foreground">
+-        <span
+-          dangerouslySetInnerHTML={{ __html: t("notification.offline.tips") }}
+-        />
+-      </label>
+-    </div>
+-  );
+-};
+-
+-const OfflineNotificationTable = ({
+-  search,
+-  selected,
+-  onSelectionChange,
+-}: {
+-  search: string;
+-  selected: string[];
+-  onSelectionChange: (ids: string[]) => void;
+-}) => {
+-  const { offlineNotification } = useOfflineNotification();
+-  const { nodeDetail } = useNodeDetails();
+-  const { t } = useTranslation();
+-  const filtered = [...nodeDetail]
+-    .sort((a, b) => a.weight - b.weight)
+-    .filter((node) => node.name.toLowerCase().includes(search.toLowerCase()));
+-  return (
+-    <div className="rounded-lg overflow-hidden">
+-      <Table>
+-        <TableHeader>
+-          <TableRow>
+-            <TableHead className="w-6">
+-              <Checkbox
+-                checked={
+-                  selected.length === filtered.length
+-                    ? true
+-                    : selected.length > 0
+-                    ? "indeterminate"
+-                    : false
+-                }
+-                onCheckedChange={(checked) =>
+-                  onSelectionChange(checked ? filtered.map((n) => n.uuid) : [])
+-                }
+-              />
+-            </TableHead>
+-            <TableHead>{t("common.server")}</TableHead>
+-            <TableHead>{t("common.status")}</TableHead>
+-            {/* <TableHead>{t("notification.offline.cooldown")}</TableHead> */}
+-            <TableHead>{t("notification.offline.grace_period")}</TableHead>
+-            <TableHead>{t("notification.offline.last_notified")}</TableHead>
+-            <TableHead>{t("common.action")}</TableHead>
+-          </TableRow>
+-        </TableHeader>
+-        <TableBody>
+-          {filtered.map((node) => (
+-            <TableRow key={node.uuid}>
+-              <TableCell>
+-                <Checkbox
+-                  checked={selected.includes(node.uuid)}
+-                  onCheckedChange={(checked) => {
+-                    if (checked) {
+-                      onSelectionChange([...selected, node.uuid]);
+-                    } else {
+-                      onSelectionChange(
+-                        selected.filter((id) => id !== node.uuid)
+-                      );
+-                    }
+-                  }}
+-                />
+-              </TableCell>
+-              <TableCell>{node.name}</TableCell>
+-              <TableCell>
+-                <Badge
+-                  color={
+-                    offlineNotification.find((n) => n.client === node.uuid)
+-                      ?.enable
+-                      ? "green"
+-                      : "red"
+-                  }
+-                >
+-                  {offlineNotification.find((n) => n.client === node.uuid)
+-                    ?.enable
+-                    ? t("common.enabled")
+-                    : t("common.disabled")}
+-                </Badge>
+-              </TableCell>
+-              {/* <TableCell>
+-                {offlineNotification.find((n) => n.client === node.uuid)
+-                  ?.cooldown || 1800}{" "}
+-                {t("nodeCard.time_second")}
+-              </TableCell> */}
+-              <TableCell>
+-                {offlineNotification.find((n) => n.client === node.uuid)
+-                  ?.grace_period || 300}
+-                {t("nodeCard.time_second")}
+-              </TableCell>
+-              <TableCell>
+-                {(() => {
+-                  const lastNotified = offlineNotification.find(
+-                    (n) => n.client === node.uuid
+-                  )?.last_notified;
+-                  if (!lastNotified) return "-";
+-                  const date = new Date(lastNotified);
+-                  if (date.getFullYear() < 3)
+-                    return t("notification.offline.never_triggered");
+-                  return date.toLocaleString();
+-                })()}
+-              </TableCell>
+-              <TableCell>
+-                <ActionButtons
+-                  offlineNotifications={offlineNotification.find(
+-                    (n) => n.client === node.uuid
+-                  )}
+-                />
+-              </TableCell>
+-            </TableRow>
+-          ))}
+-        </TableBody>
+-      </Table>
+-    </div>
+-  );
+-};
+-
+-const ActionButtons = ({
+-  offlineNotifications,
+-}: {
+-  offlineNotifications: OfflineNotification | undefined;
+-}) => {
+-  const { t } = useTranslation();
+-  const { refresh } = useOfflineNotification();
+-  const [editOpen, setEditOpen] = React.useState(false);
+-  const [editSaving, setEditSaving] = React.useState(false);
+-
+-  return (
+-    <Flex gap="2" align="center">
+-      <Dialog.Root open={editOpen} onOpenChange={setEditOpen}>
+-        <Dialog.Trigger>
+-          <IconButton
+-            variant="ghost"
+-            title={t("common.edit", "Edit")}
+-            aria-label={t("common.edit", "Edit")}
+-          >
+-            <Pencil size={16} />
+-          </IconButton>
+-        </Dialog.Trigger>
+-        <Dialog.Content>
+-          <Dialog.Title>{t("common.edit")}</Dialog.Title>
+-          <NotificationEditForm
+-            initialValues={{
+-              enable: offlineNotifications?.enable ?? false,
+-              cooldown: offlineNotifications?.cooldown ?? 1800,
+-              grace_period: offlineNotifications?.grace_period ?? 300,
+-            }}
+-            loading={editSaving}
+-            onSubmit={(values) => {
+-              setEditSaving(true);
+-              fetch("/api/admin/notification/offline/edit", {
+-                method: "POST",
+-                headers: { "Content-Type": "application/json" },
+-                body: JSON.stringify([
+-                  {
+-                    client: offlineNotifications?.client,
+-                    ...values,
+-                  },
+-                ]),
+-              })
+-                .then((res) => {
+-                  if (!res.ok) {
+-                    toast.error(
+-                      "Failed to save offline notification settings: " +
+-                        res.statusText
+-                    );
+-                  }
+-                  toast.success(t("common.updated_successfully"));
+-                  return res.json();
+-                })
+-                .then(() => {
+-                  setEditOpen(false);
+-                  refresh();
+-                  setEditSaving(false);
+-                })
+-                .catch((error) => {
+-                  console.error(
+-                    "Error saving offline notification settings:",
+-                    error
+-                  );
+-                  toast.error(t("common.error", { message: error.message }));
+-                });
+-            }}
+-            onCancel={() => setEditOpen(false)}
+-          />
+-        </Dialog.Content>
+-      </Dialog.Root>
+-    </Flex>
+-  );
+-};
+-
+-export default OfflinePage;
+diff --git a/src/pages/admin/notification/traffic_report.tsx b/src/pages/admin/notification/traffic_report.tsx
+deleted file mode 100644
+index 531f5fc..0000000
+--- a/src/pages/admin/notification/traffic_report.tsx
++++ /dev/null
+@@ -1,481 +0,0 @@
+-import { Checkbox } from "@/components/ui/checkbox";
+-import {
+-  Table,
+-  TableBody,
+-  TableCell,
+-  TableHead,
+-  TableHeader,
+-  TableRow,
+-} from "@/components/ui/table";
+-import {
+-  NodeDetailsProvider,
+-  useNodeDetails,
+-} from "@/contexts/NodeDetailsContext";
+-import {
+-  TrafficReportNotificationProvider,
+-  useTrafficReportNotification,
+-  type TrafficReportNotification,
+-} from "@/contexts/TrafficReportContext";
+-import React from "react";
+-import { Pencil, Search } from "lucide-react";
+-import { useTranslation } from "react-i18next";
+-import {
+-  Badge,
+-  Button,
+-  Dialog,
+-  Flex,
+-  IconButton,
+-  Switch,
+-  TextField,
+-} from "@radix-ui/themes";
+-import { toast } from "sonner";
+-import Loading from "@/components/loading";
+-
+-const ensureCadenceSelected = (
+-  values: { enable: boolean; daily: boolean; weekly: boolean; monthly: boolean },
+-  t: (key: string, options?: Record<string, unknown>) => string
+-) => {
+-  if (values.enable && !values.daily && !values.weekly && !values.monthly) {
+-    throw new Error(t("notification.traffic_report.errors.select_cadence"));
+-  }
+-};
+-
+-const getErrorMessage = (
+-  error: unknown,
+-  t: (key: string, options?: Record<string, unknown>) => string
+-) => {
+-  return error instanceof Error ? error.message : t("common.error");
+-};
+-
+-const parseJsonOrThrow = async (res: Response, fallbackMessage: string) => {
+-  if (!res.ok) {
+-    const data = await res.json().catch(() => null);
+-    throw new Error(data?.message || fallbackMessage);
+-  }
+-  if (res.status === 204) {
+-    return null;
+-  }
+-
+-  const contentType = res.headers.get("content-type") || "";
+-  if (!contentType.includes("application/json")) {
+-    return null;
+-  }
+-
+-  const text = await res.text();
+-  if (!text) {
+-    return null;
+-  }
+-
+-  return JSON.parse(text);
+-};
+-
+-const TrafficReportPage = () => {
+-  return (
+-    <TrafficReportNotificationProvider>
+-      <NodeDetailsProvider>
+-        <InnerLayout />
+-      </NodeDetailsProvider>
+-    </TrafficReportNotificationProvider>
+-  );
+-};
+-
+-// 表单：编辑单条或批量修改
+-const TrafficReportEditForm = ({
+-  initialValues,
+-  onSubmit,
+-  loading,
+-  onCancel,
+-}: {
+-  initialValues: { enable: boolean; daily: boolean; weekly: boolean; monthly: boolean };
+-  onSubmit: (values: { enable: boolean; daily: boolean; weekly: boolean; monthly: boolean }) => void;
+-  loading?: boolean;
+-  onCancel?: () => void;
+-}) => {
+-  const { t } = useTranslation();
+-  const [enabled, setEnabled] = React.useState(initialValues.enable);
+-  const [daily, setDaily] = React.useState(initialValues.daily);
+-  const [weekly, setWeekly] = React.useState(initialValues.weekly);
+-  const [monthly, setMonthly] = React.useState(initialValues.monthly);
+-
+-  return (
+-    <form
+-      onSubmit={(e) => {
+-        e.preventDefault();
+-        onSubmit({ enable: enabled, daily, weekly, monthly });
+-      }}
+-      className="km-notification-traffic-form flex flex-col gap-3"
+-    >
+-      <label htmlFor="status">{t("common.status")}</label>
+-      <Switch
+-        id="status"
+-        name="status"
+-        checked={enabled}
+-        onCheckedChange={setEnabled}
+-      />
+-
+-      <label className="font-medium mt-2">
+-        {t("notification.traffic_report.report_type")}
+-      </label>
+-      <Flex direction="column" gap="2">
+-        <label className="flex items-center gap-2 cursor-pointer">
+-          <Checkbox
+-            id="daily"
+-            checked={daily}
+-            onCheckedChange={(v) => setDaily(!!v)}
+-          />
+-          <span>{t("notification.traffic_report.daily")}</span>
+-        </label>
+-        <label className="flex items-center gap-2 cursor-pointer">
+-          <Checkbox
+-            id="weekly"
+-            checked={weekly}
+-            onCheckedChange={(v) => setWeekly(!!v)}
+-          />
+-          <span>{t("notification.traffic_report.weekly")}</span>
+-        </label>
+-        <label className="flex items-center gap-2 cursor-pointer">
+-          <Checkbox
+-            id="monthly"
+-            checked={monthly}
+-            onCheckedChange={(v) => setMonthly(!!v)}
+-          />
+-          <span>{t("notification.traffic_report.monthly")}</span>
+-        </label>
+-      </Flex>
+-
+-      <Flex gap="2" justify="end" className="mt-4">
+-        {onCancel && (
+-          <Dialog.Close>
+-            <Button variant="soft" color="gray" type="button" onClick={onCancel}>
+-              {t("common.cancel")}
+-            </Button>
+-          </Dialog.Close>
+-        )}
+-        <Button variant="solid" type="submit" disabled={loading}>
+-          {t("common.save")}
+-        </Button>
+-      </Flex>
+-    </form>
+-  );
+-};
+-
+-// 把三个 bool 转成展示文字
+-const reportTypeLabel = (
+-  n: TrafficReportNotification | undefined,
+-  t: (key: string) => string
+-): string => {
+-  if (!n) return "-";
+-  const parts: string[] = [];
+-  if (n.daily) parts.push(t("notification.traffic_report.daily"));
+-  if (n.weekly) parts.push(t("notification.traffic_report.weekly"));
+-  if (n.monthly) parts.push(t("notification.traffic_report.monthly"));
+-  return parts.length > 0
+-    ? parts.join(t("notification.traffic_report.separator"))
+-    : "-";
+-};
+-
+-const InnerLayout = () => {
+-  const [search, setSearch] = React.useState("");
+-  const [selected, setSelected] = React.useState<string[]>([]);
+-  const {
+-    loading: onLoading,
+-    error: onError,
+-    trafficReportNotification,
+-    refresh,
+-  } = useTrafficReportNotification();
+-  const { isLoading: onNodeLoading, error: onNodeError } = useNodeDetails();
+-  const { t } = useTranslation();
+-  const [batchLoading, setBatchLoading] = React.useState(false);
+-  const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
+-  const [batchForm, setBatchForm] = React.useState({
+-    enable: true,
+-    daily: false,
+-    weekly: false,
+-    monthly: false,
+-  });
+-
+-  const handleBatchEdit = (values: {
+-    enable: boolean;
+-    daily: boolean;
+-    weekly: boolean;
+-    monthly: boolean;
+-  }) => {
+-    try {
+-      ensureCadenceSelected(values, t);
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : t("common.error"));
+-      return;
+-    }
+-
+-    setBatchLoading(true);
+-    const payload = selected.map((id) => ({
+-      client: id,
+-      ...values,
+-    }));
+-    fetch("/api/admin/notification/traffic-report/edit", {
+-      method: "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body: JSON.stringify(payload),
+-    })
+-      .then((res) =>
+-        parseJsonOrThrow(
+-          res,
+-          t("notification.traffic_report.errors.update_failed")
+-        )
+-      )
+-      .then(() => {
+-        setBatchDialogOpen(false);
+-        toast.success(t("common.updated_successfully"));
+-        refresh();
+-      })
+-      .catch((error) => {
+-        console.error("Error updating traffic report notifications:", error);
+-        toast.error(getErrorMessage(error, t));
+-      })
+-      .finally(() => {
+-        setBatchLoading(false);
+-      });
+-  };
+-
+-  if (onLoading || onNodeLoading) {
+-    return <Loading text={t("loading")} />;
+-  }
+-  if (onError || onNodeError) {
+-    return <div>{t("common.error")}: {onError?.message || onNodeError}</div>;
+-  }
+-
+-  return (
+-    <div className="km-page-admin-notification-traffic-report flex flex-col gap-4 md:p-4 p-1">
+-      <Flex justify="between" align="center" wrap="wrap">
+-        <label className="text-2xl font-semibold">
+-          {t("notification.traffic_report.full_title")}
+-        </label>
+-        <TextField.Root
+-          type="text"
+-          className="max-w-64"
+-          placeholder={t("common.search")}
+-          value={search}
+-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+-            setSearch(e.target.value)
+-          }
+-        >
+-          <TextField.Slot>
+-            <Search size={16} />
+-          </TextField.Slot>
+-        </TextField.Root>
+-      </Flex>
+-
+-      <TrafficReportTable
+-        search={search}
+-        selected={selected}
+-        onSelectionChange={setSelected}
+-      />
+-
+-      <label className="text-sm text-muted-foreground">
+-        {t("common.selected", { count: selected.length })}
+-      </label>
+-
+-      <Flex gap="2" align="center">
+-        <Dialog.Root open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+-          <Dialog.Trigger>
+-            <Button
+-              variant="soft"
+-              onClick={() => {
+-                const first = trafficReportNotification.find(
+-                  (n) => n.client === selected[0]
+-                );
+-                setBatchForm({
+-                  enable: first?.enable ?? true,
+-                  daily: first?.daily ?? false,
+-                  weekly: first?.weekly ?? false,
+-                  monthly: first?.monthly ?? false,
+-                });
+-              }}
+-              disabled={batchLoading || selected.length === 0}
+-            >
+-              {t("common.batch_edit")}
+-            </Button>
+-          </Dialog.Trigger>
+-          <Dialog.Content>
+-            <Dialog.Title>{t("common.batch_edit")}</Dialog.Title>
+-            <TrafficReportEditForm
+-              initialValues={batchForm}
+-              loading={batchLoading}
+-              onSubmit={handleBatchEdit}
+-              onCancel={() => setBatchDialogOpen(false)}
+-            />
+-          </Dialog.Content>
+-        </Dialog.Root>
+-      </Flex>
+-    </div>
+-  );
+-};
+-
+-const TrafficReportTable = ({
+-  search,
+-  selected,
+-  onSelectionChange,
+-}: {
+-  search: string;
+-  selected: string[];
+-  onSelectionChange: (ids: string[]) => void;
+-}) => {
+-  const { trafficReportNotification } = useTrafficReportNotification();
+-  const { nodeDetail } = useNodeDetails();
+-  const { t } = useTranslation();
+-
+-  const filtered = [...nodeDetail]
+-    .sort((a, b) => a.weight - b.weight)
+-    .filter((node) => node.name.toLowerCase().includes(search.toLowerCase()));
+-
+-  return (
+-    <div className="km-notification-traffic-card rounded-lg overflow-hidden">
+-      <Table>
+-        <TableHeader>
+-          <TableRow>
+-            <TableHead className="w-6">
+-              <Checkbox
+-                checked={
+-                  selected.length === filtered.length
+-                    ? true
+-                    : selected.length > 0
+-                    ? "indeterminate"
+-                    : false
+-                }
+-                onCheckedChange={(checked) =>
+-                  onSelectionChange(checked ? filtered.map((n) => n.uuid) : [])
+-                }
+-              />
+-            </TableHead>
+-            <TableHead>{t("common.server")}</TableHead>
+-            <TableHead>{t("common.status")}</TableHead>
+-            <TableHead>{t("notification.traffic_report.report_type")}</TableHead>
+-            <TableHead>{t("common.action")}</TableHead>
+-          </TableRow>
+-        </TableHeader>
+-        <TableBody>
+-          {filtered.map((node) => {
+-            const n = trafficReportNotification.find(
+-              (item) => item.client === node.uuid
+-            );
+-            return (
+-              <TableRow key={node.uuid}>
+-                <TableCell>
+-                  <Checkbox
+-                    checked={selected.includes(node.uuid)}
+-                    onCheckedChange={(checked) => {
+-                      if (checked) {
+-                        onSelectionChange([...selected, node.uuid]);
+-                      } else {
+-                        onSelectionChange(
+-                          selected.filter((id) => id !== node.uuid)
+-                        );
+-                      }
+-                    }}
+-                  />
+-                </TableCell>
+-                <TableCell>{node.name}</TableCell>
+-                <TableCell>
+-                  <Badge color={n?.enable ? "green" : "red"}>
+-                    {n?.enable ? t("common.enabled") : t("common.disabled")}
+-                  </Badge>
+-                </TableCell>
+-                <TableCell>{reportTypeLabel(n, t)}</TableCell>
+-                <TableCell>
+-                  <ActionButtons
+-                    nodeUUID={node.uuid}
+-                    trafficReport={n}
+-                  />
+-                </TableCell>
+-              </TableRow>
+-            );
+-          })}
+-        </TableBody>
+-      </Table>
+-    </div>
+-  );
+-};
+-
+-const ActionButtons = ({
+-  nodeUUID,
+-  trafficReport,
+-}: {
+-  nodeUUID: string;
+-  trafficReport: TrafficReportNotification | undefined;
+-}) => {
+-  const { t } = useTranslation();
+-  const { refresh } = useTrafficReportNotification();
+-  const [editOpen, setEditOpen] = React.useState(false);
+-  const [editSaving, setEditSaving] = React.useState(false);
+-
+-  return (
+-    <Flex gap="2" align="center">
+-      <Dialog.Root open={editOpen} onOpenChange={setEditOpen}>
+-        <Dialog.Trigger>
+-          <IconButton
+-            variant="ghost"
+-            title={t("common.edit", "Edit")}
+-            aria-label={t("common.edit", "Edit")}
+-          >
+-            <Pencil size={16} />
+-          </IconButton>
+-        </Dialog.Trigger>
+-        <Dialog.Content>
+-          <Dialog.Title>{t("common.edit")}</Dialog.Title>
+-          <TrafficReportEditForm
+-            initialValues={{
+-              enable: trafficReport?.enable ?? false,
+-              daily: trafficReport?.daily ?? false,
+-              weekly: trafficReport?.weekly ?? false,
+-              monthly: trafficReport?.monthly ?? false,
+-            }}
+-            loading={editSaving}
+-            onSubmit={(values) => {
+-              try {
+-                ensureCadenceSelected(values, t);
+-              } catch (error) {
+-                toast.error(
+-                  error instanceof Error ? error.message : t("common.error")
+-                );
+-                return;
+-              }
+-
+-              setEditSaving(true);
+-              fetch("/api/admin/notification/traffic-report/edit", {
+-                method: "POST",
+-                headers: { "Content-Type": "application/json" },
+-                body: JSON.stringify([
+-                  {
+-                    client: nodeUUID,
+-                    ...values,
+-                  },
+-                ]),
+-              })
+-                .then((res) =>
+-                  parseJsonOrThrow(
+-                    res,
+-                    t("notification.traffic_report.errors.save_failed")
+-                  )
+-                )
+-                .then(() => {
+-                  setEditOpen(false);
+-                  toast.success(t("common.updated_successfully"));
+-                  refresh();
+-                })
+-                .catch((error) => {
+-                  console.error("Error saving traffic report settings:", error);
+-                  toast.error(getErrorMessage(error, t));
+-                })
+-                .finally(() => {
+-                  setEditSaving(false);
+-                });
+-            }}
+-            onCancel={() => setEditOpen(false)}
+-          />
+-        </Dialog.Content>
+-      </Dialog.Root>
+-    </Flex>
+-  );
+-};
+-
+-export default TrafficReportPage;
+diff --git a/src/routes.ts b/src/routes.ts
+index a7f3c08..6cb4a00 100644
+--- a/src/routes.ts
++++ b/src/routes.ts
+@@ -140,13 +140,6 @@ export const routes: RouteObject[] = [
+               lazy(() => import("./pages/admin/settings/sign-on"))
+             ),
+           },
+-          {
+-            path: "notification",
+-            element: React.createElement(Navigate, {
+-              to: "/admin/notification/channels",
+-              replace: true,
+-            }),
+-          },
+           {
+             path: "general",
+             element: React.createElement(
+@@ -167,56 +160,6 @@ export const routes: RouteObject[] = [
+           },
+         ],
+       },
+-      {
+-        path: "notification",
+-        children: [
+-          {
+-            index: true,
+-            element: React.createElement(Navigate, {
+-              to: "/admin/notification/channels",
+-              replace: true,
+-            }),
+-          },
+-          {
+-            path: "channels",
+-            element: React.createElement(
+-              lazy(() => import("./pages/admin/settings/_layout"))
+-            ),
+-            children: [
+-              {
+-                index: true,
+-                element: React.createElement(
+-                  lazy(() => import("./pages/admin/notification/channels"))
+-                ),
+-              },
+-            ],
+-          },
+-          {
+-            path: "offline",
+-            element: React.createElement(
+-              lazy(() => import("./pages/admin/notification/offline"))
+-            ),
+-          },
+-          {
+-            path: "load",
+-            element: React.createElement(
+-              lazy(() => import("./pages/admin/notification/load"))
+-            ),
+-          },
+-          {
+-            path: "general",
+-            element: React.createElement(
+-              lazy(() => import("./pages/admin/notification/general"))
+-            ),
+-          },
+-          {
+-            path: "traffic-report",
+-            element: React.createElement(
+-              lazy(() => import("./pages/admin/notification/traffic_report"))
+-            ),
+-          },
+-        ],
+-      },
+       {
+         path: "ping",
+         element: React.createElement(

@@ -105,14 +105,8 @@ func Run(ctx Context) error {
 		if err := migrateLegacyOidcConfig(db); err != nil {
 			return err
 		}
-		if err := migrateLegacyMessageSenderConfig(db); err != nil {
-			return err
-		}
 	}
 	if err := migrateLegacyClientInfo(db); err != nil {
-		return err
-	}
-	if err := migrateLegacyLoadNotification(db); err != nil {
 		return err
 	}
 	if err := migrateLegacyPingAllClientsExpansion(db); err != nil {
@@ -175,14 +169,6 @@ func hasTableColumn(db *gorm.DB, tableName, columnName string) bool {
 	return false
 }
 
-func migrateLegacyLoadNotification(db *gorm.DB) error {
-	if db.Migrator().HasColumn(&models.LoadNotification{}, "client") {
-		logger.InfoArgs("migration", "[>0.1.4] Rebuilding LoadNotification table....")
-		return db.Migrator().DropTable(&models.LoadNotification{})
-	}
-	return nil
-}
-
 func migrateLegacyOidcConfig(db *gorm.DB) error {
 	if db.Migrator().HasTable(&models.OidcProvider{}) {
 		return nil
@@ -218,94 +204,6 @@ func migrateLegacyOidcConfig(db *gorm.DB) error {
 		return err
 	}
 	return db.Model(&legacyModelConfig{}).Where("id = 1").Update("o_auth_provider", "github").Error
-}
-
-func migrateLegacyMessageSenderConfig(db *gorm.DB) error {
-	if db.Migrator().HasTable(&models.MessageSenderProvider{}) {
-		return nil
-	}
-
-	logger.InfoArgs("migration", "[>1.0.2] Migrate MessageSender configuration....")
-	var oldData struct {
-		TelegramBotToken   string `gorm:"column:telegram_bot_token"`
-		TelegramChatID     string `gorm:"column:telegram_chat_id"`
-		TelegramEndpoint   string `gorm:"column:telegram_endpoint"`
-		EmailHost          string `gorm:"column:email_host"`
-		EmailPort          int    `gorm:"column:email_port"`
-		EmailUsername      string `gorm:"column:email_username"`
-		EmailPassword      string `gorm:"column:email_password"`
-		EmailSender        string `gorm:"column:email_sender"`
-		EmailReceiver      string `gorm:"column:email_receiver"`
-		EmailUseSSL        bool   `gorm:"column:email_use_ssl"`
-		NotificationMethod string `gorm:"column:notification_method"`
-	}
-	if err := db.Raw("SELECT * FROM configs LIMIT 1").Scan(&oldData).Error; err != nil {
-		return fmt.Errorf("get legacy message sender config: %w", err)
-	}
-	if err := db.AutoMigrate(&models.MessageSenderProvider{}); err != nil {
-		return err
-	}
-
-	if oldData.NotificationMethod == "telegram" && oldData.TelegramBotToken != "" {
-		telegramConfig := map[string]interface{}{
-			"bot_token": oldData.TelegramBotToken,
-			"chat_id":   oldData.TelegramChatID,
-			"endpoint":  oldData.TelegramEndpoint,
-		}
-		if telegramConfig["endpoint"] == "" {
-			telegramConfig["endpoint"] = "https://api.telegram.org/bot"
-		}
-		if err := saveLegacyMessageSenderConfig(db, "telegram", telegramConfig); err != nil {
-			return err
-		}
-	}
-
-	if oldData.NotificationMethod == "email" && oldData.EmailHost != "" {
-		emailConfig := map[string]interface{}{
-			"host":     oldData.EmailHost,
-			"port":     oldData.EmailPort,
-			"username": oldData.EmailUsername,
-			"password": oldData.EmailPassword,
-			"sender":   oldData.EmailSender,
-			"receiver": oldData.EmailReceiver,
-			"use_ssl":  oldData.EmailUseSSL,
-		}
-		if err := saveLegacyMessageSenderConfig(db, "email", emailConfig); err != nil {
-			return err
-		}
-	}
-
-	for _, column := range []string{
-		"telegram_bot_token",
-		"telegram_chat_id",
-		"telegram_endpoint",
-		"email_host",
-		"email_port",
-		"email_username",
-		"email_password",
-		"email_sender",
-		"email_receiver",
-		"email_use_ssl",
-	} {
-		if hasTableColumn(db, "configs", column) {
-			if err := db.Migrator().DropColumn(&legacyModelConfig{}, column); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func saveLegacyMessageSenderConfig(db *gorm.DB, name string, config map[string]interface{}) error {
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("marshal legacy %s message sender config: %w", name, err)
-	}
-	return db.Save(&models.MessageSenderProvider{
-		Name:     name,
-		Addition: string(configJSON),
-	}).Error
 }
 
 func migrateLegacyConfigToItems(db *gorm.DB) error {

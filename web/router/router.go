@@ -93,7 +93,6 @@ func registerAdminRoutes(r *gin.Engine) {
 		uploadGroup.POST("/cancel", uploadHandler.Cancel)
 	}
 	g.GET("/test/geoip", jsonRpc.Bind("admin:testGeoip", jsonRpc.WithQuery("ip")))
-	g.POST("/test/sendMessage", jsonRpc.Bind("admin:testSendMessage"))
 	g.POST("/update/mmdb", admin.UpdateMmdbGeoIP)
 	g.POST("/update/user", admin.UpdateUser)
 	g.PUT("/update/favicon", admin.UploadFavicon)
@@ -153,8 +152,6 @@ func registerAdminRoutes(r *gin.Engine) {
 		settings.POST("/xtermjs", jsonRpc.Bind("admin:setXtermjsSettings", jsonRpc.WithMessage("settings saved")))
 		settings.POST("/oidc", jsonRpc.Bind("admin:setOidcProvider"))
 		settings.GET("/oidc", jsonRpc.Bind("admin:getOidcProvider", jsonRpc.WithQuery("provider")))
-		settings.POST("/message-sender", jsonRpc.Bind("admin:setMessageSenderProvider"))
-		settings.GET("/message-sender", jsonRpc.Bind("admin:getMessageSenderProvider", jsonRpc.WithQuery("provider")))
 	}
 
 	// database storage inspection and maintenance
@@ -203,29 +200,6 @@ func registerAdminRoutes(r *gin.Engine) {
 		clipboardGroup.POST("/:id", jsonRpc.Bind("admin:updateClipboard", jsonRpc.WithPath("id")))
 		clipboardGroup.POST("/remove", jsonRpc.Bind("admin:batchDeleteClipboard"))
 		clipboardGroup.POST("/:id/remove", jsonRpc.Bind("admin:deleteClipboard", jsonRpc.WithPath("id")))
-	}
-
-	// notifications
-	notificationGroup := g.Group("/notification")
-	{
-		notificationGroup.GET("/offline", jsonRpc.Bind("admin:listOfflineNotifications"))
-		notificationGroup.POST("/offline/edit", jsonRpc.Bind("admin:editOfflineNotification"))
-		notificationGroup.POST("/offline/enable", jsonRpc.Bind("admin:enableOfflineNotification"))
-		notificationGroup.POST("/offline/disable", jsonRpc.Bind("admin:disableOfflineNotification"))
-		loadAlert := notificationGroup.Group("/load")
-		{
-			loadAlert.GET("/", jsonRpc.Bind("admin:getAllLoadNotifications"))
-			loadAlert.POST("/add", jsonRpc.Bind("admin:addLoadNotification"))
-			loadAlert.POST("/delete", jsonRpc.Bind("admin:deleteLoadNotification"))
-			loadAlert.POST("/edit", jsonRpc.Bind("admin:editLoadNotification"))
-		}
-		trafficReport := notificationGroup.Group("/traffic-report")
-		{
-			trafficReport.GET("/", jsonRpc.Bind("admin:listTrafficReportNotifications"))
-			trafficReport.POST("/edit", jsonRpc.Bind("admin:editTrafficReportNotifications"))
-			trafficReport.POST("/enable", jsonRpc.Bind("admin:enableTrafficReportNotifications"))
-			trafficReport.POST("/disable", jsonRpc.Bind("admin:disableTrafficReportNotifications"))
-		}
 	}
 
 	// ping tasks

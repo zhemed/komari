@@ -2,7 +2,7 @@
 
 轻量、自托管的服务器监控：**单个 Go 二进制 + 内嵌 Web 前端**，由轻量 agent 上报指标。
 
-本仓库是**自维护分支**，版本线从 **0.0.1** 起步（当前 **0.0.2**），独立演进——**不跟随上游 1.5.x**。
+本仓库是**自维护分支**，版本线从 **0.0.1** 起步（当前 **0.0.3**），独立演进——**不跟随上游 1.5.x**。
 
 ## 与上游的关系
 
@@ -13,6 +13,9 @@
 与上游的刻意差异（完整说明见 [docs/MAINTAINING.md](./docs/MAINTAINING.md)）：
 
 - **移除插件系统**：插件市场、运行时、上传安装与插件 RPC 全部不存在。
+- **移除通知系统**：离线/负载/流量/到期/登录通知与全部通知渠道（Telegram、Webhook、Bark、
+  邮件、ServerChan 等）、通知设置页面均不存在。
+- **移除内嵌 JS 运行时**（`pkg/jsruntime`）：它本是插件与 JavaScript 通知渠道的宿主，随二者一并移除。
 - **后台“发现新版本”检查指向本仓库**，不再提示升级到上游 1.5.x。
 - **默认主题产物 vendor 进仓库**：无需网络与 Node 即可构建后端。
 - **安装脚本指向本仓库并锁定 tag**，不会安装上游版本。
@@ -52,7 +55,7 @@ sudo bash install-komari.sh
 ```
 
 安装到 `/opt/komari`、创建 `komari` systemd 服务、默认端口 `25774`。
-脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.2`，`KOMARI_REPO` 可覆盖）。
+脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.3`，`KOMARI_REPO` 可覆盖）。
 
 ### Docker
 
@@ -62,8 +65,8 @@ sudo bash install-komari.sh
 KOMARI_STATIC=1 ./scripts/build-komari.sh          # 产出 bin/komari（静态）
 mkdir -p /tmp/komari-ctx && cp bin/komari /tmp/komari-ctx/komari-linux-amd64
 cp Dockerfile /tmp/komari-ctx/
-docker build -t komari:0.0.2 /tmp/komari-ctx
-docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.2
+docker build -t komari:0.0.3 /tmp/komari-ctx
+docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.3
 ```
 
 > `Dockerfile` 用 `ARG TARGETOS/TARGETARCH`（默认 `linux/amd64`）定位构建上下文里的

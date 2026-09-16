@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.2）
+# 维护本仓库（komari 自维护版 · 当前 0.0.3）
 
-本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.2**），由我们独立维护。
+本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.3**），由我们独立维护。
 
 - 上游后端：<https://github.com/komari-monitor/komari>
 - 上游前端：<https://github.com/komari-monitor/komari-web>
@@ -15,7 +15,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.2` | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion` |
+| 项目版本 | `0.0.3` | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion` |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端来源 | 上游 tag `1.4.3` → `4a74e8a81e2e4b1c3da8ad795f9523151efb6b56` | 记录于 `scripts/frontend-pin.env` |
 | 前端产物 | `web/public/defaultTheme/`（已 vendor 进仓库） | 目录树哈希记录于 `scripts/frontend-pin.env` |
@@ -94,7 +94,7 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 3. `git tag 0.0.2 && git push origin 0.0.2`
 4. `gh release create 0.0.2 --title 0.0.2 --notes "..." komari-linux-amd64 [komari-linux-arm64]`
 
-tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.2` 拉取）。
+tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.3` 拉取）。
 **本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
 
 > **`gh` 陷阱（0.0.1 发布时实际踩到）**：本仓库有两个 remote（`origin`=自有、`upstream`=只读参考），
@@ -137,7 +137,29 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - 流量报告：内置实现**仍可用**（上游计划在 1.5.0 移除，我们停留在 1.4.3 基线，故不受影响）；
   原先指向插件市场的引导提示已删除。
 
-## 6. 已知遗留与注意事项
+## 6. 通知系统与内嵌 JS 运行时已移除
+
+**本仓库不包含通知系统**（0.0.3 起），与插件系统同样属于刻意决定：
+
+- 已删除：`utils/messageSender/`（框架 + 8 个渠道：bark/email/javascript/serverchan3/
+  serverchanturbo/telegram/webhook/empty）、`utils/notifier/`（离线、负载、流量、
+  流量报告、到期提醒）、`database/notification/`、通知相关模型与迁移步骤、
+  通知 RPC 与路由、`admin:testSendMessage`、调度任务（`notifier:traffic`/`notifier:expire`）、
+  以及 `internal/config/settings.go` 里的通知配置项。
+- 调用点重接线（0.0.3 实际改动）：agent 上/下线改为 `logger.Infof("client-api", ...)`
+  日志（`web/api/client/report.go`、`report_v2.go`）；登录改为 `auditlog.EventLog("auth", ...)`
+  审计记录（`database/accounts/sessions.go`——此前登录**只有**通知这一条痕迹，故必须补）；
+  续费路径本就有 `auditlog.EventLog("renewal", ...)`，无需补。
+- 前端（补丁 `0005-drop-notification-system.patch`，纯删除 1,789 行）：删除
+  `pages/admin/notification/`（channels/general/load/offline/traffic_report）、通知菜单组与路由。
+- **`pkg/jsruntime`（46 文件 / 11,427 行）随之一并移除**：它的消费者只剩插件系统（更早移除）
+  与 JavaScript 通知渠道；同时从 `go.mod` 去掉了 goja / goja_nodejs / base64dec。
+- 数据库中的历史通知表**保留**（孤儿表），迁移步骤已删除但表与数据不动。
+- **不要再重新引入**：从上游 cherry-pick 时若带回这些文件，必须重新剔除。
+
+注：`pkg/rpc` 里的 `NewNotification` 是 JSON-RPC 协议概念（无 id 的通知型请求），与此无关，保留。
+
+## 7. 已知遗留与注意事项
 
 - **安全修复不会自动到来**：上游 1.5.x 之后的修复需我们自行判断是否 backport。
   决定采纳时有意识地 `git fetch upstream <ref>` 后 cherry-pick——`upstream` 的 fetch refspec
@@ -149,7 +171,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
   标识为 `CurrentVersion-VersionHash`。因此 1.4.3 → 0.0.1 首次启动会 zip 整个 `./data`
   （`dbcore.go:258`）；之后每次以**不同 commit** 重新构建再启动也会再备份一次（上游同样如此，只是上游只在发版时构建）。
 
-## 7. 回滚
+## 8. 回滚
 
 - **回滚前端 vendor**：删除 `web/public/defaultTheme/` 并 `git revert` 对应提交即可；
   注意此时 `go build` 会因 embed 缺失而失败，需重新运行 `sync-frontend.sh` 或恢复该目录。
@@ -157,7 +179,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **回滚插件系统移除**：`git revert` 该提交即可恢复插件代码与 1.4.3 版本号（vendored 产物在同一提交内）。
 - **部署侧回滚**：升级前自动生成的 `data/backup/upgrade-*.zip` 即为回滚素材。
 
-## 8. 克隆与推送
+## 9. 克隆与推送
 
 - **只构建不需要历史**：`git clone --depth 1 <本仓库>` 后即可 `./scripts/build-komari.sh`。
 - **推送需要完整历史**：若以 `--depth 1` 克隆后直接 `git push`，会因缺少被引用对象报
@@ -170,7 +192,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
   注意仅 `git fetch --unshallow` 可能**无效**（refspec 只覆盖那个 tag 且 tip 未变时不会加深），
   必须显式给出 refspec 并配合 `--refetch`。
 
-## 9. 提交历史与我们自己的仓库
+## 10. 提交历史与我们自己的仓库
 
 - **历史已于 2026-09-16 重写**：上游 835 个提交不再出现在历史中。上游代码以**单个快照根提交**
   引入（`chore: import komari 1.4.3 (upstream bf6b45ec) as our 0.0.1 code snapshot`），

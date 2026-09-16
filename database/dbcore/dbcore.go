@@ -450,12 +450,8 @@ func doInitialize() error {
 		&models.Client{},
 		&models.Log{},
 		&models.Clipboard{},
-		&models.LoadNotification{},
-		&models.OfflineNotification{},
-		&models.TrafficReportNotification{},
 		&models.PingTask{},
 		&models.OidcProvider{},
-		&models.MessageSenderProvider{},
 		&models.ThemeConfiguration{},
 	)
 	if err != nil {

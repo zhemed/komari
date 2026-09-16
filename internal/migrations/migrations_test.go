@@ -138,7 +138,6 @@ func TestRunPreservesVersion120RuntimeShape(t *testing.T) {
 	if err := db.AutoMigrate(
 		&appconfig.ConfigItem{},
 		&models.OidcProvider{},
-		&models.MessageSenderProvider{},
 		&models.Client{},
 		&models.PingTask{},
 	); err != nil {
@@ -164,9 +163,6 @@ func TestRunPreservesVersion120RuntimeShape(t *testing.T) {
 	if err := db.Create(&models.OidcProvider{Name: "github", Addition: `{"client_id":"old","client_secret":"secret"}`}).Error; err != nil {
 		t.Fatalf("seed oidc provider: %v", err)
 	}
-	if err := db.Create(&models.MessageSenderProvider{Name: "telegram", Addition: `{"bot_token":"old-token"}`}).Error; err != nil {
-		t.Fatalf("seed message sender provider: %v", err)
-	}
 
 	if err := Run(Context{DB: db}); err != nil {
 		t.Fatalf("run migrations: %v", err)
@@ -190,14 +186,6 @@ func TestRunPreservesVersion120RuntimeShape(t *testing.T) {
 	}
 	if oidc.Addition != `{"client_id":"old","client_secret":"secret"}` {
 		t.Fatalf("oidc provider was unexpectedly changed: %s", oidc.Addition)
-	}
-
-	var sender models.MessageSenderProvider
-	if err := db.First(&sender, "name = ?", "telegram").Error; err != nil {
-		t.Fatalf("find message sender provider: %v", err)
-	}
-	if sender.Addition != `{"bot_token":"old-token"}` {
-		t.Fatalf("message sender provider was unexpectedly changed: %s", sender.Addition)
 	}
 
 	var task models.PingTask

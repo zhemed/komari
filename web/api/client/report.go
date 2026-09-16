@@ -15,7 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/komari-monitor/komari/database/clients"
 	v1 "github.com/komari-monitor/komari/protocol/v1"
-	"github.com/komari-monitor/komari/utils/notifier"
 	agent_runtime "github.com/komari-monitor/komari/web/agent"
 	"github.com/komari-monitor/komari/web/api"
 	"github.com/komari-monitor/komari/web/connection"
@@ -63,7 +62,7 @@ func refreshPostPresence(uuid string) {
 	connID := time.Now().UnixNano()
 	agent_runtime.KeepAlivePresence(uuid, connID, postPresenceTTL)
 	agent_runtime.SetClientProtocolVersion(uuid, 1)
-	go notifier.OnlineNotification(uuid, connID)
+	logger.Infof("client-api", "Client %s online (POST session), connID: %d", uuid, connID)
 
 	defaultGeneration := uint64(0)
 
@@ -93,7 +92,7 @@ func postPresenceExpired(uuid string, connID int64, gen uint64) {
 	postPresenceMu.Unlock()
 
 	agent_runtime.SetPresence(uuid, connID, false)
-	notifier.OfflineNotification(uuid, connID)
+	logger.Infof("client-api", "Client %s offline (POST session expired), connID: %d", uuid, connID)
 }
 
 func UploadReport(c *gin.Context) {
@@ -194,11 +193,7 @@ func WebSocketReport(c *gin.Context) {
 	}
 	agent_runtime.SetConnectedClients(uuid, conn)
 	logger.Infof("client-api", "Client %s is reconnect success, connID: %d", uuid, conn.ID)
-	go notifier.OnlineNotification(uuid, conn.ID)
-	defer func() {
-		agent_runtime.DeleteClientConditionally(uuid, conn)
-		notifier.OfflineNotification(uuid, conn.ID)
-	}()
+	defer agent_runtime.DeleteClientConditionally(uuid, conn)
 
 	// 首先处理第一次ws conn收到的消息
 	processMessage(conn, message, uuid)
