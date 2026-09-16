@@ -2,22 +2,29 @@
 #
 # 构建 komari-agent（我们自己的 0.0.x 版本线）。
 #
-# 与服务器构建最大的不同：agent 是纯 Go（CGO_ENABLED=0），交叉编译只需要 Go，
-# **不需要 zig**，一次可以出全部 14 个平台（上游 build_all.sh 同口径）。
+# 源码就在本仓库的 agent/ 目录里（上游 komari-agent 的快照 + 我们内联的改动，见
+# docs/MAINTAINING.md §11），**不再克隆上游、不再打补丁**。纯 Go（CGO_ENABLED=0），
+# 交叉编译只需要 Go，不需要 zig/gcc，一次可出 14 个平台。
 #
 # 用法：
 #   ./scripts/build-agent.sh                        # 全部 14 个平台 → dist/agent/
-#   ./scripts/build-agent.sh --only linux/amd64     # 只构建一个平台（开发时快跑）
-#   KOMARI_VERSION=0.0.5 ./scripts/build-agent.sh   # 下一版本（见 scripts/version.env）
+#   ./scripts/build-agent.sh --only linux/amd64     # 单平台（开发时快跑）
+#   KOMARI_VERSION=0.0.6 ./scripts/build-agent.sh   # 下一版本（见 scripts/version.env）
 #   KOMARI_AGENT_OUTPUT=/tmp/agent ./scripts/build-agent.sh
 #
-# 产物命名与上游一致（komari-agent-<os>-<arch>[.exe]），因为
-# install-agent.sh、前端生成的安装命令、以及 agent 自更新的资产匹配都按这个名字找资产。
+# 产物命名与上游一致（komari-agent-<os>-<arch>[.exe]）：安装脚本、前端生成的安装命令、
+# agent 自更新的资产匹配三者都按这个名字找资产。
 #
-# 为什么二进制里必须带两项 -X 注入：
-#   update.CurrentVersion → 节点详情里显示的版本号
-#   update.Repo           → 自更新查询的仓库（必须是我们，不能是上游）
-# 另外补丁 0001 已把 Repo 的源码默认值也改成我们的仓库，注入只是双保险。
+# 为什么用 -buildvcs=false：agent 的身份是构建时注入的版本号（我们的 0.0.x 线），
+# 不该把本仓库的提交信息编进二进制——否则同一份 agent 源码在不同提交上构建出的产物不同。
+#
+# 构建期自检（改坏了会被拦下，不是装饰）：
+#   1. agent/update/update.go 里的 `Filters: []string{"^komari-agent-"}`：
+#      没有它，同 release 里的服务器二进制 komari-linux-amd64 会被当成 agent 的更新包
+#      （详见 docs/MAINTAINING.md §11.1，有实测对照实验）。
+#   2. agent/update/update.go 里的 `Repo string = "zhemed/komari"`：自更新只能指向我们。
+#   3. install-agent.sh / install-agent.ps1 里 pin 的默认版本必须等于本次 KOMARI_VERSION
+#      （发版时忘了同步会被拦下）。
 #
 set -euo pipefail
 
@@ -30,11 +37,11 @@ die() { printf '[build-agent] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # shellcheck source=scripts/version.env
 . "${SCRIPT_DIR}/version.env"
-# shellcheck source=scripts/agent-pin.env
-. "${SCRIPT_DIR}/agent-pin.env"
+# shellcheck source=scripts/agent-build.env
+. "${SCRIPT_DIR}/agent-build.env"
 
-PATCH_DIR="${SCRIPT_DIR}/patches-agent"
-WORK_DIR="${KOMARI_AGENT_WORK_DIR:-${REPO_ROOT}/.build/agent-src}"
+AGENT_SRC="${REPO_ROOT}/agent"
+WORK_DIR="${KOMARI_AGENT_WORK_DIR:-${AGENT_SRC}}"
 OUTPUT_DIR="${KOMARI_AGENT_OUTPUT:-${REPO_ROOT}/dist/agent}"
 ONLY=""
 
@@ -46,7 +53,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     -h|--help)
-      sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) die "未知参数：$1（只支持 --only <os>/<arch>）" ;;
@@ -54,120 +61,36 @@ while [ $# -gt 0 ]; do
 done
 
 command -v go >/dev/null 2>&1 || die "未找到 go 工具链"
-command -v git >/dev/null 2>&1 || die "未找到 git"
-[ -n "${KOMARI_AGENT_COMMIT:-}" ] || die "scripts/agent-pin.env 缺少 KOMARI_AGENT_COMMIT"
-
-# 目录树规范化哈希：排序 + 归零 mtime/owner + gzip -n，同一份内容跨机器同哈希。
-# （与 scripts/sync-frontend.sh 的 tree_hash 同口径。）
-tree_hash() {
-  ( cd "$1" && tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
-      --exclude=.git -cf - . | gzip -n -9 | sha256sum | awk '{print $1}' )
-}
+[ -f "${AGENT_SRC}/go.mod" ] || die "找不到 agent 源码：${AGENT_SRC}/go.mod 不存在。
+     agent 源码应当随仓库一起存在（本仓库不再用 pin + 补丁的方式去拉上游）。"
 
 GO_ACTUAL="$(go env GOVERSION)"
 if [ -n "${KOMARI_AGENT_GO_VERSION:-}" ] && [ "${GO_ACTUAL}" != "${KOMARI_AGENT_GO_VERSION}" ]; then
   log "注意：本机 Go 为 ${GO_ACTUAL}，发布记录为 ${KOMARI_AGENT_GO_VERSION}；版本不同不影响构建，但产物哈希会不同"
 fi
 
-# ---------- 1. 取到 pin 的 commit ----------
-if [ ! -d "${WORK_DIR}/.git" ]; then
-  log "克隆 ${KOMARI_AGENT_REPO} → ${WORK_DIR}"
-  rm -rf "${WORK_DIR}"
-  mkdir -p "$(dirname "${WORK_DIR}")"
-  git clone --filter=blob:none --no-checkout "${KOMARI_AGENT_REPO}" "${WORK_DIR}"
-fi
-cd "${WORK_DIR}"
-log "检出 ${KOMARI_AGENT_COMMIT}"
-if ! git fetch --depth 1 origin "${KOMARI_AGENT_COMMIT}" >/dev/null 2>&1; then
-  log "按 SHA 拉取失败，回退到 origin/main 后再试"
-  git fetch --depth 50 origin main >/dev/null 2>&1 \
-    || die "无法从 ${KOMARI_AGENT_REPO} 拉取 ${KOMARI_AGENT_COMMIT}"
-fi
-git checkout --force "${KOMARI_AGENT_COMMIT}" >/dev/null 2>&1 || die "无法检出 ${KOMARI_AGENT_COMMIT}"
-git clean -xfdq
-[ "$(git rev-parse HEAD)" = "${KOMARI_AGENT_COMMIT}" ] || die "HEAD 不是 pin 的 commit"
-
-# ---------- 2. 应用自有补丁 ----------
-shopt -s nullglob
-patches=("${PATCH_DIR}"/[0-9]*.patch)
-shopt -u nullglob
-[ ${#patches[@]} -gt 0 ] || die "未找到任何补丁：${PATCH_DIR}/[0-9]*.patch"
-for p in "${patches[@]}"; do
-  log "应用补丁 $(basename "$p")"
-  git apply --check "$p" || die "补丁无法应用（上游文件结构已变？）：$p"
-  git apply "$p"
-done
-
-# ---------- 3. pin 必须与服务器基线同期（不许偷偷跟上游新线） ----------
-# 0.0.4 的教训：agent 曾经 pin 在上游 agent 的 1.5.10（2026-09-15），比服务器 1.4.3
-# （2026-08-13）晚了一个月，带进 motd 安全告警注入、文件访问等 1.5 行为。
-if [ -n "${KOMARI_AGENT_MAX_COMMIT_DATE:-}" ]; then
-  PIN_DATE="$(git show -s --format=%cs "${KOMARI_AGENT_COMMIT}")"
-  if [ "${PIN_DATE}" \> "${KOMARI_AGENT_MAX_COMMIT_DATE}" ] && [ "${KOMARI_AGENT_ALLOW_NEWER:-0}" != "1" ]; then
-    die "agent pin 比服务器基线更新：pin=${KOMARI_AGENT_COMMIT}（${PIN_DATE}）> 上限 ${KOMARI_AGENT_MAX_COMMIT_DATE}。
-     本仓库只跟服务器的 1.4.3 血统，不跟上游 agent 1.5.x（理由见 docs/MAINTAINING.md §11.5）。
-     确实要前进时：先更新 scripts/agent-pin.env 的 KOMARI_AGENT_MAX_COMMIT_DATE 并说明原因，
-     或临时 KOMARI_AGENT_ALLOW_NEWER=1 放行。"
-  fi
-  log "pin 日期校验通过：${PIN_DATE} ≤ ${KOMARI_AGENT_MAX_COMMIT_DATE}"
-fi
-
-# ---------- 3. 仓库里的安装脚本成品必须与“pin 源码 + 补丁”的结果一致 ----------
-# 我们对外发的是 install-agent.sh / install-agent.ps1 两个成品文件（前端安装命令直接指向它们），
-# 所以这里回放补丁做比对，防止上游文件或补丁变了而仓库成品没重新生成。
-PINNED_VERSION="$(sed -n 's/^KOMARI_VERSION="\${KOMARI_VERSION:-\(.*\)}"$/\1/p' "${SCRIPT_DIR}/version.env")"
-if [ "${KOMARI_AGENT_SKIP_INSTALLER_CHECK:-0}" = "1" ]; then
-  log "注意：KOMARI_AGENT_SKIP_INSTALLER_CHECK=1，跳过安装脚本一致性校验"
-else
-  for pair in "install-agent.sh:install.sh" "install-agent.ps1:install.ps1"; do
-    vendored="${pair%%:*}"
-    upstream="${pair##*:}"
-    if ! diff -q "${upstream}" "${REPO_ROOT}/${vendored}" >/dev/null 2>&1; then
-      die "${vendored} 与“pin 源码 + 补丁回放”的结果不一致。
-     说明上游安装脚本或补丁变了，但仓库里的成品没重新生成。修复：
-       cp ${WORK_DIR}/${upstream} ${REPO_ROOT}/${vendored}
-     确认 diff 符合预期后再提交。"
-    fi
-    log "${vendored} 与补丁回放结果一致"
-  done
-
-  if [ "${KOMARI_VERSION}" = "${PINNED_VERSION}" ]; then
-    grep -q "^default_agent_version=\"${KOMARI_VERSION}\"$" "${REPO_ROOT}/install-agent.sh" \
-      || die "install-agent.sh 里 default_agent_version 不是 ${KOMARI_VERSION}（发版时忘了同步？）"
-    grep -q "^\$DefaultAgentVersion = \"${KOMARI_VERSION}\"$" "${REPO_ROOT}/install-agent.ps1" \
-      || die "install-agent.ps1 里 \$DefaultAgentVersion 不是 ${KOMARI_VERSION}（发版时忘了同步？）"
-    log "安装脚本 pin 的版本与构建版本一致：${KOMARI_VERSION}"
-  else
-    log "注意：KOMARI_VERSION=${KOMARI_VERSION} 与仓库默认版本 ${PINNED_VERSION} 不同，跳过安装脚本版本一致性校验"
-  fi
-fi
-
-# ---------- 3.5 补丁关键防线自检 ----------
-# 这两条是"节点会不会被刷成服务器二进制/会不会刷回上游版本"的最后一道防线：
-# 一旦有人删掉过滤或改了默认仓库，构建立刻失败，而不是等到某个节点的 agent 换血才发现。
-grep -q 'Filters: \[\]string{"\^komari-agent-"}' update/update.go \
-  || die "补丁 0001 的资产过滤不见了（update/update.go 里没有 Filters: []string{\"^komari-agent-\"}）。
+# ---------- 1. 关键防线自检 ----------
+grep -q 'Filters: \[\]string{"\^komari-agent-"}' "${AGENT_SRC}/update/update.go" \
+  || die "资产过滤不见了（agent/update/update.go 里没有 Filters: []string{\"^komari-agent-\"}）。
      没有它，agent 会把同 release 里的服务器二进制 komari-linux-amd64 当成自己的更新包。
      详见 docs/MAINTAINING.md §11.1。"
-grep -q 'Repo string = "zhemed/komari"' update/update.go \
-  || die "update/update.go 的自更新目标不是 zhemed/komari（补丁 0001 未生效或被改回上游？）"
+grep -q 'Repo string = "zhemed/komari"' "${AGENT_SRC}/update/update.go" \
+  || die "agent/update/update.go 的自更新目标不是 zhemed/komari。"
 log "关键防线自检通过（资产过滤 + 自更新目标）"
 
-# ---------- 4. 源码树哈希校验 ----------
-SRC_HASH="$(tree_hash "${WORK_DIR}")"
-log "打补丁后源码树哈希: ${SRC_HASH}"
-if [ -n "${AGENT_SOURCE_TREE_SHA256:-}" ]; then
-  if [ "${AGENT_SOURCE_TREE_SHA256}" != "${SRC_HASH}" ]; then
-    die "源码树哈希不一致：期望 ${AGENT_SOURCE_TREE_SHA256}，实际 ${SRC_HASH}。
-     说明 pin 的 commit 变了，或补丁内容/顺序变了。确认接受后把
-     scripts/agent-pin.env 的 AGENT_SOURCE_TREE_SHA256 更新为上面的实际值，并在提交信息里说明原因。"
-  fi
-  log "源码树哈希校验通过（与 scripts/agent-pin.env 一致）"
+# 安装脚本 pin 的版本：只有构建仓库默认版本时才硬校验（临时构建别的版本只提示）
+PINNED_VERSION="$(sed -n 's/^KOMARI_VERSION="\${KOMARI_VERSION:-\(.*\)}"$/\1/p' "${SCRIPT_DIR}/version.env")"
+if [ "${KOMARI_VERSION}" = "${PINNED_VERSION}" ]; then
+  grep -q "^default_agent_version=\"${KOMARI_VERSION}\"$" "${REPO_ROOT}/install-agent.sh" \
+    || die "install-agent.sh 里 default_agent_version 不是 ${KOMARI_VERSION}（发版时忘了同步？）"
+  grep -q "^\$DefaultAgentVersion = \"${KOMARI_VERSION}\"$" "${REPO_ROOT}/install-agent.ps1" \
+    || die "install-agent.ps1 里 \$DefaultAgentVersion 不是 ${KOMARI_VERSION}（发版时忘了同步？）"
+  log "安装脚本 pin 的版本与构建版本一致：${KOMARI_VERSION}"
 else
-  log "scripts/agent-pin.env 的 AGENT_SOURCE_TREE_SHA256 为空，请回填：AGENT_SOURCE_TREE_SHA256=\"${SRC_HASH}\""
+  log "注意：KOMARI_VERSION=${KOMARI_VERSION} 与仓库默认版本 ${PINNED_VERSION} 不同，跳过安装脚本版本一致性校验"
 fi
 
-# ---------- 5. 构建矩阵（与上游 build_all.sh 一致：14 个平台） ----------
+# ---------- 2. 构建矩阵（与上游 build_all.sh 一致：14 个平台） ----------
 OS_LIST=(windows linux darwin freebsd)
 ARCH_LIST=(amd64 arm64 386 arm loong64)
 LDFLAGS="-X github.com/komari-monitor/komari-agent/update.CurrentVersion=${KOMARI_VERSION} -X github.com/komari-monitor/komari-agent/update.Repo=${KOMARI_AGENT_UPDATE_REPO}"
@@ -176,7 +99,8 @@ rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}"
 : > "${OUTPUT_DIR}/SHA256SUMS"
 
-log "go build（Komari agent ${KOMARI_VERSION}，自更新目标 ${KOMARI_AGENT_UPDATE_REPO}，Go ${GO_ACTUAL}）"
+log "go build（Komari agent ${KOMARI_VERSION}，自更新目标 ${KOMARI_AGENT_UPDATE_REPO}，Go ${GO_ACTUAL}，源码 ${WORK_DIR}）"
+cd "${WORK_DIR}"
 for GOOS in "${OS_LIST[@]}"; do
   for GOARCH in "${ARCH_LIST[@]}"; do
     # 与上游 build_all.sh 相同的排除项：windows/arm、darwin/{386,arm}、非 linux 的 loong64
@@ -192,7 +116,7 @@ for GOOS in "${OS_LIST[@]}"; do
 
     log "构建 ${GOOS}/${GOARCH} → ${BINARY_NAME}"
     env CGO_ENABLED=0 "GOOS=${GOOS}" "GOARCH=${GOARCH}" \
-      go build -trimpath -ldflags="${LDFLAGS}" -o "${OUTPUT_DIR}/${BINARY_NAME}" .
+      go build -trimpath -buildvcs=false -ldflags="${LDFLAGS}" -o "${OUTPUT_DIR}/${BINARY_NAME}" .
     ( cd "${OUTPUT_DIR}" && sha256sum "${BINARY_NAME}" >> SHA256SUMS )
   done
 done
