@@ -100,3 +100,24 @@ go build ./... && go vet ./... && go test ./...
 GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh
 git status --short          # 确认没有漏提交的 vendor 产物
 ```
+
+---
+
+## 验收记录（2026-09-16 实际执行结果）
+
+| 步骤 | 实际结果 |
+|---|---|
+| Step 1 | **14 个平台**（计划里写的 17 是算错：windows/arm、darwin/{386,arm}、非 linux 的 loong64 共排除 6 个）；补丁后源码树哈希 `d28fe30d…`；`build-agent.sh` 两道门禁（安装脚本逐字节比对 + 版本一致性）均通过 |
+| Step 2 | 临时 release `0.0.99`（仅服务器资产）与 `0.0.98`（仅 agent 资产）实测：带过滤的实验组 → 跳过 0.0.99，抓到 0.0.98 的 agent 资产，更新后自证 `I-AM-AGENT`；**去掉过滤的对照组 → 抓到 0.0.99 的服务器二进制，自证 `I-AM-SERVER`**；验完 release/tag 已删除，`gh release list` 与远端 tag 均干净 |
+| Step 2 | 默认关自更新：无参数启动日志中 `Checking update` 出现 0 次；`--enable-auto-update` 才发起检查；旧 `-autoUpdate` 仍表示开启（有告警） |
+| Step 3 | `install-agent.sh` / `install-agent.ps1` 入库；补丁回放结果与仓库成品逐字节一致（`git apply` 到 pin 源码后 `diff -q` 通过）；本机无 pwsh，ps1 用去注释括号平衡 + 逐行人工核对 |
+| Step 4 | 补丁 0006 重放成功；产物哈希 `af0bd793…`（两次独立构建一致）；构建产物里 `raw.githubusercontent.com/zhemed/komari` + `install-agent.sh/.ps1` + `ghcr.io/zhemed/komari-agent:latest` + `--enable-auto-update` 均在，上游 agent 引用为 0 |
+| Step 5 | 镜像三平台（amd64/arm64/armv7）推送成功，manifest `sha256:9dbeed0f…`；从 registry 拉取运行正常，容器标记文件存在、跳过自更新日志正确；**首次推送在 arm/v7 上 `exec format error`（无 QEMU/binfmt）→ 改为纯 COPY 构建后解决** |
+| Step 6 | release `0.0.4` 共 17 个资产（14 agent + 2 服务器 + 1 SHA256SUMS）；tag 与二进制内嵌 hash 一致（`1a2288d`）；因 Dockerfile 修正晚于首次发布，**重新打过一次 tag 并重传资产**以保证 tag == 资产 == 镜像源码 |
+| Step 7 | 本地用**我们自己的安装脚本**（纯文本菜单驱动）从 0.0.3 升到 0.0.4：二进制 sha256 与 release 资产一致，启动触发一次自动备份；再用同款命令装 agent（自动发现）：`/opt/komari-agent`、服务 active、面板出现节点 `Auto-ubuntu` 版本 `0.0.4`、服务端日志 `Client … online (v2)`；截图 `.build/shots/komari-0.0.4-agent-node.png`；测试用的自动发现密钥已清空，agent 重启后复用已保存 token 重连（未重复注册） |
+| Step 8 | MAINTAINING 新增 §11 并修正 §5/§7；README 补 agent 章节；spec 修正两处与代码不符的说法（jsruntime、GOPROXY=off 并非 vendor 生效） |
+
+留档的三条坑：① 同 release 混装两种资产时自更新库按下缀匹配资产（补丁 0001 的过滤是必需品）；
+② 多架构镜像不能有 RUN（除非有 QEMU/binfmt）；③ raw.githubusercontent 的 refs/heads/main
+路径对新文件会短暂 404（约 10 分钟自愈）。
+

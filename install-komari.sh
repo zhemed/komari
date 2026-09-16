@@ -290,7 +290,7 @@ get_download_url() {
         log_info "最新 snapshot 版本: $latest_snapshot" >&2
         echo "https://github.com/${REPO}/releases/download/${latest_snapshot}/${file_name}"
     else
-        # 稳定版：锁定自有 tag（默认 0.0.3）。
+        # 稳定版：锁定自有 tag（REPO_TAG；当前版本线见仓库 scripts/version.env）。
         # 不能用 releases/latest——上游 latest 已是 1.5.x，与本 fork 维护目标不符。
         echo "https://github.com/${REPO}/releases/download/${REPO_TAG}/${file_name}"
     fi
