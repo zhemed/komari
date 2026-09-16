@@ -1,6 +1,8 @@
 # 维护本仓库（komari 自维护版 · 当前 0.0.5）
 
-本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.5**），由我们独立维护。
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.5**），
+服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
+上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
 - 上游后端：<https://github.com/komari-monitor/komari>
 - 上游前端：<https://github.com/komari-monitor/komari-web>
@@ -46,6 +48,17 @@
 
 > 上游 `.github/workflows/release.yml:105`（已随该目录移除）写的是 `go-version: "1.23"`，
 > 与 `go.mod` 的 `1.25.0` 不一致；**以 `go.mod` 为准**。
+
+## 2.1 仓库自检（一条命令跑完机械检查）
+
+```bash
+./scripts/check-repo.sh          # 秒级：版本字面量、文档路径/锚点、脚本语法、脏文件、密钥扫描、产物哈希、无克隆上游
+./scripts/check-repo.sh --full   # 追加：go build/vet/test、离线构建、agent 三道门禁
+```
+
+它只做**能机械判定**的检查，不猜意图；任何一项不通过都会打印具体文件与原因并以非 0 退出。
+涉及的检查项与"为什么这样查"都写在脚本头部注释里。**改文档/脚本后应当跑一次快速检查，
+发版前跑一次 `--full`。**
 
 ## 3. 日常操作
 
@@ -108,8 +121,8 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
    KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
    ```
 3. agent 全平台（14 个，纯 Go）：`./scripts/build-agent.sh`
-4. 自检：`./scripts/build-agent.sh --only linux/amd64` 必须通过它自带的两道门禁，
-   且 `go build ./... && go vet ./... && go test ./...` 全绿。
+4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含版本字面量一致性、文档锚点、
+   `go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希）。
 5. `git tag <版本> && git push origin <版本>`
 6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes "..." \
       dist/komari-linux-amd64 dist/komari-linux-arm64 dist/agent/komari-agent-*`
@@ -222,7 +235,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 - **`install-komari.sh` 的 tag 是字面量**：它是给 `curl | bash` 用的独立脚本，没法在运行时读
   `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步）。
 - **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
-  `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本 fork（无插件/无通知）
+  `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本仓库（无插件/无通知）
   有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。

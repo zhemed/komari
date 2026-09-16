@@ -15,10 +15,11 @@
 - **运维能力**：数据备份与恢复、审计日志、性能分析（pprof）
 - **节点自治**：agent 覆盖 linux/darwin/windows/freebsd 共 14 个平台，支持自动发现注册
 
-## 本 fork 的取舍
+## 这个版本与上游的差异
 
-本仓库是 [komari](https://github.com/komari-monitor/komari) 1.4.3 血统的**自维护分支**，
-版本线 `0.0.x`，**不是上游官方发行版**。刻意的差异：
+本仓库由 [zhemed](https://github.com/zhemed) 独立维护，版本线 `0.0.x`。代码源自上游
+[komari](https://github.com/komari-monitor/komari) 1.4.3，但此后与上游各走各的路：
+**不是上游官方发行版**，服务端、面板与 agent 的源码都在本仓库内，上游库只作为历史来源。
 
 - **没有插件系统**：插件市场、运行时、上传安装全都不存在；
 - **没有通知系统**：离线/负载/流量/到期/登录通知与 Telegram、Bark、Webhook 等渠道已整体移除——
@@ -114,8 +115,9 @@ go build ./... && go vet ./... && go test ./...
 本项目由 [zhemed](https://github.com/zhemed) 维护，版本线 `0.0.x`（发版递增 patch 位）。
 以 MIT 许可发布，见 [LICENSE](./LICENSE)；第三方组件归属见 [NOTICE](./NOTICE)。
 
-派生自上游 [komari-monitor/komari](https://github.com/komari-monitor/komari) `1.4.3`
-（commit `bf6b45ec`）与 [komari-monitor/komari-web](https://github.com/komari-monitor/komari-web)
-`1.4.3`（commit `4a74e8a8`）；agent 源码来自
-[komari-monitor/komari-agent](https://github.com/komari-monitor/komari-agent)。
-上游版权归其作者所有。
+历史来源（仅作来源说明，不代表本仓库与上游同步）：服务端与面板源自
+[komari-monitor/komari](https://github.com/komari-monitor/komari) `1.4.3`（commit `bf6b45ec`）与
+[komari-monitor/komari-web](https://github.com/komari-monitor/komari-web) `1.4.3`
+（commit `4a74e8a8`），agent 源自
+[komari-monitor/komari-agent](https://github.com/komari-monitor/komari-agent) 的 1.4.3 同期提交
+（commit `1186aafb`）。上游版权归其作者所有。

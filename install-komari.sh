@@ -33,9 +33,9 @@ BACKUP_DIR="$INSTALL_DIR/backup"
 DATA_BACKUP_DIR="$DATA_DIR/data/backup"
 DEFAULT_PORT="25774"
 LISTEN_PORT=""
-# 本 fork 只维护自有的 0.0.x 版本线：安装/升级一律走自有仓库，避免落到上游 latest（已是 1.5.x）。
+# 本仓库只维护自有的 0.0.x 版本线：安装/升级一律走本仓库，避免落到上游 latest（已是 1.5.x）。
 REPO="${KOMARI_REPO:-zhemed/komari}"
-# 自有发布 tag。本 fork 只维护自有版本线，故锁定 tag 而非使用 latest。
+# 自有发布 tag：本仓库只维护自有版本线，故锁定 tag 而非使用 latest。
 REPO_TAG="${KOMARI_TAG:-0.0.5}"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
@@ -168,7 +168,7 @@ show_banner() {
     clear
     echo "=============================================================="
     echo "            Komari Monitoring System Installer"
-    echo "       https://github.com/${REPO}  (komari ${REPO_TAG} fork)"
+    echo "       https://github.com/${REPO}  (zhemed/komari ${REPO_TAG})"
     echo "=============================================================="
     echo
 }
@@ -291,7 +291,7 @@ get_download_url() {
         echo "https://github.com/${REPO}/releases/download/${latest_snapshot}/${file_name}"
     else
         # 稳定版：锁定自有 tag（REPO_TAG；当前版本线见仓库 scripts/version.env）。
-        # 不能用 releases/latest——上游 latest 已是 1.5.x，与本 fork 维护目标不符。
+        # 不能用 releases/latest——上游 latest 已是 1.5.x，与本仓库维护目标不符。
         echo "https://github.com/${REPO}/releases/download/${REPO_TAG}/${file_name}"
     fi
 }

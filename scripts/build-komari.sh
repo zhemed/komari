@@ -24,7 +24,7 @@ cd "${REPO_ROOT}"
 log() { printf '[build-komari] %s\n' "$*" >&2; }
 die() { printf '[build-komari] ERROR: %s\n' "$*" >&2; exit 1; }
 
-# 版本号：本 fork 自有的 0.0.x 版本线（自 2026-09 起从上游 komari 1.4.3 派生，见 docs/MAINTAINING.md）。
+# 版本号：本仓库自有的 0.0.x 版本线（自 2026-09 起由上游 komari 1.4.3 派生，见 docs/MAINTAINING.md）。
 # 默认值集中在 scripts/version.env（发版只改那一处），KOMARI_VERSION 仍可覆盖。
 # shellcheck source=scripts/version.env
 . "${SCRIPT_DIR}/version.env"
