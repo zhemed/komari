@@ -117,3 +117,28 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: Session 6: agent 自有发行线（0.0.4）——单仓库发布 agent、默认关自更新、自建镜像
+<!-- trellis-session: v=2 fp=c2f9524d05bd847e -->
+
+**Date**: 2026-09-16
+**Task**: Session 6: agent 自有发行线（0.0.4）——单仓库发布 agent、默认关自更新、自建镜像
+**Branch**: `main`
+
+### Summary
+
+把 agent 纳入我们的发行线但不新增仓库：源码 pin 上游 9e532e04 + 补丁系列（自更新目标改指 zhemed/komari、selfupdate 资产过滤 ^komari-agent-、容器内跳过、默认关自动更新），agent 二进制作为本仓库 release 资产发布（14 平台，纯 Go 不需 zig），前端补丁 0006 把安装命令/镜像/关于页 README/GitHub 按钮改指本仓库，Dockerfile.agent + build-agent-image.sh 推 ghcr.io/zhemed/komari-agent。发布 0.0.4（17 个资产，tag==资产==镜像源码）并在本机端到端：用我们的安装脚本升级本地服务器（二进制 sha256 与 release 资产一致、触发自动备份），再用面板同款命令装 agent（自动发现）→ 节点 Auto-ubuntu 版本 0.0.4 在线、v2 协议、截图留档。关键发现：go-github-selfupdate 按下缀匹配资产，同一 release 混装服务器与 agent 二进制时 agent 会把自己刷成服务器二进制——用 0.0.99/0.0.98 两个临时 release 做了对照实验（带过滤 I-AM-AGENT / 去掉过滤 I-AM-SERVER）后把过滤写进补丁并加了构建期自检。教训：多架构镜像不能有 RUN（无 QEMU 时 exec format error）；raw.githubusercontent 的 refs/heads/main 对新文件会短暂 404（约 10 分钟自愈）；发版必须先提交再构建（二进制内嵌 VCS 信息）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2ba82cc` | feat(agent): 建立我们自己的 agent 发行线（0.0.4 基线） |
+| `1a2288d` | fix(agent): 镜像改为纯 COPY 构建，避免多架构构建依赖 QEMU |
+| `5d047d8` | docs(agent): 收尾 0.0.4——运维坑记录、过期注释修正与验收记录 |
+| `4e88360` | test(agent): 构建时自检“资产过滤 + 自更新目标”两条关键防线 |
+
+### Status
+
+[OK] **Completed**
