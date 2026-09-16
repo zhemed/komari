@@ -121,4 +121,19 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **回滚前端 vendor**：删除 `web/public/defaultTheme/` 并 `git revert` 对应提交即可；
   注意此时 `go build` 会因 embed 缺失而失败，需重新运行 `sync-frontend.sh` 或恢复该目录。
 - **回滚安装脚本/补丁**：`git checkout <commit> -- install-komari.sh scripts/`。
-- **本仓库整体**：主干为 `komari-1.4.3`；上游原始状态即该分支的第一个提交（tag 1.4.3）。
+- **本仓库整体**：主干为 `komari-1.4.3`；上游原始状态即该分支的历史基点（tag 1.4.3）。
+
+## 7. 克隆与推送
+
+- **只构建不需要历史**：`git clone --depth 1 <本仓库>` 后即可直接
+  `./scripts/build-komari.sh`（主题产物已随仓库下发）。
+- **推送需要完整历史**：若以 `--depth 1` 克隆后直接 `git push`，会因缺少被引用对象而报
+  `remote unpack failed: index-pack failed`（提交对象引用的父对象未随包发出）。
+  修复方式（本仓库首次推送时实际使用）：
+
+  ```bash
+  git fetch --unshallow --refetch upstream "+refs/tags/1.4.3:refs/tags/1.4.3"
+  ```
+
+  注意仅 `git fetch --unshallow` 可能**无效**（refspec 只覆盖 tag 且 tip 未变时不会加深），
+  必须显式给出 refspec 并配合 `--refetch`。
