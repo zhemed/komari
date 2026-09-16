@@ -1,5 +1,10 @@
 FROM alpine:3.21
 
+# OCI 标签：ghcr 包页面会链回本仓库，也便于溯源（见 docs/MAINTAINING.md §12）
+LABEL org.opencontainers.image.source="https://github.com/zhemed/komari" \
+      org.opencontainers.image.description="Komari Monitor 服务器（自维护 0.0.x 版本线）" \
+      org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 # 需要**静态链接**的二进制（见 docs/MAINTAINING.md：KOMARI_STATIC=1 构建）。

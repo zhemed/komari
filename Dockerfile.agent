@@ -17,6 +17,11 @@
 # 上下文里必须已有 komari-agent-${TARGETOS}-${TARGETARCH} 与 komari-agent-container。
 FROM alpine:3.21
 
+# OCI 标签：ghcr 包页面会链回本仓库，也便于溯源（见 docs/MAINTAINING.md §12）
+LABEL org.opencontainers.image.source="https://github.com/zhemed/komari" \
+      org.opencontainers.image.description="Komari Agent（自维护 0.0.x 版本线，随服务器同 release 发布）" \
+      org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 # Docker buildx 会在构建时自动填充这些变量；默认值让普通 docker build 也能工作

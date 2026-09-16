@@ -13,7 +13,7 @@
 | pre-commit 钩子 | 无 |
 | `gofmt` 一致性 | **当前树并非 gofmt-clean**：`gofmt -l` 列出 14 个文件（见 §3） |
 | CI 测试 | **本仓库没有 CI**：上游 `.github/workflows/`（10 个 workflow，只做前端构建 + `go build`，**无 `go test` / `go vet`**）已于 2026-09-16 整体移除 |
-| README 构建说明 | 上游 README 已删除；我们的 `README.md` **有**构建与自检命令（普通/静态构建、`go build`/`vet`/`test`、离线构建） |
+| README 构建说明 | README 已改成**产品视角短文**（定位/特性/部署/维护）；构建与发布命令在 `docs/MAINTAINING.md` §3，README 只保留 `go build/vet/test` 自检三段 |
 | `CONTRIBUTING.md` | 不存在 |
 
 所以：**质量靠自己跑命令 + code review**，不要假设推上去会被拦住。

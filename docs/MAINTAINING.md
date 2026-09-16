@@ -125,6 +125,35 @@ tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TA
 > `tag 0.0.1 exists locally but has not been pushed to komari-monitor/komari`。
 > 发布时给 `gh` 显式加 `-R zhemed/komari`。
 
+### 3.5 命令行子命令
+
+服务器只有一个二进制，子命令见 `cmd/`（实测 `komari --help`）：
+
+| 命令 | 用途 |
+|---|---|
+| `komari server` | 启动服务；`-l/--listen` 指定监听地址（默认 `0.0.0.0:25774`，也可用环境变量 `KOMARI_LISTEN`） |
+| `komari chpasswd` | 忘记密码时强制改管理员密码 |
+| `komari disable-2fa` | 丢弃 2FA 配置 |
+| `komari permit-login` | 恢复密码登录（例如 SSO/OIDC 配置出错登不进去时） |
+
+全局参数：`-d/--database`（默认 `./data/komari.db`）、`-t/--db-type`（默认 `sqlite`）。
+CLI 的帮助文本里保留着上游作者署名（`Made by Akizon77 with love.`），归属信息同时由
+`LICENSE` / `NOTICE` 承载。
+
+### 3.6 数据与备份
+
+| 路径 | 说明 |
+|---|---|
+| `./data/komari.db` | 主库（配置、账号、节点） |
+| `./data/metrics.db` | 指标库 |
+| `./data/theme/` | 已安装主题 |
+| `./data/backup/` | 备份归档 |
+
+- 数据目录跟**工作目录**走（Docker 镜像里是 `/app/data`，systemd 单元里是 `/opt/komari/data`）。
+- 二进制的版本标识（`CurrentVersion-VersionHash`）与库中记录不一致时，启动会先把整个 `./data`
+  打包到 `data/backup/upgrade-<时间>.zip` 再继续（见 §7 最后一条）。
+- 后台可以上传备份并自动重启以应用。
+
 ## 4. 与上游的解耦点
 
 | 位置 | 改动 | 原因 |
@@ -195,6 +224,9 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **关于页/GitHub 按钮已指向我们**（补丁 0006）：`src/pages/admin/about.tsx` 读的是本仓库 README。
 - **`install-komari.sh` 的 tag 是字面量**：它是给 `curl | bash` 用的独立脚本，没法在运行时读
   `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步）。
+- **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
+  `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本 fork（无插件/无通知）
+  有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
@@ -302,3 +334,32 @@ agent 可能把自己刷成**服务器二进制**。
 我们**无法**远程改变别人机器上已装的上游 agent：它内部指向 `komari-monitor/komari-agent`，
 默认每 6 小时自更新到上游最新（当前 `1.5.10`）。能做的只有引导重装（面板里的安装命令已经
 指向我们的脚本）。服务器侧**不做版本闸门**，上游 agent 仍能正常上报（协议 v1/v2 未变）。
+
+## 12. 容器镜像
+
+两个镜像都发布在 ghcr.io 下，公开可拉：
+
+| 镜像 | 内容 | 平台 | 构建脚本 |
+|---|---|---|---|
+| `ghcr.io/zhemed/komari` | 服务器（alpine + 静态二进制） | amd64、arm64 | `scripts/build-server-image.sh --push` |
+| `ghcr.io/zhemed/komari-agent` | agent | amd64、arm64、armv7 | `scripts/build-agent-image.sh --push` |
+
+发布时（§3.4 第 7 步）：
+
+```bash
+gh auth token | docker login ghcr.io -u zhemed --password-stdin
+./scripts/build-server-image.sh --push    # 依赖 dist/komari-linux-{amd64,arm64}，且必须静态链接
+./scripts/build-agent-image.sh --push     # 依赖 dist/agent/komari-agent-linux-{amd64,arm64,arm}
+```
+
+- 版本号取自 `scripts/version.env`；`:latest` 与 `:<版本>` 一起推。
+- 两个脚本在缺产物、或产物不是静态链接时会**直接报错**，不会推一个跑不起来的镜像。
+- 服务器镜像里有 `RUN apk add`，跨架构构建需要本机有 QEMU/binfmt：
+  `docker run --privileged --rm tonistiigi/binfmt --install arm64`；
+  agent 镜像**刻意不含任何 RUN**（只有 COPY），因此不需要模拟器（0.0.4 实测）。
+- **包可见性只能手点**：用户级 ghcr 包的可见性无法用 API 改（`PATCH /user/packages/...`
+  实测一律 404，连已公开的包也一样），新建的包默认 **private**。要公开得去
+  `https://github.com/users/<user>/packages/container/<包名>/settings` → Change visibility → Public。
+- 验证公开可拉：`DOCKER_CONFIG=<空目录> docker manifest inspect ghcr.io/zhemed/komari:latest`
+  （匿名成功即公开；`:latest` 与 `:<版本>` 都要过一遍）。
+- Dockerfile 里带 `org.opencontainers.image.source` 标签，ghcr 包页面会链回本仓库。

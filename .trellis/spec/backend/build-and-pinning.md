@@ -2,7 +2,7 @@
 
 本文件记录**本 fork 特有**的构建契约。上游文档不覆盖这些约定，改动构建相关文件前必读。
 
-适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`install-agent.sh`、`install-agent.ps1`、`Dockerfile`、`Dockerfile.agent`。
+适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`install-agent.sh`、`install-agent.ps1`、`Dockerfile`、`Dockerfile.agent`、`README.md`（产品视角，构建细节在 `docs/MAINTAINING.md`）。
 （本仓库已无 `.github/` 流水线——上游 CI 已于 2026-09-16 移除，见 §2 末尾与 `docs/MAINTAINING.md` §4。）
 
 ---
@@ -107,6 +107,7 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：lin
 ./scripts/build-agent.sh                    # agent：14 个平台 → dist/agent/（纯 Go，无需 zig）
 ./scripts/build-agent.sh --only linux/amd64 # agent：单平台 + 两道门禁校验（改 agent 补丁后必跑）
 ./scripts/build-agent-image.sh              # agent 镜像：本地单平台构建（--push 才推 ghcr）
+./scripts/build-server-image.sh             # 服务器镜像：同上（跨架构需 QEMU/binfmt，见 MAINTAINING §12）
 ```
 
 **静态构建是发布的前提**：`Dockerfile` 基于 `alpine:3.21`（musl），glibc 动态二进制在其中
