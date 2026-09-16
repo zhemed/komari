@@ -1,12 +1,11 @@
 # Windows PowerShell installation script for Komari Agent
 # ---------------------------------------------------------------------------
-# 来源：上游 komari-monitor/komari-agent 的 install.ps1
-#       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
+# 来源：上游 komari-monitor/komari-agent 的 install.ps1，commit 1186aafb0d41445daac05d8d282d748a897fd495（2026-08-07，1.4.3 同期）
+#       —— 刻意停在 1.4.3 同期的代码，不跟随上游 agent 1.5.x（见 docs/MAINTAINING.md §11）
 # 本文件由 scripts/patches-agent/0003-install-ps1-own-source.patch 生成，改动点：
-#   1) 下载源改为本仓库 zhemed/komari 的 release（agent 资产与服务器同 tag 发布）
+#   1) 下载源改为本仓库 zhemed/komari 的 release
 #   2) 默认安装目录由 %ProgramFiles%\Komari 改为 %ProgramFiles%\Komari Agent
-#   3) 默认安装脚本 pin 的版本，--install-version latest 装最新
-#   4) 移除上游的 Snapshot 通道（本仓库不发布 Snapshot-* 版本）
+#   3) 默认安装脚本 pin 的版本；--install-version latest 装最新；本仓库没有 snapshot 通道
 # 重新生成方式见 docs/MAINTAINING.md 的“agent 发行线”一节。
 # ---------------------------------------------------------------------------
 
@@ -23,7 +22,7 @@ $InstallDir = Join-Path $Env:ProgramFiles "Komari Agent"
 $ServiceName = "komari-agent"
 # 本 fork 的发行线参数
 $AgentRepo = "zhemed/komari"
-$DefaultAgentVersion = "0.0.4"
+$DefaultAgentVersion = "0.0.5"
 $GitHubProxy = ""
 $KomariArgs = @()
 $InstallVersion = ""

@@ -81,7 +81,8 @@
 
 上游 agent 只做**源码依赖**，不 fork 到我们仓库（自有仓库只有 `zhemed/komari` 一个）：
 
-- 源码 pin：`scripts/agent-pin.env` 的 `KOMARI_AGENT_COMMIT`（当前 `9e532e04…`）；
+- 源码 pin：`scripts/agent-pin.env` 的 `KOMARI_AGENT_COMMIT`（当前 `1186aafb…`，**1.4.3 同期**）；
+  **不要**改成上游 agent main（那会带进 1.5 行为：motd 安全告警注入、文件访问、v2-only 协议）；
   浅克隆后打 `scripts/patches-agent/*.patch`，再算源码树哈希 `AGENT_SOURCE_TREE_SHA256` 并强制校验。
 - 构建：`scripts/build-agent.sh` 纯 Go 交叉编译（`CGO_ENABLED=0`），**不需要 zig/gcc**，
   矩阵与上游 `build_all.sh` 一致 = **14** 个平台（排除 windows/arm、darwin/{386,arm}、非 linux 的 loong64）。
@@ -92,7 +93,7 @@
   （`komari-linux-amd64`）。实测证据见 `docs/MAINTAINING.md` §11.1，**升级上游时不得去掉**。
 - 自更新目标固定 `Repo = "zhemed/komari"`（源码默认 + 构建期 `-X` 双保险）；
   **默认关闭自动更新**（`EnableAutoUpdate` 默认 false，`--enable-auto-update` 才开）。
-- 安装脚本是上游 `install.sh` / `install.ps1` 的 vendor + 补丁：默认安装目录 `/opt/komari-agent`
+- 安装脚本是**同一 pin** 的上游 `install.sh` / `install.ps1` 的 vendor + 补丁（因此沿用 `#!/bin/bash`）：默认安装目录 `/opt/komari-agent`
   （**不要**改回 `/opt/komari`，会和服务器的目录撞车），默认装脚本 pin 的版本。
   `build-agent.sh` 会把补丁回放结果与仓库成品**逐字节比对**，不一致即失败。
 

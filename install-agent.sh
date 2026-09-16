@@ -1,18 +1,17 @@
-#!/bin/sh
+#!/bin/bash
 
 # ---------------------------------------------------------------------------
 # Komari Agent 安装脚本（zhemed/komari 发行线）
 #
-# 来源：上游 komari-monitor/komari-agent 的 install.sh
-#       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
-# 本文件由 scripts/patches-agent/0002-install-script-own-source.patch 生成，
-# 改动点：
+# 来源：上游 komari-monitor/komari-agent 的 install.sh，commit 1186aafb0d41445daac05d8d282d748a897fd495（2026-08-07，1.4.3 同期）
+#       —— 刻意停在 1.4.3 同期的代码，不跟随上游 agent 1.5.x（见 docs/MAINTAINING.md §11）
+# 本文件由 scripts/patches-agent/0002-install-script-own-source.patch 生成，改动点：
 #   1) 下载源改为本仓库 zhemed/komari 的 release（agent 资产与服务器同 tag 发布）
 #   2) 默认安装目录由 /opt/komari 改为 /opt/komari-agent（避免与服务器 /opt/komari 撞车）
-#   3) 默认安装脚本 pin 的版本（与本仓库 release 的资产一一对应），
-#      需要最新版用 --install-version latest
-#   4) 移除上游的 Snapshot 通道（本仓库不发布 Snapshot-* 版本）
-#   5) Git Bash（MINGW）下补上 Windows 资产名的 .exe 后缀（上游此处会 404）
+#   3) 默认安装脚本 pin 的版本（与本仓库 release 的资产一一对应）；
+#      要最新版用 --install-version latest，本仓库没有 snapshot 通道
+#   4) Git Bash（MINGW）下补上 Windows 资产名的 .exe 后缀（上游此处会 404）
+# 注意：本版沿用上游当时的 #!/bin/bash（1.5 时代上游才改成 POSIX sh）。
 # 重新生成方式见 docs/MAINTAINING.md 的“agent 发行线”一节。
 # ---------------------------------------------------------------------------
 
@@ -51,21 +50,18 @@ log_config() {
     echo -e "${CYAN}[CONFIG]${NC} $1"
 }
 
-# $EUID 是 bash 专有变量, ash/dash 下未定义, 补 POSIX 回退
-EUID=${EUID:-$(id -u)}
-
 # Default values
 # 本 fork 的发行线参数，集中在这里，避免仓库名散落各处
 agent_repo="zhemed/komari"
-default_agent_version="0.0.4"
+default_agent_version="0.0.5"
 service_name="komari-agent"
 target_dir="/opt/komari-agent"
 github_proxy=""
 install_version="" # New parameter for specifying version
 install_dir_specified=false
-install_no_mirror=false # 关闭自动加速镜像
 service_user="${SUDO_USER:-$(id -un)}"
 user_service=false
+ 
 
 # Detect OS
 os_type=$(uname -s)
@@ -97,8 +93,7 @@ esac
 
 # Parse install-specific arguments
 komari_args=""
-# [[ ]] -> [ ] (POSIX)
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
     case $1 in
         --install-dir)
             target_dir="$2"
@@ -116,10 +111,6 @@ while [ $# -gt 0 ]; do
         --install-version)
             install_version="$2"
             shift 2
-            ;;
-        --install-no-mirror) # 新增: 关闭自动加速镜像
-            install_no_mirror=true
-            shift
             ;;
         --install*)
             log_warning "Unknown install parameter: $1"
@@ -166,7 +157,7 @@ log_config "Installation configuration:"
 log_config "  Service name: ${GREEN}$service_name${NC}"
 log_config "  Service user: ${GREEN}$service_user${NC}"
 log_config "  Install directory: ${GREEN}$target_dir${NC}"
-log_config "  GitHub proxy: ${GREEN}${github_proxy:-(direct)}${NC}"
+log_config "  GitHub proxy: ${GREEN}${github_proxy:-"(direct)"}${NC}"
 log_config "  Binary arguments: ${GREEN}$komari_args${NC}"
 if [ -n "$install_version" ]; then
     log_config "  Specified agent version: ${GREEN}$install_version${NC}"
@@ -264,15 +255,11 @@ install_dependencies() {
         elif command -v apk >/dev/null 2>&1; then
             log_info "Using apk to install dependencies..."
             apk add $missing_deps
-        elif command -v opkg >/dev/null 2>&1; then # OpenWrt / iStoreOS
-            log_info "Using opkg to install dependencies (OpenWrt/iStoreOS)..."
-            opkg update
-            opkg install $missing_deps
         elif command -v brew >/dev/null 2>&1; then
             log_info "Using Homebrew to install dependencies..."
             brew install $missing_deps
         else
-            log_error "No supported package manager found (apt/yum/apk/opkg/brew)"
+            log_error "No supported package manager found (apt/yum/apk/brew)"
             exit 1
         fi
         
@@ -338,26 +325,27 @@ case $arch in
 esac
 log_info "Detected OS: ${GREEN}$os_name${NC}, Architecture: ${GREEN}$arch${NC}"
 
-file_name="komari-agent-${os_name}-${arch}"
-# Windows 资产上游加了 .exe 后缀；Git Bash 走的也是这条路径，缺后缀会 404
-if [ "$os_name" = "windows" ]; then
-    file_name="${file_name}.exe"
-fi
-
 # 版本解析：默认装本脚本 pin 的版本（与本仓库 release 里的 agent 资产一一对应），
 # --install-version <版本> 可指定，--install-version latest 装最新 release。
-# 上游的 Snapshot 通道（tag 形如 Snapshot-YYYYMMDD）在本仓库不存在，直接拒绝。
+# 上游的 Snapshot 通道在本仓库不存在，直接拒绝。
 version_to_install="$default_agent_version"
 if [ -n "$install_version" ]; then
     if [ "$install_version" = "snapshot" ]; then
         log_error "本仓库不提供 snapshot 通道；请使用 --install-version <版本> 或 latest。"
         exit 1
     fi
+    log_info "Attempting to install specified version: ${GREEN}$install_version${NC}"
     version_to_install="$install_version"
+else
+    log_info "安装版本: ${GREEN}$version_to_install${NC}（脚本 pin 的默认版本，可用 --install-version 覆盖）"
 fi
-log_info "安装版本: ${GREEN}$version_to_install${NC}（脚本 pin 的默认版本，可用 --install-version 覆盖）"
 
 # Construct download URL
+file_name="komari-agent-${os_name}-${arch}"
+# Windows 资产上游加了 .exe 后缀；Git Bash 走的也是这条路径，缺后缀会 404
+if [ "$os_name" = "windows" ]; then
+    file_name="${file_name}.exe"
+fi
 if [ "$version_to_install" = "latest" ]; then
     download_path="latest/download"
 else
@@ -378,33 +366,16 @@ if [ "$EUID" -eq 0 ] && [ "$service_user" != "root" ]; then
     chown "$service_user" "$target_dir"
 fi
 
-# Download with automatic mirror fallback.
-# 直连失败自动依次尝试常见 GitHub 加速镜像, 可用 --install-no-mirror 关闭.
-if [ -n "$github_proxy" ] || [ "$install_no_mirror" = "true" ]; then
-    download_urls="$download_url"
+# Download binary
+if [ -n "$github_proxy" ]; then
+    log_step "Downloading $file_name via proxy..."
+    log_info "URL: ${CYAN}$download_url${NC}"
 else
-    download_urls="
-${download_url}
-https://ghfast.top/${download_url}
-https://gh-proxy.com/${download_url}
-https://ghproxy.net/${download_url}
-"
+    log_step "Downloading $file_name directly..."
+    log_info "URL: ${CYAN}$download_url${NC}"
 fi
-
-dl_ok=""
-for u in $download_urls; do
-    log_step "Downloading $file_name ..."
-    log_info "URL: ${CYAN}$u${NC}"
-    if curl -fL --connect-timeout 15 -o "$komari_agent_path" "$u" && [ -s "$komari_agent_path" ]; then
-        dl_ok=1
-        break
-    fi
-    rm -f "$komari_agent_path"
-done
-
-if [ -z "$dl_ok" ]; then
-    log_error "Download failed from all sources (direct + mirrors)"
-    log_error "Retry later, or specify --install-ghproxy <mirror-prefix> manually"
+if ! curl -L -o "$komari_agent_path" "$download_url"; then
+    log_error "Download failed"
     exit 1
 fi
 
@@ -625,10 +596,7 @@ ARGS="${komari_args}"
 
 start_service() {
     procd_open_instance
-    # 参数逐个追加, 避免整串拼接可能导致的引号/转义问题
-    procd_set_param command "\$PROG"
-    # shellcheck disable=SC2086
-    procd_append_param command \$ARGS
+    procd_set_param command \$PROG \$ARGS
     procd_set_param respawn
     procd_set_param stdout 1
     procd_set_param stderr 1
@@ -636,9 +604,9 @@ start_service() {
     procd_close_instance
 }
 
-# 移除 killall 版 stop_service:
-# USE_PROCD=1 时 rc.common 默认 stop 会通过 procd 正确终止实例,
-# 按进程名 killall 反而可能误杀同名进程, 且无法阻止 respawn.
+stop_service() {
+    killall \$(basename \$PROG)
+}
 
 reload_service() {
     stop
@@ -655,14 +623,8 @@ elif [ "$init_system" = "launchd" ]; then
     # macOS launchd service configuration
     log_info "Using launchd for service management"
     
-    # [[ =~ ]] -> case (POSIX); 判定用户级还是系统级安装
-    is_user_install=false
-    case "$target_dir" in
-        /Users/*) is_user_install=true ;;
-    esac
-    [ "$EUID" -ne 0 ] && is_user_install=true
-    
-    if [ "$is_user_install" = true ]; then
+    # Determine if this should be a system or user service based on installation directory
+    if [[ "$target_dir" =~ ^/Users/.* ]] || [ "$EUID" -ne 0 ]; then
         # User-level service (LaunchAgent)
         plist_dir="$HOME/Library/LaunchAgents"
         plist_file="$plist_dir/com.komari.${service_name}.plist"
@@ -715,7 +677,7 @@ EOF
 EOF
     
     # Load and start the service
-    if [ "$is_user_install" = true ]; then
+    if [[ "$target_dir" =~ ^/Users/.* ]] || [ "$EUID" -ne 0 ]; then
         # User-level service
         if launchctl bootstrap gui/$(id -u) "$plist_file"; then
             log_success "User-level launchd service configured and started"
@@ -783,5 +745,3 @@ fi
 log_config "Service: ${GREEN}$service_name${NC}"
 log_config "Arguments: ${GREEN}$komari_args${NC}"
 echo -e "${WHITE}===========================================${NC}"
-
-

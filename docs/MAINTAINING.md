@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.4）
+# 维护本仓库（komari 自维护版 · 当前 0.0.5）
 
-本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.4**），由我们独立维护。
+本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.5**），由我们独立维护。
 
 - 上游后端：<https://github.com/komari-monitor/komari>
 - 上游前端：<https://github.com/komari-monitor/komari-web>
@@ -16,11 +16,11 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.4`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.5`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端来源 | 上游 tag `1.4.3` → `4a74e8a81e2e4b1c3da8ad795f9523151efb6b56` | 记录于 `scripts/frontend-pin.env` |
 | 前端产物 | `web/public/defaultTheme/`（已 vendor 进仓库） | 目录树哈希记录于 `scripts/frontend-pin.env` |
-| agent 代码来源 | 上游 agent commit `9e532e0429cd049571e35cf344654181879b33c7` | 记录于 `scripts/agent-pin.env`；**不 fork**，见第 11 节 |
+| agent 代码来源 | 上游 agent commit `1186aafb0d41445daac05d8d282d748a897fd495`（2026-08-07，**1.4.3 同期**） | 记录于 `scripts/agent-pin.env`；**不 fork**，且**不跟上游 agent 1.5.x**，见第 11 节 |
 | agent 资产 | `komari-agent-<os>-<arch>`（14 个平台） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
 | agent 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` / `:latest` | 由 `scripts/build-agent-image.sh --push` 推送 |
 
@@ -284,7 +284,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 
 | 环节 | 事实 |
 |---|---|
-| 源码来源 | 上游 `komari-monitor/komari-agent`，pin 在 commit `9e532e04…`（`scripts/agent-pin.env`） |
+| 源码来源 | 上游 `komari-monitor/komari-agent`，pin 在 commit `1186aafb…`（2026-08-07，**1.4.3 同期**；`scripts/agent-pin.env`） |
 | 补丁 | `scripts/patches-agent/0001`（Go 代码）、`0002`/`0003`（安装脚本） |
 | 构建 | `./scripts/build-agent.sh`：纯 Go 交叉编译（`CGO_ENABLED=0`，不需要 zig），一次出 **14** 个平台 |
 | 资产名 | `komari-agent-<os>-<arch>[.exe]`，与上游一致（安装脚本与自更新都按这个名字找资产） |
@@ -372,3 +372,41 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
   0.0.4 实测：四个 tag 全部匿名可拉，服务器镜像匿名 `docker run` 后 `/install` 200、
   数据落在挂载卷。
 - Dockerfile 里带 `org.opencontainers.image.source` 标签，ghcr 包页面会链回本仓库。
+
+### 11.5 为什么停在 1.4.3 同期 agent（而不是上游最新的 agent）
+
+上游 agent 与服务器是**两个独立仓库、两条版本线**。服务器停在 `1.4.3` 血统，agent 也应该停在
+**同一天**的代码上，否则节点上跑的是比服务器更新一代的 agent。实测时间线：
+
+| 上游 agent | 时间 | 说明 |
+|---|---|---|
+| tag `1.2.60` | 2026-07-08 | |
+| **`1186aafb`（我们的 pin）** | **2026-08-07** | 服务器/前端 1.4.3 是 2026-08-13，这是它之前最后一个 agent 提交 |
+| tag `1.5.0` / `1.5.10` | 2026-09-14 / 09-15 | 1.5 线开始，1.5.10 就是我们**最初**误 pin 的 commit（`9e532e04`） |
+
+停在 1.4.3 同期实际付出的代价（逐条核对过）：
+
+- **不算损失**（我们这条血统根本调不到这些能力）：文件访问 `server/files.go`（1152 行）、
+  终端会话重连、文件上传链路修复 —— 服务器与前端都没有这些功能，agent 里有也永远不会被调用；
+  反过来，回退后节点上的 root 二进制里少掉整个文件读写实现，攻击面更小。
+- **真实损失**：3 个检测修复（AMD GPU 在 `rocm-smi` 缺失时读 sysfs、Android FUSE 磁盘识别、
+  macOS `nullfs` 去重）、安装脚本两处改进（无 bash 环境可装、snapshot 通道）。
+  需要时按 §7 的 backport 政策单独 cherry-pick，不要整条线跟上去。
+
+### 11.6 为什么会看到 “Remote control is enabled on this device”（0.0.4 时期发生的事）
+
+0.0.4 的 agent 是最初误 pin 的 **1.5.10**，它带一个上游在 `79d8d45 增强安全提醒`（2026-09-14）
+新加的提醒：**只要远程控制开着**（上游默认开），agent 就把一段告警写进 `/etc/motd`：
+
+```text
+[Komari] Remote control is enabled on this device
+127.0.0.1:25774 can execute commands and read or modify files on this device as root.
+...
+```
+
+这不是入侵痕迹，而是 agent 自己写的"你这台机器上远程控制是开着的"提示，内容说的就是
+WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没有**这段注入逻辑，
+只在 Web 终端的 shell 前置脚本里**读**一次 `/etc/motd`（`terminal/terminal_unix.go`）。
+
+排查这类提示的正确姿势：`journalctl -u komari-agent | grep -i "remote control"`，
+以及确认 agent 的启动日志里 `Github Repo:` 指向 `zhemed/komari`（不是上游仓库）。

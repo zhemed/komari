@@ -1,23 +1,22 @@
 diff --git a/install.ps1 b/install.ps1
-index 14db5f9..1d5af76 100644
+index 2579296..fea2f0f 100644
 --- a/install.ps1
 +++ b/install.ps1
-@@ -1,4 +1,14 @@
+@@ -1,4 +1,13 @@
  # Windows PowerShell installation script for Komari Agent
 +# ---------------------------------------------------------------------------
-+# 来源：上游 komari-monitor/komari-agent 的 install.ps1
-+#       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
++# 来源：上游 komari-monitor/komari-agent 的 install.ps1，commit 1186aafb0d41445daac05d8d282d748a897fd495（2026-08-07，1.4.3 同期）
++#       —— 刻意停在 1.4.3 同期的代码，不跟随上游 agent 1.5.x（见 docs/MAINTAINING.md §11）
 +# 本文件由 scripts/patches-agent/0003-install-ps1-own-source.patch 生成，改动点：
-+#   1) 下载源改为本仓库 zhemed/komari 的 release（agent 资产与服务器同 tag 发布）
++#   1) 下载源改为本仓库 zhemed/komari 的 release
 +#   2) 默认安装目录由 %ProgramFiles%\Komari 改为 %ProgramFiles%\Komari Agent
-+#   3) 默认安装脚本 pin 的版本，--install-version latest 装最新
-+#   4) 移除上游的 Snapshot 通道（本仓库不发布 Snapshot-* 版本）
++#   3) 默认安装脚本 pin 的版本；--install-version latest 装最新；本仓库没有 snapshot 通道
 +# 重新生成方式见 docs/MAINTAINING.md 的“agent 发行线”一节。
 +# ---------------------------------------------------------------------------
  
  # Logging functions with colors
  function Log-Info { param([string]$Message) Write-Host "$Message"    -ForegroundColor Cyan }
-@@ -9,8 +19,11 @@ function Log-Step { param([string]$Message) Write-Host "$Message"    -Foreground
+@@ -9,8 +18,11 @@ function Log-Step { param([string]$Message) Write-Host "$Message"    -Foreground
  function Log-Config { param([string]$Message) Write-Host "- $Message"    -ForegroundColor White }
  
  # Default parameters
@@ -26,85 +25,21 @@ index 14db5f9..1d5af76 100644
  $ServiceName = "komari-agent"
 +# 本 fork 的发行线参数
 +$AgentRepo = "zhemed/komari"
-+$DefaultAgentVersion = "0.0.4"
++$DefaultAgentVersion = "0.0.5"
  $GitHubProxy = ""
  $KomariArgs = @()
  $InstallVersion = ""
-@@ -206,59 +219,23 @@ function Uninstall-Previous {
+@@ -206,29 +218,38 @@ function Uninstall-Previous {
  }
  Uninstall-Previous
  
--function Get-LatestSnapshotVersion {
--    param([Parameter(Mandatory = $true)][string]$AssetName)
--
--    $ApiUrl = "https://api.github.com/repos/komari-monitor/komari-agent/releases?per_page=100"
--    $ApiUrls = @($ApiUrl)
--    if ($GitHubProxy -ne "") {
--        $ApiUrls = @("$GitHubProxy/$ApiUrl", $ApiUrl)
--    }
--
--    for ($i = 0; $i -lt $ApiUrls.Count; $i++) {
--        try {
--            Log-Info "Fetching snapshot releases from GitHub API..."
--            $releases = Invoke-RestMethod -Uri $ApiUrls[$i] -UseBasicParsing
--        }
--        catch {
--            $releases = $null
--        }
--
--        if ($releases) {
--            $latestSnapshot = $releases |
--            Where-Object {
--                $_.draft -eq $false -and
--                $_.prerelease -eq $true -and
--                $_.tag_name -like "Snapshot-*" -and
--                (@($_.assets.name) -contains $AssetName)
--            } |
--            Sort-Object -Property @{ Expression = { [datetime]$_.published_at }; Descending = $true }, @{ Expression = { $_.tag_name }; Descending = $true } |
--            Select-Object -First 1
--
--            if ($latestSnapshot) {
--                return $latestSnapshot.tag_name
--            }
--        }
--
--        if ($i -lt ($ApiUrls.Count - 1)) {
--            Log-Warning "Failed to resolve snapshot releases through GitHub proxy, retrying directly."
--        }
--    }
--
--    throw "No snapshot release contains asset $AssetName."
--}
--
 -$versionToInstall = ""
 +$versionToInstall = $DefaultAgentVersion
  if ($InstallVersion -ne "") {
      Log-Info "Attempting to install specified version: $InstallVersion"
-     if ($InstallVersion -ieq "snapshot") {
--        Log-Info "Resolving the latest snapshot version..."
-+        Log-Error "本仓库不提供 snapshot 通道；请使用 --install-version <版本> 或 latest。"
-+        exit 1
-+    }
-+    elseif ($InstallVersion -ieq "latest") {
-+        $ApiUrl = "https://api.github.com/repos/$AgentRepo/releases/latest"
-         try {
--            $versionToInstall = Get-LatestSnapshotVersion -AssetName $BinaryName
--            Log-Success "Latest snapshot version fetched: $versionToInstall"
-+            Log-Step "Fetching latest release version from GitHub API..."
-+            $release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
-+            $versionToInstall = $release.tag_name
-+            Log-Success "Latest version fetched: $versionToInstall"
-         }
-         catch {
--            Log-Error "Failed to resolve the latest snapshot version: $_"
-+            Log-Error "Failed to fetch latest version: $_"
-             exit 1
-         }
-     }
-@@ -267,23 +244,13 @@ if ($InstallVersion -ne "") {
-     }
- }
- else {
+-    $versionToInstall = $InstallVersion
+-}
+-else {
 -    $ApiUrl = "https://api.github.com/repos/komari-monitor/komari-agent/releases/latest"
 -    try {
 -        Log-Step "Fetching latest release version from GitHub API..."
@@ -114,8 +49,28 @@ index 14db5f9..1d5af76 100644
 -    }
 -    catch {
 -        Log-Error "Failed to fetch latest version: $_"
--        exit 1
--    }
++    if ($InstallVersion -ieq "snapshot") {
++        Log-Error "本仓库不提供 snapshot 通道；请使用 --install-version <版本> 或 latest。"
+         exit 1
+     }
++    elseif ($InstallVersion -ieq "latest") {
++        $ApiUrl = "https://api.github.com/repos/$AgentRepo/releases/latest"
++        try {
++            Log-Step "Fetching latest release version from GitHub API..."
++            $release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
++            $versionToInstall = $release.tag_name
++            Log-Success "Latest version fetched: $versionToInstall"
++        }
++        catch {
++            Log-Error "Failed to fetch latest version: $_"
++            exit 1
++        }
++    }
++    else {
++        $versionToInstall = $InstallVersion
++    }
++}
++else {
 +    Log-Info "Installing the version pinned by this script: $versionToInstall (use --install-version latest for the newest release)"
  }
  Log-Success "Installing Komari Agent version: $versionToInstall"
