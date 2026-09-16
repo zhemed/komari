@@ -33,7 +33,10 @@ BACKUP_DIR="$INSTALL_DIR/backup"
 DATA_BACKUP_DIR="$DATA_DIR/data/backup"
 DEFAULT_PORT="25774"
 LISTEN_PORT=""
-REPO="komari-monitor/komari"
+# 本 fork 只维护 1.4.3：默认安装/升级一律走自有仓库，避免落到上游 latest（已是 1.5.x）。
+REPO="${KOMARI_REPO:-zhemed/komari}"
+# 自有发布 tag。本 fork 只维护这一个版本，故锁定 tag 而非使用 latest。
+REPO_TAG="${KOMARI_TAG:-1.4.3}"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
 # TUI 工具: whiptail / dialog / 空（回退纯文本）
@@ -165,7 +168,7 @@ show_banner() {
     clear
     echo "=============================================================="
     echo "            Komari Monitoring System Installer"
-    echo "       https://github.com/komari-monitor/komari"
+    echo "       https://github.com/${REPO}  (komari ${REPO_TAG} fork)"
     echo "=============================================================="
     echo
 }
@@ -287,8 +290,9 @@ get_download_url() {
         log_info "最新 snapshot 版本: $latest_snapshot" >&2
         echo "https://github.com/${REPO}/releases/download/${latest_snapshot}/${file_name}"
     else
-        # 稳定版：使用 latest
-        echo "https://github.com/${REPO}/releases/latest/download/${file_name}"
+        # 稳定版：锁定自有 tag（默认 1.4.3）。
+        # 不能用 releases/latest——上游 latest 已是 1.5.x，与本 fork 维护目标不符。
+        echo "https://github.com/${REPO}/releases/download/${REPO_TAG}/${file_name}"
     fi
 }
 
@@ -348,7 +352,7 @@ install_binary() {
     log_step "下载 Komari 二进制文件..."
     log_info "URL: $download_url"
 
-    if ! curl -L -o "$BINARY_PATH" "$download_url"; then
+    if ! curl -fL -o "$BINARY_PATH" "$download_url"; then
         ui_msgbox "错误" "下载失败，请检查网络连接。"
         return 1
     fi
@@ -483,14 +487,18 @@ upgrade_komari() {
         return 1
     fi
 
-    log_step "下载最新版本..."
-    if ! curl -L -o "$BINARY_PATH" "$download_url"; then
+    log_step "下载 ${REPO_TAG} 版本..."
+    # 先下到临时文件再替换：避免下载失败/404 时把正在运行的自有二进制截断清零。
+    local download_tmp="${BINARY_PATH}.new"
+    if ! curl -fL -o "$download_tmp" "$download_url"; then
+        rm -f "$download_tmp"
         log_error "下载失败，正在从备份恢复"
         mv "$backup_path" "$BINARY_PATH"
         systemctl start ${SERVICE_NAME}.service
         ui_msgbox "错误" "下载失败，已从备份恢复。"
         return 1
     fi
+    mv "$download_tmp" "$BINARY_PATH"
 
     chmod +x "$BINARY_PATH"
 

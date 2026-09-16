@@ -36,3 +36,7 @@ go.work.sum
 komari
 /dist/
 .codex
+
+# 本 fork 的本地构建产物与工具链缓存（见 scripts/*.sh）
+/.build/
+/bin/

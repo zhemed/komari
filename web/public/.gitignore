@@ -1,2 +1,6 @@
 dist/*
-defaultTheme/*
+# 上游在构建时才把 komari-web 的产物注入 defaultTheme/，因此默认忽略该目录。
+# 本 fork 只维护 1.4.3，为让后端在无网络、无 Node 的环境下可独立构建，
+# 改为把该目录 vendor 进仓库（见 docs/MAINTAINING-1.4.3.md）。
+# 若想恢复上游行为，取消注释下面一行即可。
+# defaultTheme/*
