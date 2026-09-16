@@ -210,3 +210,27 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: Session 9: 前端与 agent 源码全部 vendor 进仓库（完全自有）
+<!-- trellis-session: v=2 fp=5986615f78c69f45 -->
+
+**Date**: 2026-09-16
+**Task**: Session 9: 前端与 agent 源码全部 vendor 进仓库（完全自有）
+**Branch**: `main`
+
+### Summary
+
+用户问“服务端和客户端现在都是我们自己维护的吧”，我给出精确回答（服务器源码在仓库内；前端/agent 此前是 pin+补丁的上游依赖），并按其选择把两个上游源码都搬进仓库做成完全自有。(1) agent：快照导入 74 个文件到 agent/（上游 komari-agent@1186aafb + 我们三个补丁的改动内联），build-agent.sh 重写为本地构建（去掉 clone/patch/源码树哈希/补丁回放比对，保留并强化资产过滤+自更新目标+安装脚本版本一致性三道门禁，新增 -buildvcs=false），agent-pin.env → agent-build.env。(2) 前端：快照导入 467 个文件到 frontend/（komari-web@4a74e8a8 + 六个补丁内联，排除上游 .github/），sync-frontend.sh → build-frontend.sh（本地 npm ci+build，不再依赖 git，新增“不得再出现 komari-monitor/komari-agent”检查），frontend-pin.env → frontend-build.env；顺手修掉上游 .gitignore 忽略 package-lock.json 的坑。(3) 等价性证明：agent 老路径与新路径在相同 flags 下产物逐字节一致，且老路径用默认 buildvcs 能复现 0.0.5 release 资产（证明导入零改动，唯一差异来自 buildvcs）；前端重建后目录树哈希仍为 af0bd793…，产物 git 无改动。(4) 文档/规范/README 全量同步：源码 vendor 化后的固定点表、构建脚本名、门禁含义、回滚路径、“不要重新引入 clone+打补丁”的禁令。本次改造不产生新 release（产物未变）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bfb96ad` | chore(vendor): import komari-agent@1186aafb as agent/, 打补丁改为直接改源码 |
+| `ea28dc0` | chore(vendor): import komari-web@4a74e8a8 as frontend/, 补丁内联进源码 |
+| `7759a77` | docs: 源码 vendor 化后的文档、规范与 README 同步 |
+
+### Status
+
+[OK] **Completed**

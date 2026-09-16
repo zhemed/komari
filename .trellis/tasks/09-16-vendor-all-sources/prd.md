@@ -37,3 +37,18 @@
 - 不把 agent 的 Go 依赖 vendor（`agent/vendor/`）——构建仍需 Go module proxy；如需要可另行处理。
 - 不 vendor npm 依赖（`node_modules` 不入库）；改前端仍需 Node + npm 联网装依赖。
 - 不引入上游历史，不做 `git subtree`。
+
+## 验收结果（2026-09-16）
+
+| 验收项 | 结果 |
+|---|---|
+| agent 等价性 | 老路径（pin+补丁）与新路径（`agent/`）在相同 flags 下产物**逐字节一致**（`4e104407…`）；老路径用默认 `-buildvcs` 能复现 0.0.5 release 资产（`990eac19…`）→ 证明差异只来自 `-buildvcs`，导入未改动源码 |
+| 前端等价性 | 从 `frontend/` 重建的 `web/public/defaultTheme/` 目录树哈希仍为 `af0bd793…`，且 `git status` 对该产物无改动 |
+| 离线构建 | `GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh` 成功（服务器仍可离线构建） |
+| 构建期不再克隆上游 | `grep -rn "git clone\|git fetch" scripts/*.sh` 无结果 |
+| 质量门禁 | `go build ./... && go vet ./... && go test ./...` 全绿；`./scripts/build-agent.sh --only linux/amd64` 三道门禁通过 |
+| 入库体积 | frontend 5.4M（467 文件）、agent 440K（74 文件）；`node_modules`/`dist` 未入库 |
+| 发布影响 | 未产生新 release（产物未变），0.0.5 仍是当前版本 |
+
+顺带修掉一个上游坑：`frontend/.gitignore` 原本忽略 `package-lock.json`（会让 `npm ci` 失去锁定），
+已取消忽略并在文件里注明本仓库改动。
