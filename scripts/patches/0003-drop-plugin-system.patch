@@ -1,0 +1,2054 @@
+diff --git a/src/components/admin/AdminPanelBar.tsx b/src/components/admin/AdminPanelBar.tsx
+index a294661..83edee8 100644
+--- a/src/components/admin/AdminPanelBar.tsx
++++ b/src/components/admin/AdminPanelBar.tsx
+@@ -17,7 +17,7 @@ import ThemeSwitch from "../ThemeSwitch";
+ import { useIsMobile } from "@/hooks/use-mobile";
+ import menuConfig from "../../config/menuConfig.json";
+ import type { MenuItem } from "../../types/menu";
+-import { iconMap, resolvePluginIcon } from "../../utils/iconHelper";
++import { iconMap } from "../../utils/iconHelper";
+ import { ChevronDownIcon } from "@radix-ui/react-icons";
+ import { TablerMenu2 } from "../Icones/Tabler";
+ import LoginDialog from "../Login";
+@@ -29,7 +29,6 @@ import Tips from "../ui/tips";
+ import { CircleFadingArrowUp } from "lucide-react";
+ import { useRPC2Call } from "@/contexts/RPC2Context";
+ import { resolveI18nText } from "@/utils/i18nText";
+-import type { PluginInfo } from "@/types/plugin";
+ import {
+   getThemeConfigurationType,
+   normalizeThemeRedirectTarget,
+@@ -68,9 +67,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
+   const ishttps = window.location.protocol === "https:";
+   const [t, i18n] = useTranslation();
+   const location = useLocation();
+-  const isConfigFormPage =
+-    location.pathname === "/admin/theme_managed" ||
+-    location.pathname === "/admin/plugins/config";
++  const isConfigFormPage = location.pathname === "/admin/theme_managed";
+   const { publicInfo } = usePublicInfo();
+   const { refreshVersion } = useAdminNavigation();
+   //const navigate = useNavigate();
+@@ -101,9 +98,8 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
+ 
+   const currentTheme = publicInfo?.theme;
+ 
+-  // 动态扩展菜单（主题 + 插件注入页面）
++  // 动态扩展菜单（主题注入页面）
+   const [extraMenuItems, setExtraMenuItems] = useState<ExtendedMenuItem[]>([]);
+-  const [pluginMenuItems, setPluginMenuItems] = useState<ExtendedMenuItem[]>([]);
+ 
+   useEffect(() => {
+     let ignore = false;
+@@ -168,58 +164,6 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
+       ignore = true;
+     };
+   }, [currentTheme, refreshVersion]);
+-  // 插件注入的管理页面：manifest pages（visibility=admin）-> 插件菜单的二级菜单。
+-  // iframe 页面进入 plugin-page 路由；redirect 页面复用主题的站内跳转校验。
+-  useEffect(() => {
+-    let ignore = false;
+-    async function loadPluginMenu() {
+-      try {
+-        const result = await call<any, PluginInfo[]>("admin:listPlugins");
+-        if (ignore || !Array.isArray(result)) return;
+-        const pluginIconUrl = (plugin: PluginInfo, icon?: string) =>
+-          resolvePluginIcon(plugin.short, icon) || "Blocks";
+-        const items: ExtendedMenuItem[] = [];
+-        for (const plugin of result) {
+-          if (!plugin.enabled) continue; // 未启用的插件不注入导航菜单
+-          for (const page of plugin.pages || []) {
+-            if (page.visibility === "public") continue; // 公开页面走公开路由，不进后台导航
+-            const label =
+-              resolveI18nText(page.title, currentLanguage) ||
+-              resolveI18nText(plugin.name, currentLanguage) ||
+-              plugin.short;
+-            const pageType = page.type || "iframe";
+-            if (pageType === "redirect") {
+-              const target = normalizeThemeRedirectTarget(page.url);
+-              if (!target) continue;
+-              items.push({
+-                labelKey: label,
+-                rawLabel: label,
+-                path: target,
+-                icon: pluginIconUrl(plugin, page.icon),
+-                reloadDocument: true, // 与主题 redirect 一致：整页跳转到站内路径
+-              });
+-              continue;
+-            }
+-            items.push({
+-              labelKey: label,
+-              rawLabel: label,
+-              path: `/admin/plugin-page?short=${encodeURIComponent(plugin.short)}&file=${encodeURIComponent(page.file || "")}`,
+-              icon: pluginIconUrl(plugin, page.icon),
+-            });
+-          }
+-        }
+-        if (!ignore) setPluginMenuItems(items);
+-      } catch (e) {
+-        console.warn("加载插件菜单失败:", e);
+-        if (!ignore) setPluginMenuItems([]);
+-      }
+-    }
+-    loadPluginMenu();
+-    return () => {
+-      ignore = true;
+-    };
+-  }, [call, currentLanguage, refreshVersion]);
+-
+   useEffect(() => {
+     const fetchVersionInfo = async () => {
+       try {
+@@ -317,21 +261,14 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
+           children: [...(item.children || []), ...extraMenuItems],
+         };
+       }
+-      if (item.labelKey === "plugin.title" && pluginMenuItems.length > 0) {
+-        return {
+-          ...item,
+-          children: [...(item.children || []), ...pluginMenuItems],
+-        };
+-      }
+       return item;
+     });
+-  }, [extraMenuItems, pluginMenuItems]);
++  }, [extraMenuItems]);
+   const bottomStartPath = mergedBaseMenuItems.find(
+     (item) => item.bottom,
+   )?.path;
+ 
+-  // 根据路径自动展开子菜单（包含动态扩展项；plugin-page 用 query 定位文件，
+-  // 因此子菜单匹配基于 pathname 部分）
++  // 根据路径自动展开子菜单（动态扩展项可能带 query，故子菜单匹配基于 pathname 部分）
+   useEffect(() => {
+     const newState: { [key: string]: boolean } = {};
+     const combined: ExtendedMenuItem[] = mergedBaseMenuItems;
+@@ -839,9 +776,8 @@ const SidebarItem = ({
+ }) => {
+   const location = useLocation();
+   const isExternalLink = to.startsWith("http://") || to.startsWith("https://");
+-  // 带 query 的菜单项（如 /admin/plugin-page?short=x）做全匹配；不带 query
+-  // 的菜单项只比 pathname（如 /admin/plugins/config?short=x 点亮“插件配置”），
+-  // 同时避免前缀兄弟路由（/admin/plugins 与 /admin/plugins/config）同时点亮。
++  // 带 query 的菜单项做全匹配；不带 query 的菜单项只比 pathname，
++  // 同时避免前缀兄弟路由（/admin/x 与 /admin/x/y）同时点亮。
+   const isActive =
+     !isExternalLink &&
+     to !== "/" &&
+diff --git a/src/config/menuConfig.json b/src/config/menuConfig.json
+index 9eb82b3..d522f2c 100644
+--- a/src/config/menuConfig.json
++++ b/src/config/menuConfig.json
+@@ -81,28 +81,6 @@
+         }
+       ]
+     },
+-    {
+-      "labelKey": "plugin.title",
+-      "path": "/admin/plugins",
+-      "icon": "Blocks",
+-      "children": [
+-        {
+-          "labelKey": "plugin.manage",
+-          "path": "/admin/plugins",
+-          "icon": "Blocks"
+-        },
+-        {
+-          "labelKey": "plugin.market",
+-          "path": "/admin/market/plugins",
+-          "icon": "Store"
+-        },
+-        {
+-          "labelKey": "plugin.config",
+-          "path": "/admin/plugins/config",
+-          "icon": "Settings2"
+-        }
+-      ]
+-    },
+     {
+       "labelKey": "system.title",
+       "path": "/admin/settings/site",
+diff --git a/src/lib/chunkUpload.ts b/src/lib/chunkUpload.ts
+index b0d3986..7e6491f 100644
+--- a/src/lib/chunkUpload.ts
++++ b/src/lib/chunkUpload.ts
+@@ -2,7 +2,7 @@ export const CHUNK_SIZE = 5 * 1024 * 1024;
+ const WORKER_COUNT = 5;
+ const MAX_ATTEMPTS = 4;
+ 
+-export type UploadPurpose = "backup" | "plugin" | "theme";
++export type UploadPurpose = "backup" | "theme";
+ 
+ type InitResponse = {
+   status?: string;
+diff --git a/src/pages/admin/market/plugins.tsx b/src/pages/admin/market/plugins.tsx
+deleted file mode 100644
+index 907bbb0..0000000
+--- a/src/pages/admin/market/plugins.tsx
++++ /dev/null
+@@ -1,775 +0,0 @@
+-import { useCallback, useEffect, useMemo, useState } from "react";
+-import {
+-  Badge,
+-  Box,
+-  Button,
+-  Callout,
+-  Card,
+-  Dialog,
+-  Flex,
+-  Grid,
+-  Heading,
+-  IconButton,
+-  Separator,
+-  Switch,
+-  Text,
+-  TextField,
+-} from "@radix-ui/themes";
+-import {
+-  AlertTriangle,
+-  Blocks,
+-  Download,
+-  Pencil,
+-  Plus,
+-  RefreshCw,
+-  Search,
+-  Settings2,
+-  ShieldAlert,
+-  Trash2,
+-} from "lucide-react";
+-import { useTranslation } from "react-i18next";
+-import { useNavigate } from "react-router-dom";
+-import { toast } from "sonner";
+-import Loading from "@/components/loading";
+-import { useRPC2Call } from "@/contexts/RPC2Context";
+-import { resolveI18nText, type I18nText } from "@/utils/i18nText";
+-import type { PluginInfo } from "@/types/plugin";
+-
+-interface MarketSource {
+-  id: string;
+-  name: string;
+-  url: string;
+-  enabled: boolean;
+-}
+-
+-interface SourceStatus {
+-  id: string;
+-  name: string;
+-  url: string;
+-  count: number;
+-  error?: string;
+-}
+-
+-interface MarketPlugin {
+-  name: I18nText;
+-  short: string;
+-  description?: I18nText;
+-  version: string;
+-  author: I18nText;
+-  url?: string;
+-  download: string;
+-  sha256: string;
+-  komari?: string;
+-  installable: boolean;
+-  source_id: string;
+-  source_name: string;
+-}
+-
+-interface APIResponse<T> {
+-  status: string;
+-  message?: string;
+-  data: T;
+-}
+-
+-const emptySource = (): Omit<MarketSource, "id"> => ({
+-  name: "",
+-  url: "",
+-  enabled: true,
+-});
+-
+-function isVersionNewer(candidate: string, installed: string) {
+-  const parse = (value: string) => {
+-    const match = value
+-      .trim()
+-      .replace(/^v/i, "")
+-      .match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+-    return match
+-      ? [Number(match[1]), Number(match[2] || 0), Number(match[3] || 0)]
+-      : null;
+-  };
+-  const next = parse(candidate);
+-  const current = parse(installed);
+-  if (!next || !current) return candidate !== installed;
+-  for (let index = 0; index < next.length; index += 1) {
+-    if (next[index] !== current[index]) return next[index] > current[index];
+-  }
+-  return false;
+-}
+-
+-function isKomariCompatible(constraint: string | undefined, current: string) {
+-  const parse = (value: string): [number, number, number] | null => {
+-    const parts = value.trim().replace(/^v/, "").split(".");
+-    if (
+-      parts.length > 3 ||
+-      parts.some((part) => part === "" || !/^\d+$/.test(part))
+-    ) {
+-      return null;
+-    }
+-    return [0, 1, 2].map((index) => Number(parts[index] || 0)) as [
+-      number,
+-      number,
+-      number,
+-    ];
+-  };
+-  const currentVersion = parse(current);
+-  const requirement = (constraint || "").trim();
+-  if (!requirement || !currentVersion) return true;
+-
+-  let operator = "";
+-  let version = requirement;
+-  for (const candidate of [">=", "<=", ">", "<", "="]) {
+-    if (version.startsWith(candidate)) {
+-      operator = candidate;
+-      version = version.slice(candidate.length).trim();
+-      break;
+-    }
+-  }
+-  const requiredVersion = parse(version);
+-  if (!requiredVersion) return false;
+-
+-  let comparison = 0;
+-  for (let index = 0; index < 3; index += 1) {
+-    if (currentVersion[index] !== requiredVersion[index]) {
+-      comparison = currentVersion[index] > requiredVersion[index] ? 1 : -1;
+-      break;
+-    }
+-  }
+-  switch (operator) {
+-    case ">=":
+-      return comparison >= 0;
+-    case ">":
+-      return comparison > 0;
+-    case "<=":
+-      return comparison <= 0;
+-    case "<":
+-      return comparison < 0;
+-    default:
+-      return comparison === 0;
+-  }
+-}
+-
+-// 插件是否声明了可编辑配置项（忽略 title 分组项）。
+-const hasConfiguration = (plugin: PluginInfo | undefined) =>
+-  Array.isArray(plugin?.configuration?.data) &&
+-  plugin!.configuration!.data!.some((item) => item.type !== "title");
+-
+-async function request<T>(input: RequestInfo | URL, init?: RequestInit) {
+-  const response = await fetch(input, init);
+-  const payload = (await response
+-    .json()
+-    .catch(() => null)) as APIResponse<T> | null;
+-  if (!response.ok || !payload || payload.status === "error") {
+-    throw new Error(payload?.message || `HTTP ${response.status}`);
+-  }
+-  return payload;
+-}
+-
+-// 插件市场：源管理与主题市场一致（增/改/删/启停 + 目录刷新）。
+-export default function PluginMarketPage() {
+-  const { call } = useRPC2Call();
+-  const { t, i18n } = useTranslation();
+-  const navigate = useNavigate();
+-  const language = i18n.resolvedLanguage || i18n.language || "";
+-  const displayText = useCallback(
+-    (value: I18nText | undefined) => resolveI18nText(value, language) || "",
+-    [language],
+-  );
+-
+-  const [plugins, setPlugins] = useState<MarketPlugin[]>([]);
+-  const [currentVersion, setCurrentVersion] = useState("");
+-  const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>([]);
+-  const [sources, setSources] = useState<MarketSource[]>([]);
+-  const [installed, setInstalled] = useState<Map<string, string>>(new Map());
+-  const [installedInfo, setInstalledInfo] = useState<Map<string, PluginInfo>>(
+-    new Map(),
+-  );
+-  const [search, setSearch] = useState("");
+-  const [loading, setLoading] = useState(true);
+-  const [refreshing, setRefreshing] = useState(false);
+-  const [installing, setInstalling] = useState<string | null>(null);
+-  const [pluginToUninstall, setPluginToUninstall] =
+-    useState<MarketPlugin | null>(null);
+-  const [deletingPlugin, setDeletingPlugin] = useState<string | null>(null);
+-  const [sourcesOpen, setSourcesOpen] = useState(false);
+-  const [editingID, setEditingID] = useState<string | null>(null);
+-  const [sourceForm, setSourceForm] = useState(emptySource());
+-  const [savingSource, setSavingSource] = useState(false);
+-  const [sourceToDelete, setSourceToDelete] = useState<MarketSource | null>(
+-    null,
+-  );
+-
+-  const loadSources = useCallback(async () => {
+-    const payload = await request<MarketSource[]>(
+-      "/api/admin/plugin/market/sources",
+-    );
+-    setSources(payload.data || []);
+-  }, []);
+-
+-  const loadCatalog = useCallback(
+-    async (force = false) => {
+-      const suffix = force ? "?refresh=true" : "";
+-      const [catalogPayload, installedResult, versionInfo] = await Promise.all([
+-        request<{ plugins: MarketPlugin[]; sources: SourceStatus[] }>(
+-          `/api/admin/plugin/market/catalog${suffix}`,
+-        ),
+-        call<any, PluginInfo[]>("admin:listPlugins").catch(() => []),
+-        call<any, { version: string }>("common:getVersion"),
+-      ]);
+-      setPlugins(catalogPayload.data?.plugins || []);
+-      setSourceStatuses(catalogPayload.data?.sources || []);
+-      setCurrentVersion(versionInfo.version);
+-      const list = Array.isArray(installedResult) ? installedResult : [];
+-      setInstalled(
+-        new Map(list.map((plugin) => [plugin.short, plugin.version])),
+-      );
+-      setInstalledInfo(new Map(list.map((plugin) => [plugin.short, plugin])));
+-    },
+-    [call],
+-  );
+-
+-  useEffect(() => {
+-    Promise.all([loadCatalog(), loadSources()])
+-      .catch((error) =>
+-        toast.error(error instanceof Error ? error.message : String(error)),
+-      )
+-      .finally(() => setLoading(false));
+-  }, [loadCatalog, loadSources]);
+-
+-  const filteredPlugins = useMemo(() => {
+-    const term = search.trim().toLocaleLowerCase();
+-    if (!term) return plugins;
+-    return plugins.filter((plugin) =>
+-      [
+-        displayText(plugin.name),
+-        plugin.short,
+-        displayText(plugin.author),
+-        displayText(plugin.description),
+-        plugin.source_name,
+-      ]
+-        .join(" ")
+-        .toLocaleLowerCase()
+-        .includes(term),
+-    );
+-  }, [displayText, search, plugins]);
+-
+-  const refresh = async () => {
+-    setRefreshing(true);
+-    try {
+-      await loadCatalog(true);
+-      toast.success(
+-        t("plugin.market_refresh_success", "Plugin sources refreshed"),
+-      );
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    } finally {
+-      setRefreshing(false);
+-    }
+-  };
+-
+-  const installPlugin = async (plugin: MarketPlugin) => {
+-    const key = `${plugin.source_id}:${plugin.short}`;
+-    setInstalling(key);
+-    try {
+-      const payload = await request("/api/admin/plugin/market/install", {
+-        method: "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body: JSON.stringify({
+-          source_id: plugin.source_id,
+-          short: plugin.short,
+-        }),
+-      });
+-      toast.success(
+-        payload.message ||
+-          t("plugin.market_install_success", "Plugin installed"),
+-      );
+-      await loadCatalog();
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    } finally {
+-      setInstalling(null);
+-    }
+-  };
+-
+-  const uninstallPlugin = async (plugin: MarketPlugin) => {
+-    setDeletingPlugin(plugin.short);
+-    try {
+-      await call("admin:deletePlugin", { short: plugin.short });
+-      toast.success(t("plugin.market_uninstall_success", "Plugin uninstalled"));
+-      await loadCatalog();
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    } finally {
+-      setDeletingPlugin(null);
+-    }
+-  };
+-
+-  const startCreateSource = () => {
+-    setEditingID(null);
+-    setSourceForm(emptySource());
+-  };
+-
+-  const startEditSource = (source: MarketSource) => {
+-    setEditingID(source.id);
+-    setSourceForm({
+-      name: source.name,
+-      url: source.url,
+-      enabled: source.enabled,
+-    });
+-  };
+-
+-  const saveSource = async () => {
+-    if (!sourceForm.name.trim() || !sourceForm.url.trim()) return;
+-    setSavingSource(true);
+-    try {
+-      await request(
+-        editingID
+-          ? `/api/admin/plugin/market/sources/${encodeURIComponent(editingID)}`
+-          : "/api/admin/plugin/market/sources",
+-        {
+-          method: editingID ? "PUT" : "POST",
+-          headers: { "Content-Type": "application/json" },
+-          body: JSON.stringify(sourceForm),
+-        },
+-      );
+-      toast.success(
+-        editingID
+-          ? t("market.source_updated", "Source updated")
+-          : t("market.source_created", "Source created"),
+-      );
+-      startCreateSource();
+-      await Promise.all([loadSources(), loadCatalog(true)]);
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    } finally {
+-      setSavingSource(false);
+-    }
+-  };
+-
+-  const updateSourceEnabled = async (
+-    source: MarketSource,
+-    enabled: boolean,
+-  ) => {
+-    try {
+-      await request(
+-        `/api/admin/plugin/market/sources/${encodeURIComponent(source.id)}`,
+-        {
+-          method: "PUT",
+-          headers: { "Content-Type": "application/json" },
+-          body: JSON.stringify({ ...source, enabled }),
+-        },
+-      );
+-      await Promise.all([loadSources(), loadCatalog(true)]);
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    }
+-  };
+-
+-  const deleteSource = async (source: MarketSource) => {
+-    try {
+-      await request(
+-        `/api/admin/plugin/market/sources/${encodeURIComponent(source.id)}`,
+-        {
+-          method: "DELETE",
+-        },
+-      );
+-      if (editingID === source.id) startCreateSource();
+-      toast.success(t("market.source_deleted", "Source deleted"));
+-      await Promise.all([loadSources(), loadCatalog(true)]);
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    }
+-  };
+-
+-  if (loading) return <Loading />;
+-
+-  return (
+-    <Box className="km-page-admin-market-plugins p-4 space-y-4">
+-      <Flex align="center" justify="between">
+-        <Flex align="center" gap="2">
+-          <Blocks size={20} />
+-          <Heading size="4">{t("plugin.market", "Plugin Market")}</Heading>
+-        </Flex>
+-        <Flex gap="2">
+-          <Button variant="soft" onClick={() => setSourcesOpen(true)}>
+-            <Settings2 size={14} />
+-            {t("market.manage_sources", "Manage sources")}
+-          </Button>
+-          <IconButton
+-            variant="soft"
+-            onClick={refresh}
+-            disabled={refreshing}
+-            title={t("common.refresh", "Refresh")}
+-          >
+-            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+-          </IconButton>
+-        </Flex>
+-      </Flex>
+-
+-      <Separator size="4" />
+-
+-      <Callout.Root color="amber" size="1">
+-        <Callout.Icon>
+-          <ShieldAlert size={16} />
+-        </Callout.Icon>
+-        <Callout.Text>{t("plugin.market_warning")}</Callout.Text>
+-      </Callout.Root>
+-
+-      {sourceStatuses
+-        .filter((source) => source.error)
+-        .map((source) => (
+-          <Callout.Root key={source.id} color="red" size="1">
+-            <Callout.Icon>
+-              <AlertTriangle size={16} />
+-            </Callout.Icon>
+-            <Callout.Text>
+-              {source.name}: {source.error}
+-            </Callout.Text>
+-          </Callout.Root>
+-        ))}
+-
+-      <TextField.Root
+-        value={search}
+-        onChange={(event) => setSearch(event.target.value)}
+-        placeholder={t("plugin.market_search", "Search plugins...")}
+-        className="km-market-plugins-toolbar"
+-      >
+-        <TextField.Slot>
+-          <Search size={14} />
+-        </TextField.Slot>
+-      </TextField.Root>
+-
+-      {filteredPlugins.length === 0 ? (
+-        <Callout.Root>
+-          <Callout.Text>
+-            {t("plugin.market_no_plugins", "No plugins in the market")}
+-          </Callout.Text>
+-        </Callout.Root>
+-      ) : (
+-        <Grid
+-          columns={{ initial: "1", sm: "2", lg: "3" }}
+-          gap="3"
+-          className="km-market-plugins-list"
+-        >
+-          {filteredPlugins.map((plugin) => {
+-            const installedVersion = installed.get(plugin.short);
+-            const isInstalled = installedVersion !== undefined;
+-            const hasUpdate = Boolean(
+-              installedVersion &&
+-              isVersionNewer(plugin.version, installedVersion),
+-            );
+-            const komariCompatible = isKomariCompatible(
+-              plugin.komari,
+-              currentVersion,
+-            );
+-            const canConfigure =
+-              isInstalled && hasConfiguration(installedInfo.get(plugin.short));
+-            const key = `${plugin.source_id}:${plugin.short}`;
+-            return (
+-              <Card key={key} className="km-market-plugin-card">
+-                <Flex direction="column" gap="2">
+-                  <Flex align="center" justify="between">
+-                    <Text weight="bold">
+-                      {displayText(plugin.name) || plugin.short}
+-                    </Text>
+-                    <Box>
+-                      {isInstalled && (
+-                        <Badge
+-                          color={hasUpdate ? "orange" : "green"}
+-                          variant="soft"
+-                        >
+-                          {hasUpdate
+-                            ? t("market.update_available", "Update available")
+-                            : t("market.installed", "Installed")}
+-                        </Badge>
+-                      )}
+-                      {!isInstalled && (!plugin.installable || !komariCompatible) && (
+-                        <Badge color="gray" variant="soft">
+-                          {komariCompatible
+-                            ? t(
+-                                "market.install_unavailable",
+-                                "Package unavailable",
+-                              )
+-                            : t(
+-                                "plugin.market_update_required",
+-                                "Komari update required",
+-                              )}
+-                        </Badge>
+-                      )}
+-                    </Box>
+-                  </Flex>
+-                  <Text size="2" color="gray">
+-                    {displayText(plugin.author)}
+-                    {plugin.komari ? ` · ${plugin.komari}` : ""}
+-                  </Text>
+-                  {displayText(plugin.description) && (
+-                    <Text size="2">{displayText(plugin.description)}</Text>
+-                  )}
+-                  <Flex align="center" justify="between" gap="2" wrap="wrap">
+-                    <Text size="1" color="gray">
+-                      {plugin.source_name}
+-                    </Text>
+-                    <Flex gap="1" wrap="wrap" justify="end">
+-                      {!isInstalled && plugin.installable && komariCompatible && (
+-                        <Button
+-                          size="1"
+-                          disabled={installing === key}
+-                          onClick={() => installPlugin(plugin)}
+-                        >
+-                          <Download size={14} />
+-                          {installing === key
+-                            ? t("plugin.market_installing", "Installing...")
+-                            : t("plugin.market_install", "Install")}
+-                        </Button>
+-                      )}
+-                      {isInstalled && plugin.installable && komariCompatible && (
+-                        <Button
+-                          size="1"
+-                          disabled={installing === key}
+-                          onClick={() => installPlugin(plugin)}
+-                        >
+-                          {installing === key ? (
+-                            <RefreshCw size={14} className="animate-spin" />
+-                          ) : (
+-                            <RefreshCw size={14} />
+-                          )}
+-                          {t("plugin.market_reinstall", "Reinstall")}
+-                        </Button>
+-                      )}
+-                      {canConfigure && (
+-                        <Button
+-                          size="1"
+-                          variant="soft"
+-                          onClick={() =>
+-                            navigate(
+-                              `/admin/plugins/config?short=${encodeURIComponent(plugin.short)}`,
+-                            )
+-                          }
+-                        >
+-                          <Settings2 size={14} />
+-                          {t("plugin.market_modify", "Modify")}
+-                        </Button>
+-                      )}
+-                      {isInstalled && (
+-                        <Button
+-                          size="1"
+-                          variant="soft"
+-                          color="red"
+-                          disabled={deletingPlugin === plugin.short}
+-                          onClick={() => setPluginToUninstall(plugin)}
+-                        >
+-                          <Trash2 size={14} />
+-                          {t("market.uninstall", "Uninstall")}
+-                        </Button>
+-                      )}
+-                    </Flex>
+-                  </Flex>
+-                </Flex>
+-              </Card>
+-            );
+-          })}
+-        </Grid>
+-      )}
+-
+-      {/* 源管理弹窗：与主题市场一致 */}
+-      <Dialog.Root open={sourcesOpen} onOpenChange={setSourcesOpen}>
+-        <Dialog.Content maxWidth="760px">
+-          <Dialog.Title>
+-            {t("market.manage_sources", "Manage sources")}
+-          </Dialog.Title>
+-          <Dialog.Description className="sr-only">
+-            {t("market.manage_sources", "Manage sources")}
+-          </Dialog.Description>
+-          <Flex direction="column" gap="3" mt="4">
+-            {sources.length === 0 ? (
+-              <Text color="gray">
+-                {t("market.no_sources", "No sources configured")}
+-              </Text>
+-            ) : (
+-              sources.map((source, index) => (
+-                <Box key={source.id}>
+-                  {index > 0 && <Separator size="4" mb="3" />}
+-                  <Flex justify="between" align="center" gap="3">
+-                    <Box className="min-w-0">
+-                      <Text as="div" weight="medium">
+-                        {source.name}
+-                      </Text>
+-                      <Text as="div" size="1" color="gray" className="truncate">
+-                        {source.url}
+-                      </Text>
+-                    </Box>
+-                    <Flex align="center" gap="2" className="shrink-0">
+-                      <Switch
+-                        checked={source.enabled}
+-                        onCheckedChange={(checked) =>
+-                          updateSourceEnabled(source, checked)
+-                        }
+-                      />
+-                      <IconButton
+-                        variant="ghost"
+-                        onClick={() => startEditSource(source)}
+-                        title={t("common.edit", "Edit")}
+-                      >
+-                        <Pencil size={16} />
+-                      </IconButton>
+-                      <IconButton
+-                        variant="ghost"
+-                        color="red"
+-                        onClick={() => setSourceToDelete(source)}
+-                        title={t("common.delete", "Delete")}
+-                      >
+-                        <Trash2 size={16} />
+-                      </IconButton>
+-                    </Flex>
+-                  </Flex>
+-                </Box>
+-              ))
+-            )}
+-          </Flex>
+-
+-          <Separator size="4" my="5" />
+-          <Flex justify="between" align="center" mb="3">
+-            <Text weight="bold">
+-              {editingID
+-                ? t("market.edit_source", "Edit source")
+-                : t("market.add_source", "Add source")}
+-            </Text>
+-            {editingID && (
+-              <Button size="1" variant="ghost" onClick={startCreateSource}>
+-                <Plus size={14} />
+-                {t("market.add_source", "Add source")}
+-              </Button>
+-            )}
+-          </Flex>
+-          <Flex direction="column" gap="3">
+-            <TextField.Root
+-              value={sourceForm.name}
+-              onChange={(event) =>
+-                setSourceForm((current) => ({
+-                  ...current,
+-                  name: event.target.value,
+-                }))
+-              }
+-              placeholder={t("market.source_name", "Source name")}
+-            />
+-            <TextField.Root
+-              value={sourceForm.url}
+-              onChange={(event) =>
+-                setSourceForm((current) => ({
+-                  ...current,
+-                  url: event.target.value,
+-                }))
+-              }
+-              placeholder="https://raw.githubusercontent.com/owner/repo/main/v1.json"
+-            />
+-            <Flex justify="between" align="center">
+-              <Flex align="center" gap="2">
+-                <Switch
+-                  checked={sourceForm.enabled}
+-                  onCheckedChange={(enabled) =>
+-                    setSourceForm((current) => ({ ...current, enabled }))
+-                  }
+-                />
+-                <Text size="2">{t("market.enabled", "Enabled")}</Text>
+-              </Flex>
+-              <Button
+-                onClick={saveSource}
+-                disabled={
+-                  savingSource ||
+-                  !sourceForm.name.trim() ||
+-                  !sourceForm.url.trim()
+-                }
+-              >
+-                {savingSource && (
+-                  <RefreshCw size={15} className="animate-spin" />
+-                )}
+-                {editingID ? t("common.save", "Save") : t("common.add", "Add")}
+-              </Button>
+-            </Flex>
+-          </Flex>
+-          <Flex justify="end" mt="5">
+-            <Dialog.Close>
+-              <Button variant="soft">{t("common.close", "Close")}</Button>
+-            </Dialog.Close>
+-          </Flex>
+-        </Dialog.Content>
+-      </Dialog.Root>
+-
+-      {/* 卸载确认 */}
+-      <Dialog.Root
+-        open={Boolean(pluginToUninstall)}
+-        onOpenChange={(open) => {
+-          if (!open) setPluginToUninstall(null);
+-        }}
+-      >
+-        <Dialog.Content maxWidth="420px">
+-          <Dialog.Title>{t("market.uninstall", "Uninstall")}</Dialog.Title>
+-          <Dialog.Description>
+-            {t("market.uninstall_confirm", "Uninstall {{name}}?", {
+-              name: pluginToUninstall
+-                ? displayText(pluginToUninstall.name) || pluginToUninstall.short
+-                : "",
+-            })}
+-          </Dialog.Description>
+-          <Flex justify="end" gap="2" mt="4">
+-            <Dialog.Close>
+-              <Button variant="soft" color="gray">
+-                {t("common.cancel", "Cancel")}
+-              </Button>
+-            </Dialog.Close>
+-            <Button
+-              color="red"
+-              disabled={
+-                !pluginToUninstall || deletingPlugin === pluginToUninstall.short
+-              }
+-              onClick={async () => {
+-                if (!pluginToUninstall) return;
+-                await uninstallPlugin(pluginToUninstall);
+-                setPluginToUninstall(null);
+-              }}
+-            >
+-              {deletingPlugin && (
+-                <RefreshCw size={15} className="animate-spin" />
+-              )}
+-              {t("market.uninstall", "Uninstall")}
+-            </Button>
+-          </Flex>
+-        </Dialog.Content>
+-      </Dialog.Root>
+-
+-      {/* 删除源确认 */}
+-      <Dialog.Root
+-        open={Boolean(sourceToDelete)}
+-        onOpenChange={(open) => {
+-          if (!open) setSourceToDelete(null);
+-        }}
+-      >
+-        <Dialog.Content maxWidth="420px">
+-          <Dialog.Title>{t("common.delete", "Delete")}</Dialog.Title>
+-          <Dialog.Description>
+-            {t("market.delete_source_confirm", "Delete source {{name}}?", {
+-              name: sourceToDelete?.name,
+-            })}
+-          </Dialog.Description>
+-          <Flex justify="end" gap="2" mt="4">
+-            <Dialog.Close>
+-              <Button variant="soft" color="gray">
+-                {t("common.cancel", "Cancel")}
+-              </Button>
+-            </Dialog.Close>
+-            <Button
+-              color="red"
+-              disabled={!sourceToDelete}
+-              onClick={async () => {
+-                if (!sourceToDelete) return;
+-                await deleteSource(sourceToDelete);
+-                setSourceToDelete(null);
+-              }}
+-            >
+-              {t("common.delete", "Delete")}
+-            </Button>
+-          </Flex>
+-        </Dialog.Content>
+-      </Dialog.Root>
+-    </Box>
+-  );
+-}
+diff --git a/src/pages/admin/notification/traffic_report.tsx b/src/pages/admin/notification/traffic_report.tsx
+index 9d7a901..531f5fc 100644
+--- a/src/pages/admin/notification/traffic_report.tsx
++++ b/src/pages/admin/notification/traffic_report.tsx
+@@ -17,12 +17,11 @@ import {
+   type TrafficReportNotification,
+ } from "@/contexts/TrafficReportContext";
+ import React from "react";
+-import { AlertTriangle, Pencil, Search } from "lucide-react";
++import { Pencil, Search } from "lucide-react";
+ import { useTranslation } from "react-i18next";
+ import {
+   Badge,
+   Button,
+-  Callout,
+   Dialog,
+   Flex,
+   IconButton,
+@@ -247,18 +246,6 @@ const InnerLayout = () => {
+ 
+   return (
+     <div className="km-page-admin-notification-traffic-report flex flex-col gap-4 md:p-4 p-1">
+-      <Callout.Root color="amber" size="1">
+-        <Callout.Icon>
+-          <AlertTriangle size={16} />
+-        </Callout.Icon>
+-        <Callout.Text>
+-          {t("notification.traffic_report.deprecation_notice")}{" "}
+-          <a href="/admin/market/plugins" className="text-accent-9 underline">
+-            {t("notification.traffic_report.visit_plugin_market")}
+-          </a>
+-        </Callout.Text>
+-      </Callout.Root>
+-
+       <Flex justify="between" align="center" wrap="wrap">
+         <label className="text-2xl font-semibold">
+           {t("notification.traffic_report.full_title")}
+diff --git a/src/pages/admin/plugin_config.tsx b/src/pages/admin/plugin_config.tsx
+deleted file mode 100644
+index 3e8407a..0000000
+--- a/src/pages/admin/plugin_config.tsx
++++ /dev/null
+@@ -1,298 +0,0 @@
+-import { useCallback, useEffect, useMemo, useState } from "react";
+-import { Blocks } from "lucide-react";
+-import { useSearchParams } from "react-router-dom";
+-import {
+-  Box,
+-  Button,
+-  Callout,
+-  Card,
+-  Flex,
+-  Heading,
+-  Text,
+-} from "@radix-ui/themes";
+-
+-import { useTranslation } from "react-i18next";
+-import { toast } from "sonner";
+-import Loading from "@/components/loading";
+-import InlineSvgIcon from "@/components/InlineSvgIcon";
+-import ConfigFormTabs from "@/components/admin/ConfigFormTabs";
+-import { useRPC2Call } from "@/contexts/RPC2Context";
+-import { resolveI18nText } from "@/utils/i18nText";
+-import { iconMap, resolvePluginIcon } from "@/utils/iconHelper";
+-import type { I18nText } from "@/utils/i18nText";
+-import type { PluginConfiguration, PluginInfo, PluginConfigItem } from "@/types/plugin";
+-
+-interface ConfigurationResponse {
+-  configuration?: PluginConfiguration;
+-  data?: Record<string, any>;
+-}
+-
+-// 渲染插件 icon：lucide 名用组件，URL/相对路径用图片或内联 SVG，否则默认 Blocks。
+-const renderPluginIcon = (
+-  plugin: PluginInfo,
+-  size: number,
+-  className: string,
+-  opacity: number,
+-) => {
+-  const icon = resolvePluginIcon(plugin.short, plugin.icon);
+-  if (!icon) {
+-    return <Blocks size={size} className={className} style={{ opacity }} />;
+-  }
+-  const Cmp = iconMap[icon];
+-  if (Cmp) {
+-    return <Cmp size={size} className={className} style={{ opacity }} />;
+-  }
+-  return (
+-    <InlineSvgIcon
+-      src={icon}
+-      alt=""
+-      className={`${className} object-contain`}
+-      style={{ opacity }}
+-    />
+-  );
+-};
+-
+-// 插件配置：左侧插件列表，右侧具体插件的配置项（与主题配置一致）。
+-export default function PluginConfigPage() {
+-  const { call } = useRPC2Call();
+-  const { t, i18n } = useTranslation();
+-  const language = i18n.resolvedLanguage || i18n.language || "";
+-
+-  const [searchParams] = useSearchParams();
+-  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+-  const [loading, setLoading] = useState(true);
+-  const [selected, setSelected] = useState<PluginInfo | null>(null);
+-  const [autoSelectDone, setAutoSelectDone] = useState(false);
+-  const [configuration, setConfiguration] = useState<PluginConfiguration | null>(null);
+-  const [values, setValues] = useState<Record<string, any>>({});
+-  const [saving, setSaving] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
+-
+-  const displayText = useCallback(
+-    (value: I18nText | undefined) => resolveI18nText(value, language) || "",
+-    [language],
+-  );
+-
+-  // 插件是否声明了可展示配置项（忽略 title 分组项），无配置项的插件不显示在列表中。
+-  const hasConfiguration = (plugin: PluginInfo) =>
+-    Array.isArray(plugin?.configuration?.data) &&
+-    plugin!.configuration!.data!.some((item) => item.type !== "title");
+-
+-  const configurablePlugins = useMemo(
+-    () => plugins.filter(hasConfiguration),
+-    [plugins],
+-  );
+-
+-  const loadList = useCallback(async () => {
+-    try {
+-      const result = await call<any, PluginInfo[]>("admin:listPlugins");
+-      const nextPlugins = Array.isArray(result) ? result : [];
+-      setPlugins(nextPlugins);
+-      return nextPlugins;
+-    } catch (e) {
+-      toast.error(e instanceof Error ? e.message : String(e));
+-      return null;
+-    }
+-  }, [call]);
+-
+-  useEffect(() => {
+-    loadList().finally(() => setLoading(false));
+-  }, [loadList]);
+-
+-
+-  const selectPlugin = useCallback(async (plugin: PluginInfo) => {
+-    setSelected(plugin);
+-    setConfiguration(null);
+-    setValues({});
+-    setError(null);
+-    try {
+-      const result = await call<any, ConfigurationResponse>("admin:getPluginConfiguration", {
+-        short: plugin.short,
+-      });
+-      const configuration = result?.configuration || {};
+-      setConfiguration(configuration);
+-      const items: PluginConfigItem[] = Array.isArray(configuration.data)
+-        ? configuration.data
+-        : [];
+-      const init: Record<string, any> = {};
+-      items.forEach((item) => {
+-        if (item.type !== "title" && item.type !== "textbox" && item.key) {
+-          const saved = result?.data?.[item.key];
+-          const selection = item.type === "nodes" || item.type === "pingtasks";
+-          init[item.key] =
+-            saved !== undefined
+-              ? selection
+-                ? JSON.stringify(saved)
+-                : saved
+-              : item.default ??
+-                (selection ? "[]" : undefined);
+-        }
+-      });
+-      setValues(init);
+-    } catch (e) {
+-      setError(e instanceof Error ? e.message : String(e));
+-    }
+-  }, [call]);
+-  // 从插件管理页跳转过来时（?short=xxx）自动选中对应插件。
+-  useEffect(() => {
+-    if (loading || autoSelectDone) return;
+-    const target = searchParams.get("short");
+-    if (!target || configurablePlugins.length === 0) return;
+-    const plugin = configurablePlugins.find((item) => item.short === target);
+-    if (plugin) {
+-      setAutoSelectDone(true);
+-      selectPlugin(plugin);
+-    }
+-  }, [loading, autoSelectDone, searchParams, configurablePlugins, selectPlugin]);
+-
+-  const handleValueChange = (key: string, value: any) => {
+-    setValues((current) => ({ ...current, [key]: value }));
+-  };
+-
+-  const saveAll = async () => {
+-    if (!selected) return;
+-    setSaving(true);
+-    try {
+-      await call("admin:setPluginConfiguration", {
+-        short: selected.short,
+-        data: values,
+-      });
+-      toast.success(
+-        selected.enabled
+-          ? t(
+-              "plugin.config_saved_and_reloaded",
+-              "Configuration saved and plugin reloaded",
+-            )
+-          : t("plugin.config_saved", "Configuration saved"),
+-      );
+-    } catch (e) {
+-      const errorMessage = e instanceof Error ? e.message : String(e);
+-      const reloadFailed =
+-        selected.enabled && errorMessage.includes("plugin configuration saved but reload failed");
+-      toast.error(
+-        `${reloadFailed
+-          ? t(
+-              "plugin.config_saved_reload_failed",
+-              "Configuration saved, but plugin reload failed",
+-            )
+-          : t("plugin.config_save_failed", "Failed to save configuration")}: ${
+-          errorMessage
+-        }`,
+-      );
+-      if (reloadFailed) {
+-        const nextPlugins = await loadList();
+-        const nextSelected = nextPlugins?.find((plugin) => plugin.short === selected.short);
+-        if (nextSelected) setSelected(nextSelected);
+-      }
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+-
+-  if (loading) return <Loading />;
+-
+-  const items: PluginConfigItem[] = Array.isArray(configuration?.data)
+-    ? configuration.data
+-    : [];
+-  const hasItems = items.some((item) => item.type !== "title");
+-  const hasEditableItems = items.some(
+-    (item) => item.type !== "title" && item.type !== "textbox",
+-  );
+-
+-  return (
+-    <Box className="km-page-admin-plugin-config h-full min-h-0 p-4">
+-      <ConfigFormTabs
+-        items={items}
+-        values={values}
+-        onValueChange={handleValueChange}
+-        resolveText={displayText}
+-        className="h-full"
+-        header={
+-          <Flex direction="column" gap="3">
+-            <Flex justify="between" align="center" wrap="wrap" gap="3">
+-              <Flex align="center" gap="2">
+-                <Blocks size={20} />
+-                <Heading size="4">{t("plugin.config", "Configuration")}</Heading>
+-              </Flex>
+-              {selected && !error && hasEditableItems && (
+-                <Button onClick={saveAll} disabled={saving}>
+-                  {saving
+-                    ? selected.enabled
+-                      ? t("plugin.saving_and_reloading", "Saving and reloading...")
+-                      : t("plugin.saving", "Saving...")
+-                    : selected.enabled
+-                      ? t("plugin.save_and_reload", "Save and reload")
+-                      : t("common.save")}
+-                </Button>
+-              )}
+-            </Flex>
+-            {selected && !error && hasItems && (
+-              <Text weight="bold">
+-                {displayText(selected.name) || selected.short}
+-              </Text>
+-            )}
+-          </Flex>
+-        }
+-        notice={
+-          !selected || error || !hasItems ? (
+-            <Box className="mb-4">
+-              {!selected ? (
+-                <Callout.Root>
+-                  <Callout.Text>{t("plugin.config_select_hint", "Select a plugin to configure")}</Callout.Text>
+-                </Callout.Root>
+-              ) : error ? (
+-                <Callout.Root color="red">
+-                  <Callout.Text>{error}</Callout.Text>
+-                </Callout.Root>
+-              ) : (
+-                <Callout.Root>
+-                  <Callout.Text>{t("plugin.config_no_items", "This plugin has no configuration items")}</Callout.Text>
+-                </Callout.Root>
+-              )}
+-            </Box>
+-          ) : undefined
+-        }
+-        sidebar={
+-          <Card>
+-            <Flex direction="column" gap="1">
+-              {configurablePlugins.length === 0 && (
+-                <Text size="2" color="gray">
+-                  {plugins.length === 0
+-                    ? t("plugin.no_plugins", "No plugins installed yet")
+-                    : t("plugin.config_no_configurable_plugins", "No plugins with configuration items")}
+-                </Text>
+-              )}
+-              {configurablePlugins.map((plugin) => {
+-                const isActive = selected?.short === plugin.short;
+-                return (
+-                  <button
+-                    key={plugin.short}
+-                    type="button"
+-                    onClick={() => selectPlugin(plugin)}
+-                    className="group flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors duration-200 hover:bg-accent-3"
+-                    style={{
+-                      borderLeft: isActive
+-                        ? "4px solid var(--accent-8)"
+-                        : "4px solid transparent",
+-                      backgroundColor: isActive ? "var(--accent-4)" : "transparent",
+-                      color: isActive ? "var(--accent-10)" : "inherit",
+-                    }}
+-                  >
+-                    {renderPluginIcon(plugin, 16, "h-5 w-5 shrink-0", isActive ? 1 : 0.7)}
+-                    <Text
+-                      size="2"
+-                      weight={isActive ? "bold" : "medium"}
+-                      className="min-w-0 truncate"
+-                    >
+-                      {displayText(plugin.name) || plugin.short}
+-                    </Text>
+-                  </button>
+-                );
+-              })}
+-            </Flex>
+-          </Card>
+-        }
+-      />
+-    </Box>
+-  );
+-}
+diff --git a/src/pages/admin/plugin_page.tsx b/src/pages/admin/plugin_page.tsx
+deleted file mode 100644
+index 767a0a8..0000000
+--- a/src/pages/admin/plugin_page.tsx
++++ /dev/null
+@@ -1,29 +0,0 @@
+-import { Box, Callout } from "@radix-ui/themes";
+-import { useSearchParams } from "react-router-dom";
+-import { useTranslation } from "react-i18next";
+-
+-// 插件注入的管理页面：iframe 内嵌插件目录里的静态 HTML。
+-export default function PluginPage() {
+-  const { t } = useTranslation();
+-  const [params] = useSearchParams();
+-  const short = params.get("short");
+-  const file = params.get("file");
+-  if (!short || !file) {
+-    return (
+-      <Callout.Root>
+-        <Callout.Text>{t("plugin.page_missing_params", "Missing plugin page parameters")}</Callout.Text>
+-      </Callout.Root>
+-    );
+-  }
+-  const src = `/api/admin/plugin/${encodeURIComponent(short)}/${file}`;
+-  return (
+-    <Box className="km-page-admin-plugin h-full min-h-[calc(100vh-96px)]">
+-      <iframe
+-        title={`${short}/${file}`}
+-        src={src}
+-        sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
+-        className="km-plugin-frame h-full min-h-[calc(100vh-96px)] w-full border-0"
+-      />
+-    </Box>
+-  );
+-}
+diff --git a/src/pages/admin/plugins.tsx b/src/pages/admin/plugins.tsx
+deleted file mode 100644
+index 4c45c35..0000000
+--- a/src/pages/admin/plugins.tsx
++++ /dev/null
+@@ -1,532 +0,0 @@
+-import { useCallback, useEffect, useRef, useState } from "react";
+-import {
+-  Badge,
+-  Box,
+-  Button,
+-  Callout,
+-  Card,
+-  Dialog,
+-  Flex,
+-  Heading,
+-  Separator,
+-  Switch,
+-  Text,
+-} from "@radix-ui/themes";
+-import {
+-  Blocks,
+-  FileText,
+-  RefreshCw,
+-  Settings2,
+-  Trash2,
+-  Upload,
+-} from "lucide-react";
+-import { useTranslation } from "react-i18next";
+-import { useNavigate } from "react-router-dom";
+-import { toast } from "sonner";
+-import Loading from "@/components/loading";
+-import InlineSvgIcon from "@/components/InlineSvgIcon";
+-import UploadDialog from "@/components/UploadDialog";
+-import { createChunkUploadTask, type ChunkUploadTask } from "@/lib/chunkUpload";
+-import { useAdminNavigation } from "@/contexts/AdminNavigationContext";
+-import { useRPC2Call } from "@/contexts/RPC2Context";
+-import { resolveI18nText, type I18nText } from "@/utils/i18nText";
+-import { iconMap, resolvePluginIcon } from "@/utils/iconHelper";
+-import type { PluginInfo } from "@/types/plugin";
+-
+-interface SetEnabledResult {
+-  requires_approval?: boolean;
+-}
+-
+-// 插件是否声明了可编辑配置项（忽略 title 分组项）。
+-const hasConfiguration = (plugin: PluginInfo) =>
+-  Array.isArray(plugin.configuration?.data) &&
+-  plugin.configuration!.data!.some((item) => item.type !== "title");
+-
+-// 渲染插件 icon：lucide 名用组件，URL/相对路径用图片或内联 SVG，否则默认 Blocks。
+-const renderPluginIcon = (
+-  plugin: PluginInfo,
+-  size: number,
+-  className: string,
+-) => {
+-  const icon = resolvePluginIcon(plugin.short, plugin.icon);
+-  if (!icon) return <Blocks size={size} className={className} />;
+-  const Cmp = iconMap[icon];
+-  if (Cmp) {
+-    return <Cmp size={size} className={className} />;
+-  }
+-  return (
+-    <InlineSvgIcon
+-      src={icon}
+-      alt=""
+-      className={`${className} object-contain`}
+-    />
+-  );
+-};
+-
+-// 插件管理：上传 zip、switch 启停、权限确认弹窗、运行日志、行内错误文本。
+-export default function PluginsPage() {
+-  const { call } = useRPC2Call();
+-  const { refreshNavigation } = useAdminNavigation();
+-  const { t, i18n } = useTranslation();
+-  const navigate = useNavigate();
+-  const language = i18n.resolvedLanguage || i18n.language || "";
+-  const displayText = useCallback(
+-    (value: I18nText | undefined) => resolveI18nText(value, language) || "",
+-    [language],
+-  );
+-
+-  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+-  const [loading, setLoading] = useState(true);
+-  const [uploading, setUploading] = useState(false);
+-  const [uploadProgress, setUploadProgress] = useState(0);
+-  const uploadTaskRef = useRef<ChunkUploadTask | null>(null);
+-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+-  const [toggling, setToggling] = useState<string | null>(null);
+-  const [pendingApproval, setPendingApproval] = useState<PluginInfo | null>(
+-    null,
+-  );
+-  const [logPlugin, setLogPlugin] = useState<PluginInfo | null>(null);
+-  const [logContent, setLogContent] = useState("");
+-  const [logsLoading, setLogsLoading] = useState(false);
+-  const [pluginToDelete, setPluginToDelete] = useState<PluginInfo | null>(null);
+-  const [deleting, setDeleting] = useState(false);
+-
+-  const loadList = useCallback(async () => {
+-    try {
+-      const result = await call<any, PluginInfo[]>("admin:listPlugins");
+-      setPlugins(Array.isArray(result) ? result : []);
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    }
+-  }, [call]);
+-
+-  useEffect(() => {
+-    loadList().finally(() => setLoading(false));
+-  }, [loadList]);
+-
+-  const uploadPlugin = async (file: File) => {
+-    if (!file.name.endsWith(".zip")) {
+-      toast.error(
+-        t(
+-          "plugin.invalid_file_type",
+-          "Invalid file type, only .zip files are supported",
+-        ),
+-      );
+-      return;
+-    }
+-    setUploading(true);
+-    setUploadProgress(0);
+-    const task = createChunkUploadTask("/api/admin/upload");
+-    uploadTaskRef.current = task;
+-    try {
+-      await task.upload("plugin", file, setUploadProgress);
+-      toast.success(t("plugin.uploaded", "Plugin uploaded"));
+-      setUploadDialogOpen(false);
+-      setUploadProgress(0);
+-      await loadList();
+-    } catch (error) {
+-      if (!(error instanceof DOMException && error.name === "AbortError")) {
+-        toast.error(
+-          t("plugin.upload_failed", "Plugin upload failed") +
+-            ": " +
+-            (error instanceof Error ? error.message : String(error)),
+-        );
+-      }
+-    } finally {
+-      setUploading(false);
+-      uploadTaskRef.current = null;
+-    }
+-  };
+-
+-  const cancelUpload = () => {
+-    uploadTaskRef.current?.cancel();
+-    setUploadProgress(0);
+-  };
+-
+-  const toggle = async (plugin: PluginInfo, enabled: boolean) => {
+-    setToggling(plugin.short);
+-    try {
+-      const result = await call<
+-        { short: string; enabled: boolean },
+-        SetEnabledResult
+-      >("admin:setPluginEnabled", {
+-        short: plugin.short,
+-        enabled,
+-      });
+-      if (enabled && result?.requires_approval) {
+-        setPendingApproval(plugin);
+-        return;
+-      }
+-      toast.success(
+-        enabled
+-          ? t("plugin.enable_success", "Plugin enabled")
+-          : t("plugin.disable_success", "Plugin disabled"),
+-      );
+-      refreshNavigation();
+-      await loadList();
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-      await loadList(); // 启动失败自动禁用，刷新后行内显示 last_error
+-    } finally {
+-      setToggling(null);
+-    }
+-  };
+-
+-  const approveAndEnable = async () => {
+-    if (!pendingApproval) return;
+-    const plugin = pendingApproval;
+-    setPendingApproval(null);
+-    setToggling(plugin.short);
+-    try {
+-      await call("admin:setPluginEnabled", {
+-        short: plugin.short,
+-        enabled: true,
+-        approved: true,
+-      });
+-      refreshNavigation();
+-      toast.success(t("plugin.enable_success", "Plugin enabled"));
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    } finally {
+-      setToggling(null);
+-      await loadList();
+-    }
+-  };
+-
+-  const openLogs = async (plugin: PluginInfo) => {
+-    setLogPlugin(plugin);
+-    setLogContent("");
+-    setLogsLoading(true);
+-    try {
+-      const result = await call<{ short: string }, { logs?: string }>(
+-        "admin:getPluginLogs",
+-        {
+-          short: plugin.short,
+-        },
+-      );
+-      setLogContent(result?.logs || "");
+-    } catch (error) {
+-      setLogContent(
+-        `${t("plugin.logs_load_failed", "Failed to load logs")}: ${
+-          error instanceof Error ? error.message : String(error)
+-        }`,
+-      );
+-    } finally {
+-      setLogsLoading(false);
+-    }
+-  };
+-
+-  const deletePlugin = async (plugin: PluginInfo) => {
+-    setDeleting(true);
+-    try {
+-      await call("admin:deletePlugin", { short: plugin.short });
+-      toast.success(t("plugin.deleted", "Plugin deleted"));
+-      setPluginToDelete(null);
+-      await loadList();
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : String(error));
+-    } finally {
+-      setDeleting(false);
+-    }
+-  };
+-
+-  // 需要批准的权限列表（按能力拆分；超时/大小限制等运行时设置不在此列）。
+-  // server.registerRPC、server.getConfig、插件目录内文件读写默认授予，不弹确认。
+-  const permissionLabels = (plugin: PluginInfo): string[] => {
+-    const labels: string[] = [];
+-    const p = plugin.permissions;
+-    if (!p) return labels;
+-    if (p.allowSystemRPC)
+-      labels.push(t("plugin.permission.allowSystemRPC", "Call system RPC"));
+-    if (p.allowRoutes)
+-      labels.push(t("plugin.permission.allowRoutes", "Register HTTP routes"));
+-    if (p.allowHooks)
+-      labels.push(
+-        t("plugin.permission.allowHooks", "Modify HTTP requests/responses"),
+-      );
+-    if (p.allowHTMLInject)
+-      labels.push(
+-        t(
+-          "plugin.permission.allowHTMLInject",
+-          "Embed CSS/JS into every HTML page",
+-        ),
+-      );
+-    if (p.allowExec)
+-      labels.push(t("plugin.permission.allowExec", "Execute child processes"));
+-    if (p.allowListen)
+-      labels.push(t("plugin.permission.allowListen", "Listen on local ports"));
+-    if (p.allowAllFileAccess)
+-      labels.push(
+-        t(
+-          "plugin.permission.allowAllFileAccess",
+-          "Access files outside the plugin directory",
+-        ),
+-      );
+-    return labels;
+-  };
+-
+-  if (loading) return <Loading />;
+-
+-  return (
+-    <Box className="km-page-admin-plugins p-4 space-y-4">
+-      <Flex align="center" justify="between" className="km-plugins-toolbar">
+-        <Flex align="center" gap="2">
+-          <Blocks size={20} />
+-          <Heading size="4">{t("plugin.title", "Plugins")}</Heading>
+-        </Flex>
+-        <Flex gap="2">
+-          <Button
+-            onClick={() => setUploadDialogOpen(true)}
+-            disabled={uploading}
+-          >
+-            <Upload size={14} />
+-            {t("plugin.upload", "Upload Plugin")}
+-          </Button>
+-          <Button variant="soft" onClick={loadList}>
+-            <RefreshCw size={14} />
+-            {t("common.refresh", "Refresh")}
+-          </Button>
+-        </Flex>
+-      </Flex>
+-
+-      <Separator size="4" />
+-
+-      {plugins.length === 0 ? (
+-        <Callout.Root>
+-          <Callout.Text>
+-            {t("plugin.no_plugins", "No plugins installed yet")}
+-          </Callout.Text>
+-        </Callout.Root>
+-      ) : (
+-        <Flex direction="column" gap="3" className="km-plugins-list">
+-          {plugins.map((plugin) => (
+-            <Card key={plugin.short} className="km-plugin-card w-full">
+-              <Flex direction="column" gap="2">
+-                <Flex align="center" justify="between" gap="4">
+-                  <Flex align="center" gap="3" className="min-w-0">
+-                    {renderPluginIcon(plugin, 20, "h-5 w-5 shrink-0")}
+-                    <Flex direction="column" gap="1" className="min-w-0">
+-                      <Flex align="center" gap="2" wrap="wrap">
+-                        <Text weight="bold">
+-                          {displayText(plugin.name) || plugin.short}
+-                        </Text>
+-                        <Badge color={plugin.running ? "green" : "gray"}>
+-                          {plugin.running
+-                            ? t("plugin.running", "Running")
+-                            : t("plugin.stopped", "Stopped")}
+-                        </Badge>
+-                        <Text size="2" color="gray">
+-                          v{plugin.version}
+-                          {displayText(plugin.author)
+-                            ? ` · ${displayText(plugin.author)}`
+-                            : ""}
+-                        </Text>
+-                      </Flex>
+-                      {displayText(plugin.description) && (
+-                        <Text size="2" color="gray" className="truncate">
+-                          {displayText(plugin.description)}
+-                        </Text>
+-                      )}
+-                    </Flex>
+-                  </Flex>
+-                  <Flex align="center" gap="3" className="shrink-0">
+-                    {hasConfiguration(plugin) && (
+-                      <Button
+-                        size="1"
+-                        variant="soft"
+-                        onClick={() =>
+-                          navigate(
+-                            `/admin/plugins/config?short=${encodeURIComponent(plugin.short)}`,
+-                          )
+-                        }
+-                      >
+-                        <Settings2 size={14} />
+-                        {t("plugin.config", "Configuration")}
+-                      </Button>
+-                    )}
+-                    <Button
+-                      size="1"
+-                      variant="soft"
+-                      onClick={() => openLogs(plugin)}
+-                    >
+-                      <FileText size={14} />
+-                      {t("logs.title", "Logs")}
+-                    </Button>
+-                    <Button
+-                      size="1"
+-                      variant="ghost"
+-                      color="red"
+-                      onClick={() => setPluginToDelete(plugin)}
+-                      title={t("plugin.delete", "Delete plugin")}
+-                      aria-label={t("plugin.delete", "Delete plugin")}
+-                    >
+-                      <Trash2 size={14} />
+-                    </Button>
+-                    <Switch
+-                      checked={plugin.enabled}
+-                      disabled={toggling === plugin.short}
+-                      onCheckedChange={(checked) => toggle(plugin, checked)}
+-                      aria-label={
+-                        plugin.enabled
+-                          ? t("plugin.disable", "Disable plugin")
+-                          : t("plugin.enable", "Enable plugin")
+-                      }
+-                      title={
+-                        plugin.enabled
+-                          ? t("plugin.disable", "Disable plugin")
+-                          : t("plugin.enable", "Enable plugin")
+-                      }
+-                    />
+-                  </Flex>
+-                </Flex>
+-                {plugin.last_error && (
+-                  <Callout.Root color="red" size="1">
+-                    <Callout.Text>
+-                      {t("plugin.last_error", "Last error")}:{" "}
+-                      {plugin.last_error}
+-                    </Callout.Text>
+-                  </Callout.Root>
+-                )}
+-              </Flex>
+-            </Card>
+-          ))}
+-        </Flex>
+-      )}
+-
+-      {/* 权限确认弹窗 */}
+-      <Dialog.Root
+-        open={pendingApproval !== null}
+-        onOpenChange={(open) => {
+-          if (!open) setPendingApproval(null);
+-        }}
+-      >
+-        <Dialog.Content>
+-          <Dialog.Title>
+-            {t("plugin.permission_title", "Permission required")}
+-          </Dialog.Title>
+-          <Text as="p" size="2" className="mb-2">
+-            {t(
+-              "plugin.permission_description",
+-              "This plugin requests the following permissions:",
+-            )}
+-          </Text>
+-          <Flex direction="column" gap="2" my="3">
+-            {pendingApproval &&
+-              permissionLabels(pendingApproval).length === 0 && (
+-                <Text size="2" color="gray">
+-                  {t(
+-                    "plugin.permission_none",
+-                    "This plugin requests no special permissions",
+-                  )}
+-                </Text>
+-              )}
+-            {pendingApproval &&
+-              permissionLabels(pendingApproval).map((label) => (
+-                <Badge
+-                  key={label}
+-                  color="orange"
+-                  size="2"
+-                  className="justify-start"
+-                >
+-                  {label}
+-                </Badge>
+-              ))}
+-          </Flex>
+-          <Text size="1" color="gray" className="mb-4">
+-            {t(
+-              "plugin.permission_default_note",
+-              "Default granted: read plugin configuration, register plugin RPC, read/write files inside the plugin directory",
+-            )}
+-          </Text>
+-          <Flex gap="2" justify="end">
+-            <Button variant="soft" onClick={() => setPendingApproval(null)}>
+-              {t("common.cancel", "Cancel")}
+-            </Button>
+-            <Button onClick={approveAndEnable}>
+-              {t("plugin.permission_approve", "Approve & Enable")}
+-            </Button>
+-          </Flex>
+-        </Dialog.Content>
+-      </Dialog.Root>
+-
+-      {/* 运行日志弹窗 */}
+-      <Dialog.Root
+-        open={logPlugin !== null}
+-        onOpenChange={(open) => {
+-          if (!open) setLogPlugin(null);
+-        }}
+-      >
+-        <Dialog.Content>
+-          <Dialog.Title>
+-            {t("logs.title", "Logs")} · {logPlugin?.short}
+-          </Dialog.Title>
+-          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-gray-1 p-3 text-xs">
+-            {logsLoading
+-              ? t("plugin.loading", "Loading...")
+-              : logContent || t("plugin.no_logs", "No logs")}
+-          </pre>
+-        </Dialog.Content>
+-      </Dialog.Root>
+-
+-      {/* 上传对话框 */}
+-      <UploadDialog
+-        open={uploadDialogOpen}
+-        onOpenChange={setUploadDialogOpen}
+-        title={t("plugin.upload", "Upload Plugin")}
+-        description={t(
+-          "plugin.upload_description",
+-          "Upload a .zip plugin package",
+-        )}
+-        accept=".zip"
+-        dragDropText={t("plugin.drag_drop", "Drag and drop files here")}
+-        clickToBrowseText={t(
+-          "plugin.or_click_to_browse",
+-          "Or click to browse files",
+-        )}
+-        hintText={t("plugin.zip_files_only", "Only .zip files are supported")}
+-        uploading={uploading}
+-        progress={uploadProgress}
+-        uploadingText={t("plugin.uploading", "Uploading...")}
+-        cancelUploadLabel={t("common.cancel", "Cancel")}
+-        onCancelUpload={cancelUpload}
+-        onFileSelected={uploadPlugin}
+-        closeLabel={t("common.cancel", "Cancel")}
+-      />
+-
+-      {/* 删除确认 */}
+-      <Dialog.Root
+-        open={pluginToDelete !== null}
+-        onOpenChange={(open) => {
+-          if (!open) setPluginToDelete(null);
+-        }}
+-      >
+-        <Dialog.Content>
+-          <Dialog.Title>{t("plugin.delete", "Delete plugin")}</Dialog.Title>
+-          <Text as="p" size="2" my="3">
+-            {t("plugin.delete_confirm", "Delete this plugin?")}{" "}
+-            {pluginToDelete?.short}
+-            <br />
+-            {t(
+-              "plugin.delete_confirm_desc",
+-              "The plugin directory and its configuration will be removed.",
+-            )}
+-          </Text>
+-          <Flex gap="2" justify="end">
+-            <Button variant="soft" onClick={() => setPluginToDelete(null)}>
+-              {t("common.cancel", "Cancel")}
+-            </Button>
+-            <Button
+-              color="red"
+-              disabled={deleting}
+-              onClick={() => pluginToDelete && deletePlugin(pluginToDelete)}
+-            >
+-              {deleting
+-                ? t("plugin.deleting", "Deleting...")
+-                : t("plugin.delete", "Delete")}
+-            </Button>
+-          </Flex>
+-        </Dialog.Content>
+-      </Dialog.Root>
+-    </Box>
+-  );
+-}
+diff --git a/src/pages/plugin_page.tsx b/src/pages/plugin_page.tsx
+deleted file mode 100644
+index 5ee7bf2..0000000
+--- a/src/pages/plugin_page.tsx
++++ /dev/null
+@@ -1,28 +0,0 @@
+-import { Box, Callout } from "@radix-ui/themes";
+-import { useParams } from "react-router-dom";
+-import { useTranslation } from "react-i18next";
+-
+-// 插件公开页面（visibility=public）：通过公开路由直接访问，不进导航。
+-// 内容来自无需鉴权的 /api/plugin/:short/*filepath。
+-export default function PluginPage() {
+-  const { t } = useTranslation();
+-  const { short, filepath } = useParams<{ short: string; filepath: string }>();
+-  if (!short || !filepath) {
+-    return (
+-      <Callout.Root className="km-plugin-missing">
+-        <Callout.Text>{t("plugin.page_missing_params", "Missing plugin page parameters")}</Callout.Text>
+-      </Callout.Root>
+-    );
+-  }
+-  const src = `/api/plugin/${encodeURIComponent(short)}/${filepath}`;
+-  return (
+-    <Box className="km-page-plugin h-full min-h-[calc(100vh-96px)]">
+-      <iframe
+-        title={`${short}/${filepath}`}
+-        src={src}
+-        sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
+-        className="km-plugin-frame h-full min-h-[calc(100vh-96px)] w-full border-0"
+-      />
+-    </Box>
+-  );
+-}
+\ No newline at end of file
+diff --git a/src/routes.ts b/src/routes.ts
+index 5bd4d3a..a7f3c08 100644
+--- a/src/routes.ts
++++ b/src/routes.ts
+@@ -20,10 +20,6 @@ export const routes: RouteObject[] = [
+         path: "instance/:uuid",
+         element: React.createElement(lazy(() => import("./pages/instance"))),
+       },
+-      {
+-        path: "plugin/:short/*filepath",
+-        element: React.createElement(lazy(() => import("./pages/plugin_page"))),
+-      },
+     ],
+   },
+   {
+@@ -88,36 +84,12 @@ export const routes: RouteObject[] = [
+           replace: true,
+         }),
+       },
+-      {
+-        path: "plugins",
+-        element: React.createElement(
+-          lazy(() => import("./pages/admin/plugins"))
+-        ),
+-      },
+-      {
+-        path: "plugins/config",
+-        element: React.createElement(
+-          lazy(() => import("./pages/admin/plugin_config"))
+-        ),
+-      },
+-      {
+-        path: "plugin-page",
+-        element: React.createElement(
+-          lazy(() => import("./pages/admin/plugin_page"))
+-        ),
+-      },
+       {
+         path: "market/themes",
+         element: React.createElement(
+           lazy(() => import("./pages/admin/market/themes"))
+         ),
+       },
+-      {
+-        path: "market/plugins",
+-        element: React.createElement(
+-          lazy(() => import("./pages/admin/market/plugins"))
+-        ),
+-      },
+       {
+         path: "sessions",
+         element: React.createElement(
+diff --git a/src/types/plugin.ts b/src/types/plugin.ts
+deleted file mode 100644
+index 3869ee9..0000000
+--- a/src/types/plugin.ts
++++ /dev/null
+@@ -1,62 +0,0 @@
+-import type { I18nText } from "@/utils/i18nText";
+-
+-export interface PluginPermissions {
+-  node?: boolean;
+-  allowSystemRPC?: boolean; // server.call
+-  allowRoutes?: boolean; // server.route
+-  allowHooks?: boolean; // server.hook
+-  allowHTMLInject?: boolean; // server.injectHTML
+-  allowExec?: boolean;
+-  allowListen?: boolean;
+-  allowAllFileAccess?: boolean;
+-  maxHTTPBodyBytes?: number;
+-  maxChildOutputBytes?: number;
+-  timeout?: number;
+-}
+-
+-export interface PluginConfigItem {
+-  key?: string;
+-  name?: I18nText;
+-  required?: boolean;
+-  type: string; // title textbox string number select switch richtext nodes pingtasks
+-  options?: string;
+-  default?: any;
+-  help?: I18nText;
+-}
+-
+-export interface PluginConfiguration {
+-  type?: string;
+-  icon?: string;
+-  name?: I18nText;
+-  data?: PluginConfigItem[];
+-}
+-
+-export type PluginPageType = "iframe" | "redirect";
+-export type PluginPageVisibility = "public" | "admin";
+-
+-export interface PluginPage {
+-  file?: string;
+-  title?: I18nText;
+-  icon?: string;
+-  type?: PluginPageType; // defaults to "iframe"
+-  url?: string; // redirect target (internal site path)
+-  visibility?: PluginPageVisibility; // defaults to "admin"
+-}
+-
+-export interface PluginInfo {
+-  short: string;
+-  name: I18nText;
+-  description?: I18nText;
+-  author?: I18nText;
+-  version: string;
+-  url?: string;
+-  icon?: string;
+-  komari?: string;
+-  entry?: string;
+-  permissions?: PluginPermissions;
+-  configuration?: PluginConfiguration;
+-  pages?: PluginPage[];
+-  enabled: boolean;
+-  running: boolean;
+-  last_error?: string;
+-}
+diff --git a/src/utils/iconHelper.ts b/src/utils/iconHelper.ts
+index 0f3da28..d0e81e3 100644
+--- a/src/utils/iconHelper.ts
++++ b/src/utils/iconHelper.ts
+@@ -56,14 +56,3 @@ export const iconMap: Record<string, React.ComponentType<any>> = {
+   Settings2,
+   LayoutDashboard,
+ };
+-// 解析插件/插件页面声明的 icon：
+-// - lucide 图标名（iconMap 中存在）原样返回，由调用方用组件渲染；
+-// - 绝对 URL / 站内路径原样返回；
+-// - 其余按插件包内相对路径拼 admin 静态文件端点。
+-// 返回空串表示没有可用的图标（调用方用默认图标）。
+-export const resolvePluginIcon = (short: string, icon?: string): string => {
+-  if (!icon) return "";
+-  if (icon in iconMap) return icon;
+-  if (/^(https?:\/\/|\/|\.\/|\.\.\/)/.test(icon)) return icon;
+-  return `/api/admin/plugin/${encodeURIComponent(short)}/${icon}`;
+-};
+\ No newline at end of file

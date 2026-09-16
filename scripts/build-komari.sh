@@ -21,7 +21,9 @@ die() { printf '[build-komari] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # 版本号规则：维持 1.4.3；将来发自有补丁版必须递增三段中的 patch 位（如 1.4.4），
 # 否则前端 parseSemver（只取 x.y.z 三段）永远不会把它判为“可更新”。
-VERSION="${KOMARI_VERSION:-1.4.3}"
+# 版本号：本 fork 自有的 0.0.1 基线（自 2026-09 起从上游 komari 1.4.3 派生，见 docs/MAINTAINING.md）。
+# 递增规则：前端 parseSemver 只取 x.y.z 三段并要求严格递增，故发新版本必须递增 patch 位。
+VERSION="${KOMARI_VERSION:-0.0.1}"
 if [ -z "${KOMARI_VERSION_HASH:-}" ]; then
   KOMARI_VERSION_HASH="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 fi

@@ -1,14 +1,16 @@
 # Komari
 
 > [!IMPORTANT]
-> **This is a self-maintained fork pinned to komari 1.4.3.** Upstream is
+> **This is a self-maintained fork of komari, versioned from `0.0.1`.** Upstream is
 > <https://github.com/komari-monitor/komari>; we deliberately do **not** track its
-> 1.5.x line. The exact upstream commits, the reproducible build commands, and the
-> release-numbering rule are documented in
-> [docs/MAINTAINING-1.4.3.md](./docs/MAINTAINING-1.4.3.md).
+> 1.5.x line. The `0.0.1` code derives from upstream `komari@1.4.3` +
+> `komari-web@1.4.3`. Build commands, version pinning, and every deliberate
+> deviation (including the removed plugin system) are documented in
+> [docs/MAINTAINING.md](./docs/MAINTAINING.md).
 >
-> 本仓库是 **komari 1.4.3 的自维护分叉**，不跟随上游 1.5.x。版本固定点与构建方式见
-> [docs/MAINTAINING-1.4.3.md](./docs/MAINTAINING-1.4.3.md)。
+> 本仓库是 **komari 的自维护分叉**，版本线从 `0.0.1` 开始，不跟随上游 1.5.x。
+> 版本固定点、构建方式与刻意的改动（含已移除的插件系统）见
+> [docs/MAINTAINING.md](./docs/MAINTAINING.md)。
 
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fkomari-monitor%2Fkomari&label=&icon=github&color=%23a370f7&message=&style=flat&tz=UTC)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/komari-monitor/komari)

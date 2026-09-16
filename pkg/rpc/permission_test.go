@@ -36,8 +36,8 @@ func TestCheckPermission(t *testing.T) {
 		{RoleAdmin, "client:report", false},
 		{RoleAdmin, "common:getNodes", true},
 		// 未知命名空间默认要求 admin
-		{RoleGuest, "plugin:foo", false},
-		{RoleAdmin, "plugin:foo", true},
+		{RoleGuest, "unknown:foo", false},
+		{RoleAdmin, "unknown:foo", true},
 	}
 	for _, c := range cases {
 		if got := CheckPermission(c.group, c.method); got != c.want {

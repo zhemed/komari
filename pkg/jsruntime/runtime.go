@@ -89,7 +89,7 @@ type Options struct {
 	// with symlinks. Module (require) resolution stays confined to BaseDir.
 	ExtraRoots []string
 	// StorageDir is an additional confined filesystem root for long-term
-	// data that survives plugin reinstallation. It must exist and is exposed
+	// script data. It must exist and is exposed
 	// to scripts as the __storageDir__ global when NodeJS is enabled.
 	StorageDir string
 	// MaxHTTPBodyBytes limits buffered fetch responses and HTTP server request
@@ -472,8 +472,7 @@ func (r *Runtime) Call(name string, args ...any) error {
 }
 
 // CallVoid invokes a named JavaScript function and reports errors without
-// requiring a truthy result. It is used for side-effect entry points such as
-// plugin load()/unload() hooks.
+// requiring a truthy result.
 func (r *Runtime) CallVoid(name string, args ...any) error {
 	return r.call(name, false, args...)
 }

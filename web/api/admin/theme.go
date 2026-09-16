@@ -291,8 +291,7 @@ func validateThemeManifest(themeInfo models.Theme) error {
 	return themeInfo.ValidateConfiguration()
 }
 
-// isValidMarketShort validates a market entry short name (shared by the
-// theme and plugin markets).
+// isValidMarketShort validates a theme market entry short name.
 func isValidMarketShort(short string) bool {
 	if short == "" || short == "default" {
 		return false

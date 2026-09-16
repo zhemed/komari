@@ -1,6 +1,6 @@
 // Package httpbody provides bounded helpers for reading HTTP request or
-// response bodies. It is shared between the jsruntime fetch/http modules and
-// the plugin host so that both enforce the same size limit.
+// response bodies. It is shared between the jsruntime fetch and http modules
+// so that they enforce the same size limit.
 package httpbody
 
 import (
