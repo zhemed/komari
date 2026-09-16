@@ -73,3 +73,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 解除内网地址限制、移除 HTTPS 横幅并发布 0.0.2
+<!-- trellis-session: v=2 fp=47758a25cb978ca3 -->
+
+**Date**: 2026-09-16
+**Task**: 解除内网地址限制、移除 HTTPS 横幅并发布 0.0.2
+**Branch**: `main`
+
+### Summary
+
+修复内网部署下两个上游遗留限制并发布 0.0.2。(1) 主题市场被自家 SSRF 防护拦死：isPrivateIP() 用 net.LookupHost 且解析失败即 fail-closed（theme.go:315），默认主题市场源 raw.githubusercontent.com（theme_market.go:25）在部分网络被解析成私网/污染地址，直接报 requests to private or internal addresses are not allowed。改为新增 blockPrivateEndpoints()，默认不拦截，KOMARI_BLOCK_PRIVATE_ENDPOINTS=1 可恢复；新增回归测试 theme_market_ssrf_test.go 固化两种模式。(2) 移除非 HTTPS 全站红色告警（Index.tsx/AdminPanelBar.tsx/terminal/index.tsx 三处 + 5 个语言包文案），前端补丁 0004 纯删除 90 行。(3) 版本推进 0.0.2，前端产物重新生成 FRONTEND_TREE_SHA256 更新为 e8b3edf9（两次一致）。(4) 发布 0.0.2 静态资产（amd64 48443168 / arm64 46518400），本地实例改用 release 资产重新部署（sha256 与本地构建一致 40b02a34），实测首页渲染无红条、页脚显示 0.0.2 (241dddb)；两次版本标识变化各触发一次 ./data 自动备份（0.0.1→0.0.2、0.0.2-hashA→0.0.2-hashB），验证了升级备份机制在真实部署中生效。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `241dddb` | fix!: 默认允许内网地址下载，移除全站 HTTPS 告警横幅（0.0.2） |
+
+### Status
+
+[OK] **Completed**
