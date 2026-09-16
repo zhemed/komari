@@ -18,16 +18,17 @@
 |---|---|---|
 | 项目版本 | `0.0.5`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
-| 前端来源 | 上游 tag `1.4.3` → `4a74e8a81e2e4b1c3da8ad795f9523151efb6b56` | 记录于 `scripts/frontend-pin.env` |
-| 前端产物 | `web/public/defaultTheme/`（已 vendor 进仓库） | 目录树哈希记录于 `scripts/frontend-pin.env` |
-| agent 代码来源 | 上游 agent commit `1186aafb0d41445daac05d8d282d748a897fd495`（2026-08-07，**1.4.3 同期**） | 记录于 `scripts/agent-pin.env`；**不 fork**，且**不跟上游 agent 1.5.x**，见第 11 节 |
+| 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
+| 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
+| agent 源码 | **在本仓库**：`agent/`（上游 commit `1186aafb…`，2026-08-07，**1.4.3 同期**的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/agent-build.env`；见第 11 节 |
 | agent 资产 | `komari-agent-<os>-<arch>`（14 个平台） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
 | agent 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` / `:latest` | 由 `scripts/build-agent-image.sh --push` 推送 |
 
-**为什么必须自己 pin 前端**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
-主题产物缺失时 `static()` 会在 `public.go:130` 直接 panic——即**本后端仓库单独无法构建**。
-上游 CI 里的 `.github/actions/build-frontend/action.yml:34`（**该目录已从本仓库移除**）在普通 tag 下
-会退化为克隆 komari-web 的**默认分支**，所以上游同 tag 的二进制所用前端本身就不是确定可复现的。
+**为什么前端源码/产物都在仓库里**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
+主题产物缺失时 `static()` 会在 `public.go:130` 直接 panic——即后端单独无法构建。所以：
+产物 `web/public/defaultTheme/` **提交进仓库**（离线可构建），源码 `frontend/` 也在仓库里
+（改前端不用克隆上游）。上游 CI 里的 `.github/actions/build-frontend/action.yml:34`
+（该目录已从本仓库移除）在普通 tag 下会退化为克隆前端**默认分支**，这也是我们自己 vendor 的原因之一。
 
 **发版本规则**：递增三段中的 patch 位（`0.0.2`、`0.0.3`…）。
 前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段并要求严格递增，
@@ -57,26 +58,28 @@
 主题产物已 vendor 在仓库内，克隆后即可直接构建。若 `web/public/defaultTheme/` 缺失，
 脚本会明确报错并指出这正是 `public.go:130` panic 的根因。
 
-### 3.2 重新生成前端产物（需要网络 + Node）
+### 3.2 重新构建前端产物（改了 frontend/ 才需要，需要网络 + Node）
 
 ```bash
-./scripts/sync-frontend.sh
+./scripts/build-frontend.sh
 ```
 
-脚本会：按 pin 的 commit 检出 komari-web → 按序应用 `scripts/patches/` 下全部补丁 →
-`npm ci`（依 `package-lock.json` 锁定）→ `npm run build` → 原子替换
-`web/public/defaultTheme/` → 校验目录树哈希与上游地址残留。
+脚本会：在仓库内的 `frontend/`（上游快照 + 我们内联的改动）里 `npm ci`
+（依 `package-lock.json` 锁定）→ `npm run build` → 原子替换 `web/public/defaultTheme/`
+→ 校验目录树哈希与上游地址残留。**不克隆上游、不打补丁**；只改后端的人不需要跑它，
+因为产物已提交进仓库。
 
-哈希不一致时脚本会失败并给出实际值：确认接受后更新 `scripts/frontend-pin.env`
+哈希不一致时脚本会失败并给出实际值：确认接受后更新 `scripts/frontend-build.env`
 的 `FRONTEND_TREE_SHA256`，并在提交信息里说明原因。
 
-**为什么需要补丁 0002（可复现性）**：上游 `vite.config.ts:53` 取
+**为什么 `SOURCE_DATE_EPOCH` 是产物可复现的前提**：上游 `vite.config.ts:53` 取
 `new Date().toISOString()` 并经 `define.__BUILD_TIME__`（`vite.config.ts:125-126`）注入产物，
 最终由页脚 `src/components/Footer.tsx:26` 显示。这个每次构建都不同的常量会让承载它的 chunk
 改名 → 所有引用它的 chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变化，
-于是同源码同 lockfile 两次构建的哈希必然不同。补丁 0002 让 `buildTime` 优先读取
-`SOURCE_DATE_EPOCH`（[reproducible-builds](https://reproducible-builds.org/docs/source-date-epoch/) 标准约定），
-脚本把它设为 **pin commit 的提交时间**，产物因此确定可复现。
+于是同源码同 lockfile 两次构建的哈希必然不同。`frontend/vite.config.ts` 里的 `buildTime`
+优先读取 `SOURCE_DATE_EPOCH`（[reproducible-builds](https://reproducible-builds.org/docs/source-date-epoch/)
+标准约定），脚本把它设为**上游 commit 的提交时间**（`KOMARI_FRONTEND_SOURCE_DATE_EPOCH=1786612131`），
+产物因此确定可复现。
 
 > 沙箱/受限环境下若 `~/.npm` 不可写，可加 `npm_config_cache=<某可写目录>` 前缀。
 
@@ -160,14 +163,8 @@ CLI 的帮助文本里保留着上游作者署名（`Made by Akizon77 with love.
 |---|---|---|
 | `web/public/defaultTheme/` | vendor 进仓库 | 让后端无网络/无 Node 也可构建（见第 1 节） |
 | `web/public/.gitignore` | 取消忽略 `defaultTheme/*` | 上游默认忽略该注入目录，不改则 vendor 产物根本提交不进去 |
-| `scripts/patches/0001-update-check-repo.patch` | 更新检查由上游改为 `zhemed/komari` | 否则后台持续提示升级到上游 1.5.x |
-| `scripts/patches/0002-reproducible-build-time.patch` | 构建时间可被 `SOURCE_DATE_EPOCH` 覆盖 | 见 3.2；这是产物可复现的前提 |
-| `scripts/patches/0003-drop-plugin-system.patch` | 删除插件页面、路由、菜单与上传 purpose | 见第 5 节 |
-| `scripts/patches/0004-drop-https-warn.patch` | 去掉非 HTTPS 的全站红色告警横幅 | 自托管常用内网 HTTP，横幅无操作价值 |
-| `scripts/patches/0005-drop-notification-system.patch` | 删除 5 个通知页面、菜单与路由 | 见第 6 节 |
-| `scripts/patches/0006-agent-install-source.patch` | 安装命令/镜像/关于页 README/GitHub 按钮指向 `zhemed/komari` | 面板里给出的 agent 安装命令必须装我们的 agent，见第 11 节 |
-| `scripts/patches-agent/0001-own-update-line.patch` | agent 自更新指向本仓库 + 资产过滤 + 容器跳过 + 默认关更新 | 见第 11 节（含实测证据） |
-| `scripts/patches-agent/0002`、`0003` | 安装脚本改指本仓库、默认目录 `/opt/komari-agent`、默认装 pin 的版本 | 见第 11 节 |
+| `frontend/`（源码内联） | 更新检查指向 `zhemed/komari`、构建时间可用 `SOURCE_DATE_EPOCH` 覆盖、删除插件系统、去掉非 HTTPS 告警横幅、删除通知系统、安装命令与镜像指向本仓库 | 这些原本是补丁 0001–0006，源码 vendor 化后**已内联进 `frontend/`**，见第 4 节与第 11 节 |
+| `agent/`（源码内联） | 自更新指向本仓库 + 资产过滤 + 容器内跳过 + 默认关自动更新 | 原本是 patches-agent 0001–0003，已内联进 `agent/`；理由见第 11 节（含实测证据） |
 | `install-komari.sh` | 指向自有仓库并锁定 tag；`curl -f` + 先下临时文件再替换 | 不再安装上游 1.5.x；失败时不写入错误页、不截断运行中的二进制 |
 | `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游 `komari` 规则锚定为 `/komari` | 后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
 | `Dockerfile` | `ARG TARGETOS/TARGETARCH` 给出默认值 `linux/amd64` | 让普通 `docker build`（非 buildx）也能定位上下文里的二进制 |
@@ -177,7 +174,7 @@ CLI 的帮助文本里保留着上游作者署名（`Made by Akizon77 with love.
 更新检查的目标仓库可在构建期覆盖：
 
 ```bash
-VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
+VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 ```
 
 ## 5. 插件系统已移除
@@ -252,12 +249,12 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 ## 8. 回滚
 
 - **回滚前端 vendor**：删除 `web/public/defaultTheme/` 并 `git revert` 对应提交即可；
-  注意此时 `go build` 会因 embed 缺失而失败，需重新运行 `sync-frontend.sh` 或恢复该目录。
+  注意此时 `go build` 会因 embed 缺失而失败，需重新运行 `build-frontend.sh` 或恢复该目录。
 - **回滚安装脚本/补丁**：`git checkout <commit> -- install-komari.sh scripts/`。
 - **回滚插件系统移除**：`git revert` 该提交即可恢复插件代码与 1.4.3 版本号（vendored 产物在同一提交内）。
-- **回滚 agent 发行线**：删掉 `install-agent.sh` / `install-agent.ps1` / `scripts/patches-agent/` /
-  `scripts/build-agent.sh` / `scripts/build-agent-image.sh` / `Dockerfile.agent` / `scripts/agent-pin.env`
-  并 `git revert` 补丁 0006（然后重跑 `sync-frontend.sh` 让面板回到上游命令，哈希也要一起回填）。
+- **回滚 agent 发行线**：删掉 `install-agent.sh` / `install-agent.ps1` / `agent/` /
+  `scripts/build-agent.sh` / `scripts/build-agent-image.sh` / `Dockerfile.agent` / `scripts/agent-build.env`
+  并 `git revert` 对应改动（然后重跑 `build-frontend.sh`，哈希也要一起回填）。
 - **回滚已发布的 agent 资产/镜像**：`gh release delete-asset`、`gh api -X DELETE /user/packages/...`
   （token 有 `delete:packages`）。
 - **部署侧回滚**：升级前自动生成的 `data/backup/upgrade-*.zip` 即为回滚素材。
@@ -286,6 +283,9 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - 「代码来源」由 `LICENSE` / `NOTICE` / `README.md` / 根提交信息承载，而不再由逐行历史承载。
 - 需要取回上游历史做 backport 时：`git fetch upstream --tags`（`upstream` remote 保留）。
 - 本地曾存在的 68 个上游 tag 已删除，避免上游对象长期驻留；本仓库只推送自己的 tag。
+- **前端与 agent 的源码也是快照导入**（2026-09-16，`chore(vendor): import ...`）：
+  同样不带上游历史，上游 commit 只作为溯源信息记在 `scripts/frontend-build.env` /
+  `scripts/agent-build.env` 与导入提交信息里。
 
 ## 11. agent 发行线（0.0.4 起）
 
@@ -295,14 +295,14 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 
 | 环节 | 事实 |
 |---|---|
-| 源码来源 | 上游 `komari-monitor/komari-agent`，pin 在 commit `1186aafb…`（2026-08-07，**1.4.3 同期**；`scripts/agent-pin.env`） |
-| 补丁 | `scripts/patches-agent/0001`（Go 代码）、`0002`/`0003`（安装脚本） |
-| 构建 | `./scripts/build-agent.sh`：纯 Go 交叉编译（`CGO_ENABLED=0`，不需要 zig），一次出 **14** 个平台 |
+| 源码 | **在本仓库**：`agent/`（上游 `komari-monitor/komari-agent@1186aafb…`，2026-08-07 的快照 + 我们内联的改动；溯源见 `scripts/agent-build.env`） |
+| 我们对源码做的改动 | 自更新目标改指本仓库、`selfupdate` 加资产过滤、容器内跳过自更新、自动更新默认关闭、`--enable-auto-update` 新参数；安装脚本见下表 |
+| 构建 | `./scripts/build-agent.sh`：在 `agent/` 里纯 Go 交叉编译（`CGO_ENABLED=0`，不需要 zig/gcc），一次出 **14** 个平台；用 `-buildvcs=false`，让产物只取决于源码与注入的版本号 |
 | 资产名 | `komari-agent-<os>-<arch>[.exe]`，与上游一致（安装脚本与自更新都按这个名字找资产） |
 | 版本号 | 与我们同一条 `0.0.x` 线（`scripts/version.env`），不沿用上游 agent 的 1.x |
 | 自更新目标 | `update.Repo = zhemed/komari`（源码默认值 + 构建期 `-X` 双保险） |
 | 自更新默认 | **关闭**；开启用 `--enable-auto-update` 或 `AGENT_ENABLE_AUTO_UPDATE=1`（旧的 `-autoUpdate` 仍表示开启） |
-| 安装脚本 | `install-agent.sh` / `install-agent.ps1`（上游脚本 vendor + 补丁）；默认装脚本 pin 的版本，`--install-version latest` 可装最新 |
+| 安装脚本 | `install-agent.sh` / `install-agent.ps1`（放在仓库根，前端的安装命令直指这里）：默认装脚本 pin 的版本，`--install-version latest` 可装最新 |
 | 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`（多架构 amd64/arm64/armv7），`./scripts/build-agent-image.sh --push`；`Dockerfile.agent` **刻意不含任何 RUN**，否则没有 QEMU/binfmt 的机器上多架构构建会 `exec format error` |
 
 ### 11.1 为什么必须给自更新加资产过滤（发布前实测过的坑）
@@ -320,25 +320,30 @@ agent 可能把自己刷成**服务器二进制**。
 
 结论：**这条防线不是装饰**，升级上游 agent 代码时必须保留；临时 release/tag 验完已删除。
 
-### 11.2 构建脚本自带的两道门禁
+### 11.2 构建脚本自带的三道门禁
 
-`./scripts/build-agent.sh` 除了算出源码树哈希（`AGENT_SOURCE_TREE_SHA256`）外，还：
+`./scripts/build-agent.sh` 在构建前会 grep 源码并断言：
 
-1. 把补丁回放到上游源码后，与仓库里的 `install-agent.sh` / `install-agent.ps1` **逐字节比对**
-   ——防止上游文件变了而仓库成品没重新生成；
-2. 检查两个安装脚本里 pin 的默认版本（`default_agent_version` / `$DefaultAgentVersion`）
-   等于本次 `KOMARI_VERSION`——防止发版忘了同步（除非 `KOMARI_VERSION` 与仓库默认值不同，
-   这种情况按临时构建处理，只告警）。
+1. `agent/update/update.go` 里仍有资产过滤 `Filters: []string{"^komari-agent-"}`——删了它
+   节点会被刷成服务器二进制（§11.1）；
+2. `agent/update/update.go` 的 `Repo` 仍是 `zhemed/komari`——自更新只能指向我们；
+3. `install-agent.sh` / `install-agent.ps1` 里 pin 的默认版本等于本次 `KOMARI_VERSION`
+   ——防止发版忘了同步（`KOMARI_VERSION` 与仓库默认值不同时按临时构建处理，只告警）。
 
-### 11.3 升级 agent 的上游 pin
+源码 vendor 化之前这里还有"源码树哈希""补丁回放比对"两道门禁：源码既然已经在仓库里，
+这两类问题（pin 漂移、补丁失效）从结构上就不存在了。
 
-1. 改 `scripts/agent-pin.env` 的 `KOMARI_AGENT_COMMIT`（先看上游 diff 里 `update/`、`cmd/`、
-   `install.sh` 是否变结构，补丁可能失效）。
-2. `./scripts/build-agent.sh --only linux/amd64`：补丁失效会明确报错；哈希变化会打印实际值。
-3. 按提示把 `AGENT_SOURCE_TREE_SHA256` 更新为新值，并在提交信息里说明。
-4. 安装脚本若也变了：把 `.build/agent-src/install.sh`（补丁已应用）拷回 `install-agent.sh`，
-   `install.ps1` 同理，并确认 `default_agent_version` 与版本线一致。
-5. 重跑构建脚本，确认两道门禁通过。
+### 11.3 如何跟进上游 agent 的修复
+
+源码已在仓库里，**没有 pin 和补丁可以重放**，跟进方式回到最朴素的 git 流程：
+
+1. 看上游要拿的 commit（`git log` 远程仓库，或 `gh api` 查 commit）改了什么；
+2. 在本仓库 `agent/` 里手工 apply/改写（不要整棵覆盖——我们内联过改动，直接覆盖会丢）；
+3. `./scripts/build-agent.sh --only linux/amd64`，三道门禁必须通过；
+4. 涉及自更新/协议的行为改动，先在 `.build/` 里搭临时 release 做对照实验（§11.1 的做法），
+   验完把这些提交信息写清楚。
+
+**不要**把上游 agent 整条线跟上来：0.0.4 的教训就是跟到了 1.5.10（§11.5）。
 
 ### 11.4 已经装出去的上游 agent 怎么办
 

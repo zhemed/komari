@@ -26,6 +26,8 @@
 - **默认不自动更新**：服务器与 agent 都不会自己去拉新版本（agent 要跟随发布需显式
   `--enable-auto-update`）；
 - **agent 也停在 1.4.3 同期**（不跟上游 agent 1.5.x），与服务器同一条血统；
+- **源码全在仓库内**：面板前端（`frontend/`）与 agent（`agent/`）的源码都是本仓库的快照，
+  构建时**不克隆上游、不打补丁**；整套东西可以离线构建（只改后端时连 Node 都不需要）；
 - 主题系统与主题市场保留；仓库历史只包含我们自己的提交。
 
 完整说明见 [docs/MAINTAINING.md](./docs/MAINTAINING.md)。
@@ -69,6 +71,10 @@ cd komari
 ./scripts/build-komari.sh        # 开发用：动态链接，需 Go ≥1.25 + gcc；前端产物已随仓库下发
 ./bin/komari server              # 默认监听 0.0.0.0:25774
 
+# 改了面板前端（frontend/）或 agent（agent/）时
+./scripts/build-frontend.sh      # 需 Node + 网络（npm ci）；重建 web/public/defaultTheme/
+./scripts/build-agent.sh         # 纯 Go 交叉编译，14 个平台
+
 # 发布形态（静态链接，需 zig）与自建镜像
 KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
 ./scripts/build-server-image.sh --push
@@ -96,7 +102,7 @@ docker run -d --name komari-agent --restart always \
 ## 构建与维护
 
 维护者视角的内容都在 [docs/MAINTAINING.md](./docs/MAINTAINING.md)：构建契约与版本固定、
-前端 vendor 与补丁系列、发布清单、agent 发行线、容器镜像、数据目录与备份、回滚方式。
+前后端与 agent 源码（都在本仓库内）、发布清单、agent 发行线、容器镜像、数据目录与备份、回滚方式。
 提交前自检：
 
 ```bash

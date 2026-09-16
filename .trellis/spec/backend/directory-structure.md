@@ -96,7 +96,7 @@ GORM 结构体集中在 `database/models/`（13 个文件）。RPC handler 里�
 
 - **不要**新建第二个 `package main`：`main.go` 是唯一入口，子命令写进 `cmd/`。
 - **不要**在 `web/rpc/jsonrpc/` 里直接 `db.Create(...)`：业务读写落在 `database/` 对应包，handler 只做参数装配、权限判断与审计。
-- **不要**把新 Go 文件放进 `web/public/defaultTheme/`——那是前端产物目录，会被 `scripts/sync-frontend.sh` 整体替换。
+- **不要**把新 Go 文件放进 `web/public/defaultTheme/`——那是前端产物目录，会被 `scripts/build-frontend.sh` 整体替换。
 - **不要**把 `docs/MAINTAINING.md` 的信息复制进本文件：构建/pin 契约以 `build-and-pinning.md` 为准，本文件只管"代码放哪"。
 
 ## 6. 自检

@@ -181,8 +181,9 @@ if apiResponse.Code != http.StatusNotFound { ... }
 
 ## 5. 前端约束（容易踩，与后端同仓库）
 
-前端源码**不在本仓库**，而是由 `scripts/sync-frontend.sh` 从 pin 的 commit 检出到 `.build/komari-web/`
-并应用 `scripts/patches/*.patch`。因此：
+前端源码**已在本仓库**（`frontend/`，上游快照 + 我们内联的改动，2026-09-16 导入），
+由 `scripts/build-frontend.sh` 在本地构建；`.build/`、`frontend/node_modules/` 与 `frontend/dist/`
+都是生成物，**不要**当源码改。因此：
 
 - **改前端行为要改补丁，不要改 `.build/komari-web/`**（会被 `git clean -xfdq` + 重新检出覆盖）。
   现有 3 个补丁：`0001-update-check-repo.patch`、`0002-reproducible-build-time.patch`、
@@ -210,7 +211,7 @@ if apiResponse.Code != http.StatusNotFound { ... }
 4. **不要把 `install-komari.sh` 的下载路径改回 `releases/latest`**（会装到上游 1.5.x）。
 5. **不要把 Go 依赖说成"vendor"**：仓库根**没有** `vendor/` 目录，`.gitignore:26` 的 `# vendor/` 是注释掉的；
    Go 依赖走 module cache。本仓库说的 "vendored" **专指前端产物** `web/public/defaultTheme/`。
-6. **不要用 `npm install`** 替代 `npm ci`（`scripts/sync-frontend.sh:80`）。
+6. **不要用 `npm install`** 替代 `npm ci`（`scripts/build-frontend.sh`；`frontend/package-lock.json` 已入库）。
    注意上游 CI（`.github/actions/build-frontend/action.yml:37`，该目录已移除）用的是 `npm install`，**不要照抄**。
 7. **不要改版本号语义**：发版必须递增 patch 位（`0.0.1` → `0.0.2`），带后缀的 tag 前端永远识别不到更新。
 

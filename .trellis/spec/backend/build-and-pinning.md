@@ -21,25 +21,28 @@
 上游默认忽略它（`web/public/.gitignore` 的 `defaultTheme/*`），本 fork 已改为不忽略——
 **不要把它改回去**，否则 vendor 产物会被静默排除在提交之外（本仓库首次提交时曾因此漏掉 448 个文件）。
 
-### 1.2 前端版本以 `scripts/frontend-pin.env` 为唯一事实来源
+### 1.2 前端源码已在仓库内（`frontend/`），产物哈希是门禁
 
-- `KOMARI_WEB_COMMIT` 固定到具体 commit（当前 `4a74e8a8…`，即 komari-web tag 1.4.3）。
-- **不要改为分支名或 `latest`**：上游 CI（`.github/actions/build-frontend/action.yml:34`，
-  **该目录已从本仓库移除**）在普通 tag 下会退化为克隆默认分支，这正是上游同 tag 二进制
-  不可复现的原因。
-- 依赖安装一律用 `npm ci`（仓库内已提交 `package-lock.json`），**不要用 `npm install`**。
+- 源码：`frontend/`（上游 `komari-web@4a74e8a8` 的快照 + 我们内联的改动，2026-09-16 导入）。
+  **不要再引入"克隆上游 + 打补丁"的路径**：`scripts/patches/` 已删除，`sync-frontend.sh` 已由
+  `scripts/build-frontend.sh` 取代。
+- 溯源与构建参数在 `scripts/frontend-build.env`（上游 repo/commit、`KOMARI_UPDATE_REPO`、
+  `KOMARI_FRONTEND_SOURCE_DATE_EPOCH`、`FRONTEND_TREE_SHA256`）。
+- 依赖安装一律用 `npm ci`（`frontend/package-lock.json` 已入库；注意 `frontend/.gitignore`
+  里上游原本忽略了它，我们已取消忽略），**不要用 `npm install`**。
+- `frontend/node_modules/`、`frontend/dist/` 不入库（由 `frontend/.gitignore` 兜住）。
 
 ### 1.3 产物必须可复现（`FRONTEND_TREE_SHA256`）
 
-`sync-frontend.sh` 对 `web/public/defaultTheme/` 计算规范化目录树哈希
-（`tar --sort=name --mtime='@0' … | gzip -n | sha256sum`）并与 `frontend-pin.env` 比对，不一致即失败。
+`build-frontend.sh` 对 `web/public/defaultTheme/` 计算规范化目录树哈希
+（`tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner | gzip -n | sha256sum`）
+并与 `frontend-build.env` 比对，不一致即失败。
 
-这条门禁成立的前提是 `scripts/patches/0002-reproducible-build-time.patch`：
-上游 `vite.config.ts:53` 取 `new Date().toISOString()`，经 `define.__BUILD_TIME__`
-（`vite.config.ts:125-126`）注入产物并显示于 `src/components/Footer.tsx:26`。该常量每次都不同
-→ 承载它的 chunk 改名 → 所有引用它的 chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision
-同步变化，产物因此不可复现。补丁让 `buildTime` 优先读 `SOURCE_DATE_EPOCH`，
-脚本把它设为 **pin commit 的提交时间**。
+这条门禁成立的前提是 `frontend/vite.config.ts` 里 `buildTime` 优先读 `SOURCE_DATE_EPOCH`：
+上游原本取 `new Date().toISOString()`，经 `define.__BUILD_TIME__` 注入产物并显示于
+`frontend/src/components/Footer.tsx`。该常量每次都不同 → 承载它的 chunk 改名 → 所有引用它的
+chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变化，产物因此不可复现。
+脚本把 `SOURCE_DATE_EPOCH` 设为 **上游导入 commit 的提交时间**（`KOMARI_FRONTEND_SOURCE_DATE_EPOCH`）。
 
 - **不要**为了让构建通过而清空或放宽 `FRONTEND_TREE_SHA256`；
   确认变化合理时更新它并在提交信息中说明原因。
@@ -81,9 +84,10 @@
 
 上游 agent 只做**源码依赖**，不 fork 到我们仓库（自有仓库只有 `zhemed/komari` 一个）：
 
-- 源码 pin：`scripts/agent-pin.env` 的 `KOMARI_AGENT_COMMIT`（当前 `1186aafb…`，**1.4.3 同期**）；
-  **不要**改成上游 agent main（那会带进 1.5 行为：motd 安全告警注入、文件访问、v2-only 协议）；
-  浅克隆后打 `scripts/patches-agent/*.patch`，再算源码树哈希 `AGENT_SOURCE_TREE_SHA256` 并强制校验。
+- 源码：`agent/`（上游 `komari-agent@1186aafb`，2026-08-07、**1.4.3 同期**的快照 + 我们内联的改动）。
+  **不要**把上游 agent main 整条覆盖进来（那会带进 1.5 行为：motd 安全告警注入、文件访问、
+  v2-only 协议，见 `docs/MAINTAINING.md` §11.5）；跟进上游请按 §11.3 手工挑改动。
+  溯源与构建参数在 `scripts/agent-build.env`；`scripts/patches-agent/` 已删除。
 - 构建：`scripts/build-agent.sh` 纯 Go 交叉编译（`CGO_ENABLED=0`），**不需要 zig/gcc**，
   矩阵与上游 `build_all.sh` 一致 = **14** 个平台（排除 windows/arm、darwin/{386,arm}、非 linux 的 loong64）。
 - 资产名必须是 `komari-agent-<os>-<arch>[.exe]`：安装脚本、前端生成的命令、agent 自更新的资产匹配
@@ -101,11 +105,11 @@
 
 ```bash
 ./scripts/build-komari.sh                 # 输出 bin/komari（仅需 Go，动态链接 glibc）
-./scripts/sync-frontend.sh                # 重新生成前端产物（需网络 + Node）
+./scripts/build-frontend.sh                # 重新构建前端产物（改了 frontend/ 才需要，需 Node + 网络）
 KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
 KOMARI_STATIC=1 ./scripts/build-komari.sh                      # 发布用：linux/amd64 静态（需 zig）
 KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
-./scripts/build-agent.sh                    # agent：14 个平台 → dist/agent/（纯 Go，无需 zig）
+./scripts/build-agent.sh                    # agent：14 个平台 → dist/agent/（源码在 agent/，纯 Go，无需 zig）
 ./scripts/build-agent.sh --only linux/amd64 # agent：单平台 + 两道门禁校验（改 agent 补丁后必跑）
 ./scripts/build-agent-image.sh              # agent 镜像：本地单平台构建（--push 才推 ghcr）
 ./scripts/build-server-image.sh             # 服务器镜像：同上（跨架构需 QEMU/binfmt，见 MAINTAINING §12）
