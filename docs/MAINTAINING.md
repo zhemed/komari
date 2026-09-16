@@ -227,6 +227,14 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
+- **agent 自带测试里有 3 个依赖外网的**：`agent/server/task_test.go` 的 `TestICMPPing` /
+  `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的外部目标，在无外网或目标不可达的机器上必然失败
+  （实测本机 34s 后 3 个全红，其余包全绿）。本地自检用离线安全子集：
+
+  ```bash
+  (cd agent && go test ./monitoring/... ./terminal/... ./update/...)
+  ```
+  正因如此，`scripts/build-agent.sh` **不把 agent 测试当发布门禁**（会变成 flaky）。
 - **偶发：升级重启后 `data/komari.db-wal` 被 unlink，外部读到旧数据**（2026-09-16 实测一次）。
   现象：`0.0.4 → 0.0.5` 升级重启后，服务端进程持有 `komari.db-wal`/`-shm` 的 fd，但文件已从
   目录消失（`ls -l /proc/<pid>/fd` 显示 `(deleted)`），此时用外部 `sqlite3` 读 `./data/komari.db`
