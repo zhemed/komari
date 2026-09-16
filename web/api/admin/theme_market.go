@@ -463,7 +463,7 @@ func downloadMarketURL(rawURL string, maxSize int64) ([]byte, error) {
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" || parsed.User != nil {
 			return errors.New("only public HTTP and HTTPS URLs are allowed")
 		}
-		if isPrivateIP(parsed.Hostname()) {
+		if blockPrivateEndpoints() && isPrivateIP(parsed.Hostname()) {
 			return errors.New("requests to private or internal addresses are not allowed")
 		}
 		return nil

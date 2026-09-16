@@ -2,7 +2,7 @@
 
 轻量、自托管的服务器监控：**单个 Go 二进制 + 内嵌 Web 前端**，由轻量 agent 上报指标。
 
-本仓库是**自维护分支**，版本线从 **0.0.1** 起步，独立演进——**不跟随上游 1.5.x**。
+本仓库是**自维护分支**，版本线从 **0.0.1** 起步（当前 **0.0.2**），独立演进——**不跟随上游 1.5.x**。
 
 ## 与上游的关系
 
@@ -52,7 +52,7 @@ sudo bash install-komari.sh
 ```
 
 安装到 `/opt/komari`、创建 `komari` systemd 服务、默认端口 `25774`。
-脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.1`，`KOMARI_REPO` 可覆盖）。
+脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.2`，`KOMARI_REPO` 可覆盖）。
 
 ### Docker
 
@@ -62,8 +62,8 @@ sudo bash install-komari.sh
 KOMARI_STATIC=1 ./scripts/build-komari.sh          # 产出 bin/komari（静态）
 mkdir -p /tmp/komari-ctx && cp bin/komari /tmp/komari-ctx/komari-linux-amd64
 cp Dockerfile /tmp/komari-ctx/
-docker build -t komari:0.0.1 /tmp/komari-ctx
-docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.1
+docker build -t komari:0.0.2 /tmp/komari-ctx
+docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.2
 ```
 
 > `Dockerfile` 用 `ARG TARGETOS/TARGETARCH`（默认 `linux/amd64`）定位构建上下文里的

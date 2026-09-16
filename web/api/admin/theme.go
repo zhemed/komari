@@ -308,6 +308,17 @@ func isValidMarketShort(short string) bool {
 }
 
 // downloadThemeFromURL 从URL下载主题文件
+// blockPrivateEndpoints 决定“后台触发的下载”是否必须拒绝私网/内网地址
+// （主题安装 URL、主题市场源；见 downloadThemeFromURL 与 downloadMarketURL）。
+//
+// 本仓库面向自托管/内网使用，默认**不拦截**：默认主题市场源在部分网络下会被 DNS
+// 解析到私网地址（或被污染、解析失败），旧的 fail-closed 行为会把请求直接拦掉并抛
+// "requests to private or internal addresses are not allowed"，让市场完全不可用。
+// 需要恢复该防护时设置环境变量 KOMARI_BLOCK_PRIVATE_ENDPOINTS=1。
+func blockPrivateEndpoints() bool {
+	return os.Getenv("KOMARI_BLOCK_PRIVATE_ENDPOINTS") == "1"
+}
+
 // isPrivateIP checks if the resolved IP addresses are private/internal
 func isPrivateIP(host string) bool {
 	ips, err := net.LookupHost(host)
@@ -335,7 +346,7 @@ func downloadThemeFromURL(rawURL string) ([]byte, error) {
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return nil, fmt.Errorf("only http and https schemes are allowed")
 	}
-	if isPrivateIP(parsedURL.Hostname()) {
+	if blockPrivateEndpoints() && isPrivateIP(parsedURL.Hostname()) {
 		return nil, fmt.Errorf("requests to private/internal addresses are not allowed")
 	}
 

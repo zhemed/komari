@@ -1,6 +1,6 @@
-# 维护本仓库（komari 0.0.1 自有基线）
+# 维护本仓库（komari 自维护版 · 当前 0.0.2）
 
-本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 开始，由我们独立维护。
+本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.2**），由我们独立维护。
 
 - 上游后端：<https://github.com/komari-monitor/komari>
 - 上游前端：<https://github.com/komari-monitor/komari-web>
@@ -15,7 +15,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.1` | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion` |
+| 项目版本 | `0.0.2` | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion` |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端来源 | 上游 tag `1.4.3` → `4a74e8a81e2e4b1c3da8ad795f9523151efb6b56` | 记录于 `scripts/frontend-pin.env` |
 | 前端产物 | `web/public/defaultTheme/`（已 vendor 进仓库） | 目录树哈希记录于 `scripts/frontend-pin.env` |
@@ -94,7 +94,7 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 3. `git tag 0.0.2 && git push origin 0.0.2`
 4. `gh release create 0.0.2 --title 0.0.2 --notes "..." komari-linux-amd64 [komari-linux-arm64]`
 
-tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.1` 拉取）。
+tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.2` 拉取）。
 **本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
 
 > **`gh` 陷阱（0.0.1 发布时实际踩到）**：本仓库有两个 remote（`origin`=自有、`upstream`=只读参考），

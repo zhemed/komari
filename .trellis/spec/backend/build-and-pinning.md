@@ -48,7 +48,7 @@
 
 ### 1.4 版本号语义（0.0.x 自有版本线）
 
-`CurrentVersion` 由 `scripts/build-komari.sh` 注入，默认 `0.0.1`。
+`CurrentVersion` 由 `scripts/build-komari.sh` 注入，默认 `0.0.2`。
 前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段且要求严格递增，
 因此 `0.0.1-fix1` 这类 tag **永远不会**被判为"可更新"；发新版本必须递增 patch 位（`0.0.2`）。
 

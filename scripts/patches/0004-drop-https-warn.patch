@@ -1,0 +1,216 @@
+diff --git a/src/components/admin/AdminPanelBar.tsx b/src/components/admin/AdminPanelBar.tsx
+index 83edee8..fbb493d 100644
+--- a/src/components/admin/AdminPanelBar.tsx
++++ b/src/components/admin/AdminPanelBar.tsx
+@@ -1,7 +1,6 @@
+ import { Cross1Icon, ExitIcon } from "@radix-ui/react-icons";
+ import {
+   Button,
+-  Callout,
+   Flex,
+   Grid,
+   IconButton,
+@@ -64,7 +63,6 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
+   });
+   const { account } = useAccount();
+   const isMobile = useIsMobile();
+-  const ishttps = window.location.protocol === "https:";
+   const [t, i18n] = useTranslation();
+   const location = useLocation();
+   const isConfigFormPage = location.pathname === "/admin/theme_managed";
+@@ -725,25 +723,6 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
+               boxSizing: "border-box",
+             }}
+           >
+-            <Callout.Root mb="2" hidden={ishttps} color="red">
+-              <Callout.Icon>
+-                <svg
+-                  xmlns="http://www.w3.org/2000/svg"
+-                  width="24"
+-                  viewBox="0 0 24 24"
+-                >
+-                  <path
+-                    fill="currentColor"
+-                    d="M10.03 3.659c.856-1.548 3.081-1.548 3.937 0l7.746 14.001c.83 1.5-.255 3.34-1.969 3.34H4.254c-1.715 0-2.8-1.84-1.97-3.34zM12.997 17A.999.999 0 1 0 11 17a.999.999 0 0 0 1.997 0m-.259-7.853a.75.75 0 0 0-1.493.103l.004 4.501l.007.102a.75.75 0 0 0 1.493-.103l-.004-4.502z"
+-                  />
+-                </svg>
+-              </Callout.Icon>
+-              <Callout.Text>
+-                <Text size="2" weight="medium">
+-                  {t("warn_https")}
+-                </Text>
+-              </Callout.Text>
+-            </Callout.Root>
+             {isConfigFormPage ? (
+               <div className="min-h-0 flex-1">{content}</div>
+             ) : (
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index 75e3d05..109ed66 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -1427,6 +1427,5 @@
+   "view": {
+     "mode": "View Mode"
+   },
+-  "warn_https": "The current connection is not HTTPS! Your sensitive data is at serious risk. Take immediate action to secure the connection! Copy may not available!",
+   "warn_websocket": "RPC2 request failed, please check the network connection or server status!"
+ }
+diff --git a/src/i18n/locales/id_ID.json b/src/i18n/locales/id_ID.json
+index 15e485c..a988844 100644
+--- a/src/i18n/locales/id_ID.json
++++ b/src/i18n/locales/id_ID.json
+@@ -1427,6 +1427,5 @@
+   "view": {
+     "mode": "Mode Tampilan"
+   },
+-  "warn_https": "Koneksi saat ini bukan HTTPS! Data sensitif Anda berisiko. Amankan koneksi sekarang! Fitur salin mungkin tidak tersedia!",
+   "warn_websocket": "Permintaan RPC2 gagal, periksa koneksi jaringan atau status server!"
+ }
+diff --git a/src/i18n/locales/ja_JP.json b/src/i18n/locales/ja_JP.json
+index ab9fd77..ae31fe0 100644
+--- a/src/i18n/locales/ja_JP.json
++++ b/src/i18n/locales/ja_JP.json
+@@ -1427,6 +1427,5 @@
+   "view": {
+     "mode": "表示モード"
+   },
+-  "warn_https": "現在の接続は HTTPS ではありません！あなたの敏感なデータには重大なリスクがあります。接続を安全にするために直ちに対策を講じてください！コピー操作は使用できない可能性があります！",
+   "warn_websocket": "RPC2 リクエストに失敗しました。ネットワーク接続またはサーバーの状態を確認してください！"
+ }
+diff --git a/src/i18n/locales/zh_CN.json b/src/i18n/locales/zh_CN.json
+index 60495e8..6d00d5d 100644
+--- a/src/i18n/locales/zh_CN.json
++++ b/src/i18n/locales/zh_CN.json
+@@ -1427,6 +1427,5 @@
+   "view": {
+     "mode": "显示模式"
+   },
+-  "warn_https": "当前连接不是 HTTPS！您的敏感数据存在严重风险。请立即采取措施确保连接安全！复制操作可能无法使用！",
+   "warn_websocket": "RPC2 请求失败，请检查网络连接或服务器状态！"
+ }
+diff --git a/src/i18n/locales/zh_TW.json b/src/i18n/locales/zh_TW.json
+index 8ad6e03..c6ef1e7 100644
+--- a/src/i18n/locales/zh_TW.json
++++ b/src/i18n/locales/zh_TW.json
+@@ -1427,6 +1427,5 @@
+   "view": {
+     "mode": "顯示模式"
+   },
+-  "warn_https": "當前連線不是 HTTPS！您的敏感資料存在嚴重風險。請立即採取措施確保連線安全！複製操作可能無法使用！",
+   "warn_websocket": "RPC2 請求失敗，請檢查網路連線或伺服器狀態！"
+ }
+diff --git a/src/pages/Index.tsx b/src/pages/Index.tsx
+index fcaae1e..e66bc34 100644
+--- a/src/pages/Index.tsx
++++ b/src/pages/Index.tsx
+@@ -234,33 +234,8 @@ const Index = () => {
+ const Callouts = () => {
+   const [t] = useTranslation();
+   const { showCallout } = useLiveData();
+-  const ishttps = window.location.protocol === "https:";
+   return (
+     <Flex direction="column" gap="2" className="km-callouts m-2">
+-      <Callout.Root
+-        m="2"
+-        hidden={ishttps}
+-        color="red"
+-        className="km-callout km-callout-https"
+-      >
+-        <Callout.Icon>
+-          <svg
+-            xmlns="http://www.w3.org/2000/svg"
+-            width="24"
+-            viewBox="0 0 24 24"
+-          >
+-            <path
+-              fill="currentColor"
+-              d="M10.03 3.659c.856-1.548 3.081-1.548 3.937 0l7.746 14.001c.83 1.5-.255 3.34-1.969 3.34H4.254c-1.715 0-2.8-1.84-1.97-3.34zM12.997 17A.999.999 0 1 0 11 17a.999.999 0 0 0 1.997 0m-.259-7.853a.75.75 0 0 0-1.493.103l.004 4.501l.007.102a.75.75 0 0 0 1.493-.103l-.004-4.502z"
+-            />
+-          </svg>
+-        </Callout.Icon>
+-        <Callout.Text>
+-          <Text size="2" weight="medium">
+-            {t("warn_https")}
+-          </Text>
+-        </Callout.Text>
+-      </Callout.Root>
+       <Callout.Root
+         m="2"
+         hidden={showCallout}
+diff --git a/src/pages/terminal/index.tsx b/src/pages/terminal/index.tsx
+index 650e016..597b430 100644
+--- a/src/pages/terminal/index.tsx
++++ b/src/pages/terminal/index.tsx
+@@ -12,14 +12,12 @@ import {
+   Callout,
+   Dialog,
+   Flex,
+-  IconButton,
+   TextField,
+   Theme,
+ } from "@radix-ui/themes";
+ 
+ 
+ import { useTranslation } from "react-i18next";
+-import { Cross1Icon } from "@radix-ui/react-icons";
+ import { TablerAlertTriangleFilled } from "../../components/Icones/Tabler";
+ import CommandClipboardPanel from "@/pages/terminal/CommandClipboard";
+ import { Toaster } from "@/components/ui/sonner";
+@@ -30,7 +28,6 @@ import {
+   type XtermjsSettings,
+   useXtermjsSettings,
+ } from "@/hooks/useXtermjsSettings";
+-import { motion } from "framer-motion";
+ import throttle from "lodash/throttle";
+ interface TerminalAreaProps {
+   terminalRef: React.RefObject<HTMLDivElement | null>;
+@@ -108,9 +105,6 @@ const TerminalPage = () => {
+   const draggingRef = useRef(false);
+   const fitAddonRef = useRef<any>(null);
+   const containerRef = useRef<HTMLDivElement>(null);
+-  const [callout, setCallout] = useState(
+-    window.location.protocol !== "https:"
+-  );
+   const [settingsResolved, setSettingsResolved] = useState(false);
+   const [settingsResolutionError, setSettingsResolutionError] =
+     useState<Error | null>(null);
+@@ -545,39 +539,6 @@ const TerminalPage = () => {
+             </Callout.Root>
+           </div>
+         ) : null}
+-        <div className="absolute inset-x-0 top-4 flex justify-center items-center z-30">
+-          <motion.div
+-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+-            animate={{ opacity: 1, y: 0, scale: 1 }}
+-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+-            transition={{ duration: 0.3, ease: "easeInOut" }}
+-            hidden={!callout}
+-          >
+-            <Callout.Root
+-              color="red"
+-              size="2"
+-              className="bg-red-50 backdrop-blur-sm border-2 border-red-800 rounded-lg"
+-            >
+-              <Callout.Icon>
+-                <TablerAlertTriangleFilled className="text-red-700" />
+-              </Callout.Icon>
+-              <Callout.Text className="text-red-400 font-medium">
+-                <Flex align="center" justify="between" gap="3">
+-                  <span>{t("warn_https")}</span>
+-                  <IconButton
+-                    variant="soft"
+-                    color="red"
+-                    size="1"
+-                    className="hover:bg-red-200/50 transition-colors"
+-                    onClick={() => setCallout(false)}
+-                  >
+-                    <Cross1Icon />
+-                  </IconButton>
+-                </Flex>
+-              </Callout.Text>
+-            </Callout.Root>
+-          </motion.div>
+-        </div>
+         <Flex className="h-screen w-screen" direction="row" ref={containerRef}>
+           <TerminalArea
+             terminalRef={terminalRef}
