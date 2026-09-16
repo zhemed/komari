@@ -36,3 +36,12 @@
 
 - 已知限制：用户级 ghcr 包的可见性无法用 API 改（实测 `PATCH /user/packages/...` 一律 404），
   只能手点，需要用户配合。
+
+## 进度（2026-09-16）
+
+已完成：README 重写（114 行，结构对齐 new-api-own）、MAINTAINING §3.5/§3.6/§12 落地、
+`scripts/build-server-image.sh` 与双镜像发布（带 OCI 标签）、README 内命令逐条实测、
+规范两处同步（README 定位、镜像脚本入范围）。提交 `fc7cf35`。
+
+**唯一未完成项**：两个 ghcr 包（`komari`、`komari-agent`）仍是 private，需人工在网页上点成
+Public（API 改不了），之后用 `DOCKER_CONFIG=<空目录> docker manifest inspect` 验证匿名可拉再归档。

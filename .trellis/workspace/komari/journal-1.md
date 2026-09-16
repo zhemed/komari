@@ -142,3 +142,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Session 7: README 改成产品视角短文 + 发布服务器镜像 ghcr.io/zhemed/komari
+<!-- trellis-session: v=2 fp=fe7b5c91d91a845e -->
+
+**Date**: 2026-09-16
+**Task**: Session 7: README 改成产品视角短文 + 发布服务器镜像 ghcr.io/zhemed/komari
+**Branch**: `main`
+
+### Summary
+
+用户看到 zhemed/new-api-own 的 README 风格（定位→特性→部署→维护）表示很喜欢，按这个风格重写本仓库 README：114 行，特性 10 条 + 本 fork 取舍（无插件/无通知/默认不自动升级）+ 部署四条路（systemd 脚本 / docker run / 源码构建 / 节点 agent）+ 维护与许可；原来的维护者长文（构建契约、发布清单、CLI 子命令、数据目录、容器镜像）下沉到 docs/MAINTAINING.md，新增 §3.5 命令行子命令、§3.6 数据与备份、§12 容器镜像。为了让 README 的 Docker 一节是真命令，新增 scripts/build-server-image.sh 并发布 ghcr.io/zhemed/komari:0.0.4/:latest（amd64+arm64，静态产物校验、缺产物即报错），两个 Dockerfile 补 OCI source 标签。踩到的坑：用户级 ghcr 包的可见性无法用 API 改（PATCH /user/packages/... 一律 404，连已公开的 litepan 也一样），新包默认 private，只能网页点 Public——已写进 MAINTAINING §12，并把匿名可拉验证留作待办。实测：服务器镜像 /install 200、日志 0.0.4、数据落卷；agent 镜像入口正常；README 四条命令逐条跑通。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fc7cf35` | docs: README 改为产品视角短文；发布服务器镜像 ghcr.io/zhemed/komari |
+
+### Status
+
+[OK] **Completed**
