@@ -164,3 +164,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: Session 7 收尾: 镜像公开验证通过（README 的 docker run 已可匿名使用）
+<!-- trellis-session: v=2 fp=0130d97aaf322d8d -->
+
+**Date**: 2026-09-16
+**Task**: Session 7 收尾: 镜像公开验证通过（README 的 docker run 已可匿名使用）
+**Branch**: `main`
+
+### Summary
+
+用户把 ghcr 两个包手点成 Public 后完成验证：komari / komari-agent 的 :0.0.4 与 :latest 四个 tag 用空凭据 DOCKER_CONFIG 匿名 manifest inspect 全部成功；服务器镜像用空凭据 docker run 后 /install 返回 200、日志版本 0.0.4、数据落进挂载卷 /app/data，agent 镜像匿名 --help 正常。已把 MAINTAINING §12 的状态改成“两个包均已人工设为 public”并留下发版后必跑的匿名可拉验证脚本片段；任务 09-16-readme-product-style 验收通过并归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fc7cf35` | docs: README 改为产品视角短文；发布服务器镜像 ghcr.io/zhemed/komari |
+| `dbc0410` | chore: record journal |
+
+### Status
+
+[OK] **Completed**
