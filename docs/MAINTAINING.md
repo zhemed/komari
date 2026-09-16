@@ -198,6 +198,9 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
+- **`raw.githubusercontent.com/.../refs/heads/main/<新文件>` 会短暂 404**：面板安装命令用的就是这个
+  路径形式。0.0.4 实测：`main` 推上去后该路径仍 404 约 10 分钟（同一文件用 commit SHA 或
+  去掉 `refs/heads/` 的形式立刻 200），随后自愈。刚发完版别急着怀疑脚本没推上去。
 - **不要 `git push upstream`**：`upstream` 只作为只读参考。
 - **版本切换会触发一次升级备份**：`database/dbcore/dbcore.go:233` 的规则是"版本标识不同即备份"，
   标识为 `CurrentVersion-VersionHash`。因此 1.4.3 → 0.0.1 首次启动会 zip 整个 `./data`
@@ -257,7 +260,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 | 自更新目标 | `update.Repo = zhemed/komari`（源码默认值 + 构建期 `-X` 双保险） |
 | 自更新默认 | **关闭**；开启用 `--enable-auto-update` 或 `AGENT_ENABLE_AUTO_UPDATE=1`（旧的 `-autoUpdate` 仍表示开启） |
 | 安装脚本 | `install-agent.sh` / `install-agent.ps1`（上游脚本 vendor + 补丁）；默认装脚本 pin 的版本，`--install-version latest` 可装最新 |
-| 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`，`./scripts/build-agent-image.sh --push` |
+| 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`（多架构 amd64/arm64/armv7），`./scripts/build-agent-image.sh --push`；`Dockerfile.agent` **刻意不含任何 RUN**，否则没有 QEMU/binfmt 的机器上多架构构建会 `exec format error` |
 
 ### 11.1 为什么必须给自更新加资产过滤（发布前实测过的坑）
 

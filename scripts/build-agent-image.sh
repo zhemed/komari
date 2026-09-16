@@ -41,11 +41,14 @@ done
 command -v docker >/dev/null 2>&1 || die "未找到 docker"
 docker buildx version >/dev/null 2>&1 || die "未找到 docker buildx"
 
-# 上下文：Dockerfile.agent 只 COPY 同名产物，所以把产物和 Dockerfile 放一起
+# 上下文：Dockerfile.agent 只 COPY 同名产物 + 标记文件，所以把三者放一起
+# （没有任何 RUN 步骤 → 多架构构建不需要 QEMU/binfmt）
 CTX="${REPO_ROOT}/.build/agent-image"
 rm -rf "${CTX}"
 mkdir -p "${CTX}"
 cp -f "${REPO_ROOT}/Dockerfile.agent" "${CTX}/Dockerfile"
+# 容器标记文件（Dockerfile.agent 刻意不写 RUN，改为 COPY 这个空文件）
+: > "${CTX}/komari-agent-container"
 
 # 需要的产物：按目标平台映射到 GOOS/GOARCH（linux/arm/v7 → linux-arm）
 need_arch() {

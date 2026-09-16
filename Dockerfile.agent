@@ -4,12 +4,17 @@
 #       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
 # 改动：
 #   1) ARG 给了默认值（与仓库根 Dockerfile 同口径），普通 docker build 也能跑
-#   2) 装 ca-certificates / tzdata（面板走 https 与本地时区）
+#   2) **刻意不写任何 RUN**：只有 COPY。多架构构建（arm64 / armv7）在没有 QEMU/binfmt
+#      的机器上也能完成——上游的 `RUN touch` 与 `RUN apk add` 都需要能执行目标架构的
+#      容器，本机没有模拟器时直接 `exec format error`。
+#      容器标记文件改为从上下文 COPY 进来（内容为空，等价于 touch）。
+#      alpine:3.21 基础镜像自带 ca-certificates-bundle，HTTPS 连接不受影响；
+#      不装 tzdata，容器内时区为 UTC（面板展示不受影响）。
 #   3) 容器标记文件保留：agent 检测到后会跳过二进制自更新
-#      （见 scripts/patches-agent/0001-own-update-line.patch）
+#      （见 scripts/patches-agent/0001-own-update-line.patch），升级请换镜像。
 #
 # 构建入口是 scripts/build-agent-image.sh（它准备上下文并调 buildx）：
-# 上下文里必须已有 komari-agent-${TARGETOS}-${TARGETARCH} 这套产物。
+# 上下文里必须已有 komari-agent-${TARGETOS}-${TARGETARCH} 与 komari-agent-container。
 FROM alpine:3.21
 
 WORKDIR /app
@@ -18,11 +23,8 @@ WORKDIR /app
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 
-RUN apk add --no-cache ca-certificates tzdata
-
 COPY --chmod=755 komari-agent-${TARGETOS}-${TARGETARCH} /app/komari-agent
-
-RUN touch /.komari-agent-container
+COPY --chmod=644 komari-agent-container /.komari-agent-container
 
 ENTRYPOINT ["/app/komari-agent"]
 # 运行时请指定参数
