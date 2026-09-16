@@ -98,6 +98,20 @@ for p in "${patches[@]}"; do
   git apply "$p"
 done
 
+# ---------- 3. pin 必须与服务器基线同期（不许偷偷跟上游新线） ----------
+# 0.0.4 的教训：agent 曾经 pin 在上游 agent 的 1.5.10（2026-09-15），比服务器 1.4.3
+# （2026-08-13）晚了一个月，带进 motd 安全告警注入、文件访问等 1.5 行为。
+if [ -n "${KOMARI_AGENT_MAX_COMMIT_DATE:-}" ]; then
+  PIN_DATE="$(git show -s --format=%cs "${KOMARI_AGENT_COMMIT}")"
+  if [ "${PIN_DATE}" \> "${KOMARI_AGENT_MAX_COMMIT_DATE}" ] && [ "${KOMARI_AGENT_ALLOW_NEWER:-0}" != "1" ]; then
+    die "agent pin 比服务器基线更新：pin=${KOMARI_AGENT_COMMIT}（${PIN_DATE}）> 上限 ${KOMARI_AGENT_MAX_COMMIT_DATE}。
+     本仓库只跟服务器的 1.4.3 血统，不跟上游 agent 1.5.x（理由见 docs/MAINTAINING.md §11.5）。
+     确实要前进时：先更新 scripts/agent-pin.env 的 KOMARI_AGENT_MAX_COMMIT_DATE 并说明原因，
+     或临时 KOMARI_AGENT_ALLOW_NEWER=1 放行。"
+  fi
+  log "pin 日期校验通过：${PIN_DATE} ≤ ${KOMARI_AGENT_MAX_COMMIT_DATE}"
+fi
+
 # ---------- 3. 仓库里的安装脚本成品必须与“pin 源码 + 补丁”的结果一致 ----------
 # 我们对外发的是 install-agent.sh / install-agent.ps1 两个成品文件（前端安装命令直接指向它们），
 # 所以这里回放补丁做比对，防止上游文件或补丁变了而仓库成品没重新生成。

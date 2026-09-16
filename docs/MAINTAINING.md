@@ -230,6 +230,17 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
+- **偶发：升级重启后 `data/komari.db-wal` 被 unlink，外部读到旧数据**（2026-09-16 实测一次）。
+  现象：`0.0.4 → 0.0.5` 升级重启后，服务端进程持有 `komari.db-wal`/`-shm` 的 fd，但文件已从
+  目录消失（`ls -l /proc/<pid>/fd` 显示 `(deleted)`），此时用外部 `sqlite3` 读 `./data/komari.db`
+  看到的是升级前的数据（表现为面板里的节点版本停在旧值）。
+  - 已排除：外部只读连接不是原因（重启后连续两次外部 `SELECT` 均未触发，WAL 正常）；
+    升级流程也不删 WAL（代码里只有 `PRAGMA wal_checkpoint(TRUNCATE)`，`database/dbcore/dbcore.go:247`）。
+  - 处置：**重启一次服务端即恢复一致**（之后外部读到的就是实时数据），本次重启后
+    `komari.db-wal` 0 字节、fd 正常、外部读取实时。
+  - 影响面：WAL 处于 unlink 状态时，若进程被 `kill -9` 会丢掉尚未 checkpoint 的写入；
+    正常 `systemctl stop`（SIGTERM）会 checkpoint 回主库，本次未观察到数据丢失。
+  - 结论：升级后发现"外部工具读到旧数据"，先重启一次服务再判断，不要直接当成丢数据。
 - **`raw.githubusercontent.com/.../refs/heads/main/<新文件>` 会短暂 404**：面板安装命令用的就是这个
   路径形式。0.0.4 实测：`main` 推上去后该路径仍 404 约 10 分钟（同一文件用 commit SHA 或
   去掉 `refs/heads/` 的形式立刻 200），随后自愈。刚发完版别急着怀疑脚本没推上去。

@@ -220,3 +220,17 @@ the administrator guide, rather than being changed during startup"）。
 - 在 `internal/migrations/` 里 `DropTable` 一张还有数据的表 → 违反 §7 的现状；退场表优先 `RenameTable` 成 `*_backup`。
 - 直接外泄数据库连接错误字符串 → 走 `internal/metricstore/redact.go:13-22` 的 `RedactConnectionError`。
 - 把时间当本地时区写进主库或 metric store → 后续跨时区查询与 `SystemDateDistance` 都会错位。
+
+---
+
+## 附：外部工具读取 SQLite 的两个坑（2026-09-16 实测）
+
+本仓库的 `./data/komari.db` 跑在 WAL 模式（`internal/sqlitetune/connector.go:153` 的
+`PRAGMA journal_mode = WAL`），排查线上问题时容易踩到：
+
+1. **外部 sqlite3 读到"旧"数据**：WAL 模式下，只在 `-wal` 里、尚未 checkpoint 的写入对
+   新连接是可见的（SQLite 保证），所以正常情况下外部读不会落后。但升级重启过程中出现过
+   `komari.db-wal` 被 unlink、进程仍持有其 fd 的偶发状态，此时外部读会停在升级前——
+   **先重启一次服务端再判断**，别急着下"数据丢了"的结论（详见 `docs/MAINTAINING.md` §7）。
+2. **不要用 `cp` 直接拷 `komari.db` 当备份**：WAL 里的写入可能不在主文件里。
+   面板的备份走 `VACUUM INTO`（`web/api/admin/download.go:119`）拿到一致性快照。
