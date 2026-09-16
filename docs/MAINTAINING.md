@@ -97,6 +97,11 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.1` 拉取）。
 **本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
 
+> **`gh` 陷阱（0.0.1 发布时实际踩到）**：本仓库有两个 remote（`origin`=自有、`upstream`=只读参考），
+> `gh release create` 可能把仓库解析成 `upstream`，报
+> `tag 0.0.1 exists locally but has not been pushed to komari-monitor/komari`。
+> 发布时给 `gh` 显式加 `-R zhemed/komari`。
+
 ## 4. 与上游的解耦点
 
 | 位置 | 改动 | 原因 |
