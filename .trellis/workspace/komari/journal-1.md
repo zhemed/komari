@@ -234,3 +234,27 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: Session 10: 全面维护——说明口径换成我们自己的版本 + 新增仓库自检脚本
+<!-- trellis-session: v=2 fp=f6b0c2a310db4165 -->
+
+**Date**: 2026-09-16
+**Task**: Session 10: 全面维护——说明口径换成我们自己的版本 + 新增仓库自检脚本
+**Branch**: `main`
+
+### Summary
+
+用户要求全面维护 komari 仓库、把说明文件换成我们自己的版本，并点名了 GitHub 上那段 'Komari 1.4.3 self-maintained fork: pinned version, vendored frontend...' 描述。(1) 元信息：描述改为「自维护服务器监控：单二进制服务端 + 内嵌面板 + 14 平台 agent；源码全在本仓库，可离线构建」，补 8 个 topics；homepage 保持空（与其仓库一致）；确认许可识别为 MIT（gh repo view 的 licenseInfo 字段为空是映射问题，REST 里 spdx_id=MIT）。(2) 口径：README「本 fork 的取舍」→「这个版本与上游的差异」并改为“由 zhemed 独立维护的发行版”；MAINTAINING 开头同改；安装/构建脚本 5 处“本 fork”→“本仓库”，安装界面 (komari x fork) → (zhemed/komari x)；LICENSE 保留上游行并补我们的改动版权行。(3) 新增 scripts/check-repo.sh：快速 7 项（版本字面量、文档引用+file:line 锚点越界、脚本语法、脏文件、密钥扫描、前端产物哈希、构建期无克隆上游）+ --full 追加 Go 门禁/离线构建/agent 三道门禁；接进 MAINTAINING §2.1 与 §3.4 发布清单、规范 §2。(4) 用它扫出并修掉 9 处真实不一致：6 个规范文件仍有 0.0.3 已删除的 pkg/jsruntime、utils/messageSender 残留（含“保留物”“无测试目录”“panic 场合”“模块表两行”“Debug 用法”），三处数字漂移（测试分布改为实测 77 个测试文件、defaultTheme 受控文件 442→431、Debug 用法 1 处→0 处），一处 file:line 锚点漂移（migrations.go:417/420 → 315/318，文件只 387 行）。理念：删代码必须同时扫文档里的引用与数字，现在由脚本兜底。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8cc30ef` | docs: 说明口径改成我们自己的版本，LICENSE 补上改动版权行 |
+| `1ca69c4` | feat(tools): 新增 scripts/check-repo.sh 仓库自检，并接进发布清单 |
+| `f1186a2` | docs(spec): 清掉体检抓出的过期规范（已删除模块与漂移数字） |
+
+### Status
+
+[OK] **Completed**
