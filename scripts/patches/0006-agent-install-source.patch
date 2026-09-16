@@ -1,0 +1,177 @@
+diff --git a/src/components/NavBar.tsx b/src/components/NavBar.tsx
+index f9c5157..6b6d9f2 100644
+--- a/src/components/NavBar.tsx
++++ b/src/components/NavBar.tsx
+@@ -37,7 +37,7 @@ const NavBar = () => {
+         <IconButton
+           variant="soft"
+           onClick={() => {
+-            window.open("https://github.com/komari-monitor", "_blank");
++            window.open("https://github.com/zhemed/komari", "_blank");
+           }}
+         >
+           <GitHubLogoIcon />
+diff --git a/src/components/admin/NodeTable/NodeFunction.tsx b/src/components/admin/NodeTable/NodeFunction.tsx
+index 055129d..55aa23e 100644
+--- a/src/components/admin/NodeTable/NodeFunction.tsx
++++ b/src/components/admin/NodeTable/NodeFunction.tsx
+@@ -43,7 +43,7 @@ export function ActionsCell({ row }: { row: Row<z.infer<typeof schema>> }) {
+     React.useState<Platform>("linux");
+   const [installOptions, setInstallOptions] = React.useState<InstallOptions>({
+     disableWebSsh: false,
+-    disableAutoUpdate: false,
++    disableAutoUpdate: true,
+     ignoreUnsafeCert: false,
+     ghproxy: "",
+     dir: "",
+@@ -58,8 +58,8 @@ export function ActionsCell({ row }: { row: Row<z.infer<typeof schema>> }) {
+     if (installOptions.disableWebSsh) {
+       args.push("--disable-web-ssh");
+     }
+-    if (installOptions.disableAutoUpdate) {
+-      args.push("--disable-auto-update");
++    if (!installOptions.disableAutoUpdate) {
++      args.push("--enable-auto-update");
+     }
+     if (installOptions.ignoreUnsafeCert) {
+       args.push("--ignore-unsafe-cert");
+@@ -87,13 +87,13 @@ export function ActionsCell({ row }: { row: Row<z.infer<typeof schema>> }) {
+     switch (selectedPlatform) {
+       case "linux":
+         finalCommand =
+-          `wget -qO- https://raw.githubusercontent.com/komari-monitor/komari-agent/refs/heads/main/install.sh | sudo bash -s -- ` +
++          `wget -qO- https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-agent.sh | sudo bash -s -- ` +
+           quoteShellArgs(args);
+         break;
+       case "windows":
+         finalCommand =
+           `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ` +
+-          `"iwr 'https://raw.githubusercontent.com/komari-monitor/komari-agent/refs/heads/main/install.ps1'` +
++          `"iwr 'https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-agent.ps1'` +
+           ` -UseBasicParsing -OutFile 'install.ps1'; &` +
+           ` '.\\install.ps1'`;
+         args.forEach((arg) => {
+@@ -103,7 +103,7 @@ export function ActionsCell({ row }: { row: Row<z.infer<typeof schema>> }) {
+         break;
+       case "macos":
+         finalCommand =
+-          `zsh <(curl -sL https://raw.githubusercontent.com/komari-monitor/komari-agent/refs/heads/main/install.sh) ` +
++          `zsh <(curl -sL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-agent.sh) ` +
+           quoteShellArgs(args);
+         break;
+     }
+diff --git a/src/pages/admin/about.tsx b/src/pages/admin/about.tsx
+index ee6af22..c6c69b6 100644
+--- a/src/pages/admin/about.tsx
++++ b/src/pages/admin/about.tsx
+@@ -16,7 +16,7 @@ export default function AboutPage() {
+   const [view, setView] = useState("open_source");
+   useEffect(() => {
+     fetch(
+-      "https://raw.githubusercontent.com/komari-monitor/komari/refs/heads/main/README.md"
++      "https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/README.md"
+     )
+       .then((res) => res.text())
+       .then(setMarkdown);
+@@ -192,7 +192,7 @@ export default function AboutPage() {
+                   )}
+                 </div>
+                 <a
+-                  href="https://github.com/komari-monitor/komari/blob/main/README.md"
++                  href="https://github.com/zhemed/komari/blob/main/README.md"
+                   target="_blank"
+                   rel="noreferrer"
+                   className="flex flex-row gap-2 text-sm items-center"
+diff --git a/src/pages/admin/index.tsx b/src/pages/admin/index.tsx
+index 1309efe..2701ae8 100644
+--- a/src/pages/admin/index.tsx
++++ b/src/pages/admin/index.tsx
+@@ -208,7 +208,7 @@ const AutoDiscoverySection = ({
+   const [installOptions, setInstallOptions] =
+     React.useState<AutoDiscoveryInstallOptions>({
+       disableWebSsh: false,
+-      disableAutoUpdate: false,
++      disableAutoUpdate: true,
+       ignoreUnsafeCert: false,
+       memoryIncludeCache: false,
+       getIpAddrFromNic: false,
+@@ -248,8 +248,8 @@ const AutoDiscoverySection = ({
+     if (installOptions.disableWebSsh) {
+       args.push("--disable-web-ssh");
+     }
+-    if (installOptions.disableAutoUpdate) {
+-      args.push("--disable-auto-update");
++    if (!installOptions.disableAutoUpdate) {
++      args.push("--enable-auto-update");
+     }
+     if (installOptions.ignoreUnsafeCert) {
+       args.push("--ignore-unsafe-cert");
+@@ -313,11 +313,11 @@ const AutoDiscoverySection = ({
+       args.push(rotateVal);
+     }
+ 
+-    let scriptFile = "install.sh";
++    let scriptFile = "install-agent.sh";
+     if (selectedPlatform === "windows") {
+-      scriptFile = "install.ps1";
++      scriptFile = "install-agent.ps1";
+     }
+-    let scriptUrl = `https://raw.githubusercontent.com/komari-monitor/komari-agent/refs/heads/main/${scriptFile}`;
++    let scriptUrl = `https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/${scriptFile}`;
+     if (enableGhproxy && ghproxy) {
+       scriptUrl = scriptUrl.slice(8); // 去掉 https://
+       if (ghproxy.endsWith("/")) {
+@@ -375,7 +375,7 @@ const AutoDiscoverySection = ({
+           `touch .komari-auto-discovery.json && ` +
+           `docker run -d --name komari-agent --restart=always ` +
+           `-v .komari-auto-discovery.json:/app/auto-discovery.json ` +
+-          `ghcr.io/komari-monitor/komari-agent:latest ` +
++          `ghcr.io/zhemed/komari-agent:latest ` +
+           quoteShellArgs(dockerArgs);
+         break;
+       }
+@@ -1418,7 +1418,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
+     React.useState<Platform>("linux");
+   const [installOptions, setInstallOptions] = React.useState<InstallOptions>({
+     disableWebSsh: false,
+-    disableAutoUpdate: false,
++    disableAutoUpdate: true,
+     ignoreUnsafeCert: false,
+     memoryIncludeCache: false,
+     getIpAddrFromNic: false,
+@@ -1460,8 +1460,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
+     if (installOptions.disableWebSsh) {
+       args.push("--disable-web-ssh");
+     }
+-    if (installOptions.disableAutoUpdate) {
+-      args.push("--disable-auto-update");
++    if (!installOptions.disableAutoUpdate) {
++      args.push("--enable-auto-update");
+     }
+     if (installOptions.ignoreUnsafeCert) {
+       args.push("--ignore-unsafe-cert");
+@@ -1520,12 +1520,12 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
+       args.push(`--month-rotate`);
+       args.push(rotateVal);
+     }
+-    let scriptFile = "install.sh";
++    let scriptFile = "install-agent.sh";
+     if (selectedPlatform === "windows") {
+-      scriptFile = "install.ps1";
++      scriptFile = "install-agent.ps1";
+     }
+     let scriptUrl =
+-      `https://raw.githubusercontent.com/komari-monitor/komari-agent/refs/heads/main/${scriptFile}`;
++      `https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/${scriptFile}`;
+     if (enableGhproxy) {
+       if (enableGhproxy && ghproxy) {
+         scriptUrl = scriptUrl.slice(8); // 去掉 https://
+@@ -1578,7 +1578,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
+         }
+         finalCommand =
+           `docker run -d --name komari-agent --restart=always ` +
+-          `ghcr.io/komari-monitor/komari-agent:latest ` +
++          `ghcr.io/zhemed/komari-agent:latest ` +
+           quoteShellArgs(dockerArgs);
+         break;
+       }

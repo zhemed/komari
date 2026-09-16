@@ -1,9 +1,10 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.3）
+# 维护本仓库（komari 自维护版 · 当前 0.0.4）
 
-本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.3**），由我们独立维护。
+本仓库是 **komari 的自维护分叉**，版本线从 **0.0.1** 起步（当前 **0.0.4**），由我们独立维护。
 
 - 上游后端：<https://github.com/komari-monitor/komari>
 - 上游前端：<https://github.com/komari-monitor/komari-web>
+- 上游 agent：<https://github.com/komari-monitor/komari-agent>
 - 本仓库：<https://github.com/zhemed/komari>
 
 > **代码来源**：0.0.1 由上游 `komari@1.4.3`（commit `bf6b45ec…`）+ `komari-web@1.4.3`（commit `4a74e8a8…`）派生。
@@ -15,10 +16,13 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.3` | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion` |
+| 项目版本 | `0.0.4`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端来源 | 上游 tag `1.4.3` → `4a74e8a81e2e4b1c3da8ad795f9523151efb6b56` | 记录于 `scripts/frontend-pin.env` |
 | 前端产物 | `web/public/defaultTheme/`（已 vendor 进仓库） | 目录树哈希记录于 `scripts/frontend-pin.env` |
+| agent 代码来源 | 上游 agent commit `9e532e0429cd049571e35cf344654181879b33c7` | 记录于 `scripts/agent-pin.env`；**不 fork**，见第 11 节 |
+| agent 资产 | `komari-agent-<os>-<arch>`（14 个平台） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
+| agent 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` / `:latest` | 由 `scripts/build-agent-image.sh --push` 推送 |
 
 **为什么必须自己 pin 前端**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
 主题产物缺失时 `static()` 会在 `public.go:130` 直接 panic——即**本后端仓库单独无法构建**。
@@ -35,7 +39,9 @@
 |---|---|---|
 | Go | ≥ `1.25.0`（以 `go.mod:3` 为准） | `go1.26.6` 通过 |
 | gcc | 必需（`CGO_ENABLED=1`，`mattn/go-sqlite3`） | `gcc 11.4.0` 通过 |
+| zig | 仅**静态**发布构建时需要（服务器） | `zig 0.16.0` 通过 |
 | Node / npm | 仅"重新生成前端"时需要 | `node v22.23.2` + `npm 10.9.8` 通过 |
+| （agent 构建） | **纯 Go，`CGO_ENABLED=0`——不需要 gcc、不需要 zig** | `go1.26.6` 通过 |
 
 > 上游 `.github/workflows/release.yml:105`（已随该目录移除）写的是 `go-version: "1.23"`，
 > 与 `go.mod` 的 `1.25.0` 不一致；**以 `go.mod` 为准**。
@@ -89,13 +95,30 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 
 ### 3.4 发布一个版本
 
-1. `KOMARI_VERSION=0.0.2 KOMARI_STATIC=1 ./scripts/build-komari.sh`
-2. 资产命名要与 `install-komari.sh` 的期望一致：`mv bin/komari komari-linux-amd64`
-3. `git tag 0.0.2 && git push origin 0.0.2`
-4. `gh release create 0.0.2 --title 0.0.2 --notes "..." komari-linux-amd64 [komari-linux-arm64]`
+一次发布 = **整套栈**：服务器静态产物 + 14 个 agent 资产 + agent 镜像。
 
-tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TAG=0.0.3` 拉取）。
-**本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
+1. 同步版本字面量（`scripts/version.env` 的 `KOMARI_VERSION`、`install-komari.sh` 的 `REPO_TAG`、
+   `install-agent.sh` 的 `default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`）。
+2. 服务器静态产物（需 zig）：
+   ```bash
+   KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
+   KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
+   ```
+3. agent 全平台（14 个，纯 Go）：`./scripts/build-agent.sh`
+4. 自检：`./scripts/build-agent.sh --only linux/amd64` 必须通过它自带的两道门禁，
+   且 `go build ./... && go vet ./... && go test ./...` 全绿。
+5. `git tag <版本> && git push origin <版本>`
+6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes "..." \
+      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/agent/komari-agent-*`
+7. 推送镜像：`./scripts/build-agent-image.sh --push`
+
+> **顺序很重要**：服务器二进制的版本 hash 来自构建时的 `git rev-parse HEAD`，
+> 且 Go 会把 VCS 信息也编进去。所以**先提交、后构建**，否则 release 里的二进制
+> 声称的 hash 与实际 tag 不一致（0.0.4 发布时踩到过一次）。
+
+tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TAG` 拉取）。
+**同一个 release 里同时有服务器与 agent 资产是必需形态**——agent 靠补丁 0001 的资产过滤
+区分两者（见 §11.1）。**本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
 
 > **`gh` 陷阱（0.0.1 发布时实际踩到）**：本仓库有两个 remote（`origin`=自有、`upstream`=只读参考），
 > `gh release create` 可能把仓库解析成 `upstream`，报
@@ -111,6 +134,11 @@ tag 与 `KOMARI_VERSION` 保持一致（`install-komari.sh` 默认按 `KOMARI_TA
 | `scripts/patches/0001-update-check-repo.patch` | 更新检查由上游改为 `zhemed/komari` | 否则后台持续提示升级到上游 1.5.x |
 | `scripts/patches/0002-reproducible-build-time.patch` | 构建时间可被 `SOURCE_DATE_EPOCH` 覆盖 | 见 3.2；这是产物可复现的前提 |
 | `scripts/patches/0003-drop-plugin-system.patch` | 删除插件页面、路由、菜单与上传 purpose | 见第 5 节 |
+| `scripts/patches/0004-drop-https-warn.patch` | 去掉非 HTTPS 的全站红色告警横幅 | 自托管常用内网 HTTP，横幅无操作价值 |
+| `scripts/patches/0005-drop-notification-system.patch` | 删除 5 个通知页面、菜单与路由 | 见第 6 节 |
+| `scripts/patches/0006-agent-install-source.patch` | 安装命令/镜像/关于页 README/GitHub 按钮指向 `zhemed/komari` | 面板里给出的 agent 安装命令必须装我们的 agent，见第 11 节 |
+| `scripts/patches-agent/0001-own-update-line.patch` | agent 自更新指向本仓库 + 资产过滤 + 容器跳过 + 默认关更新 | 见第 11 节（含实测证据） |
+| `scripts/patches-agent/0002`、`0003` | 安装脚本改指本仓库、默认目录 `/opt/komari-agent`、默认装 pin 的版本 | 见第 11 节 |
 | `install-komari.sh` | 指向自有仓库并锁定 tag；`curl -f` + 先下临时文件再替换 | 不再安装上游 1.5.x；失败时不写入错误页、不截断运行中的二进制 |
 | `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游 `komari` 规则锚定为 `/komari` | 后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
 | `Dockerfile` | `ARG TARGETOS/TARGETARCH` 给出默认值 `linux/amd64` | 让普通 `docker build`（非 buildx）也能定位上下文里的二进制 |
@@ -132,7 +160,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
   前端插件页面/路由/菜单/类型。
 - **不要再重新引入**：升级上游代码时若带回这些文件，必须重新剔除。
 - 数据库中的历史插件表**保留**（孤儿表），未做破坏性迁移。
-- `pkg/jsruntime/` **保留**：它不是插件专用——`utils/messageSender/javascript` 依赖它。
+- `pkg/jsruntime/` 在 0.0.3 已随通知系统一并移除（见第 6 节）；插件系统移除时它确实还被需要，两者不再共存。
 - 主题系统与主题市场**保留**，且主题本就没有版本门禁，不受版本号影响。
 - 流量报告：内置实现**仍可用**（上游计划在 1.5.0 移除，我们停留在 1.4.3 基线，故不受影响）；
   原先指向插件市场的引导提示已删除。
@@ -164,8 +192,12 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - **安全修复不会自动到来**：上游 1.5.x 之后的修复需我们自行判断是否 backport。
   决定采纳时有意识地 `git fetch upstream <ref>` 后 cherry-pick——`upstream` 的 fetch refspec
   目前被锁在 tag 1.4.3，这是防止误引入 1.5.x 的**安全默认**，不要随手改掉。
-- **关于页仍读取上游 README**：`src/pages/admin/about.tsx:19` 拉取上游仓库 README 用于展示，
-  属信息展示而非升级路径，未做改动。
+- **关于页/GitHub 按钮已指向我们**（补丁 0006）：`src/pages/admin/about.tsx` 读的是本仓库 README。
+- **`install-komari.sh` 的 tag 是字面量**：它是给 `curl | bash` 用的独立脚本，没法在运行时读
+  `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步）。
+- **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
+  同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
+- **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
 - **不要 `git push upstream`**：`upstream` 只作为只读参考。
 - **版本切换会触发一次升级备份**：`database/dbcore/dbcore.go:233` 的规则是"版本标识不同即备份"，
   标识为 `CurrentVersion-VersionHash`。因此 1.4.3 → 0.0.1 首次启动会 zip 整个 `./data`
@@ -177,6 +209,11 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
   注意此时 `go build` 会因 embed 缺失而失败，需重新运行 `sync-frontend.sh` 或恢复该目录。
 - **回滚安装脚本/补丁**：`git checkout <commit> -- install-komari.sh scripts/`。
 - **回滚插件系统移除**：`git revert` 该提交即可恢复插件代码与 1.4.3 版本号（vendored 产物在同一提交内）。
+- **回滚 agent 发行线**：删掉 `install-agent.sh` / `install-agent.ps1` / `scripts/patches-agent/` /
+  `scripts/build-agent.sh` / `scripts/build-agent-image.sh` / `Dockerfile.agent` / `scripts/agent-pin.env`
+  并 `git revert` 补丁 0006（然后重跑 `sync-frontend.sh` 让面板回到上游命令，哈希也要一起回填）。
+- **回滚已发布的 agent 资产/镜像**：`gh release delete-asset`、`gh api -X DELETE /user/packages/...`
+  （token 有 `delete:packages`）。
 - **部署侧回滚**：升级前自动生成的 `data/backup/upgrade-*.zip` 即为回滚素材。
 
 ## 9. 克隆与推送
@@ -203,3 +240,62 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/sync-frontend.sh
 - 「代码来源」由 `LICENSE` / `NOTICE` / `README.md` / 根提交信息承载，而不再由逐行历史承载。
 - 需要取回上游历史做 backport 时：`git fetch upstream --tags`（`upstream` remote 保留）。
 - 本地曾存在的 68 个上游 tag 已删除，避免上游对象长期驻留；本仓库只推送自己的 tag。
+
+## 11. agent 发行线（0.0.4 起）
+
+**我们不 fork agent**：agent 二进制由本仓库自己构建、作为**本仓库 release 的资产**发布，
+所以自有仓库始终只有 `zhemed/komari` 一个（前面说的"三条线"是发布链上的三方，
+其中前端与 agent 都只是上游依赖）。
+
+| 环节 | 事实 |
+|---|---|
+| 源码来源 | 上游 `komari-monitor/komari-agent`，pin 在 commit `9e532e04…`（`scripts/agent-pin.env`） |
+| 补丁 | `scripts/patches-agent/0001`（Go 代码）、`0002`/`0003`（安装脚本） |
+| 构建 | `./scripts/build-agent.sh`：纯 Go 交叉编译（`CGO_ENABLED=0`，不需要 zig），一次出 **14** 个平台 |
+| 资产名 | `komari-agent-<os>-<arch>[.exe]`，与上游一致（安装脚本与自更新都按这个名字找资产） |
+| 版本号 | 与我们同一条 `0.0.x` 线（`scripts/version.env`），不沿用上游 agent 的 1.x |
+| 自更新目标 | `update.Repo = zhemed/komari`（源码默认值 + 构建期 `-X` 双保险） |
+| 自更新默认 | **关闭**；开启用 `--enable-auto-update` 或 `AGENT_ENABLE_AUTO_UPDATE=1`（旧的 `-autoUpdate` 仍表示开启） |
+| 安装脚本 | `install-agent.sh` / `install-agent.ps1`（上游脚本 vendor + 补丁）；默认装脚本 pin 的版本，`--install-version latest` 可装最新 |
+| 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`，`./scripts/build-agent-image.sh --push` |
+
+### 11.1 为什么必须给自更新加资产过滤（发布前实测过的坑）
+
+`go-github-selfupdate` 选资产用的是**后缀**匹配（`selfupdate/detect.go` 的 `findAssetFromRelease`：
+`strings.HasSuffix(name, "linux-amd64")` 之类），**不看前缀**。同一个 release 里既有服务器的
+`komari-linux-amd64`、又有 agent 的 `komari-agent-linux-amd64` 时，两者都命中后缀 `linux-amd64`，
+agent 可能把自己刷成**服务器二进制**。
+
+补丁 0001 因此传入 `selfupdate.Config{Filters: []string{"^komari-agent-"}}`（库在 `updater.go` 里
+要求过滤与后缀同时命中，见 `updater.go:53-67`）。0.0.4 发布前用两个临时 release 实测：
+
+- **带过滤**：跳过只有服务器资产的 `0.0.99`，取 `0.0.98` 的 `komari-agent-linux-amd64` → 更新后自证 `I-AM-AGENT`；
+- **去掉过滤（对照组）**：直接取 `0.0.99` 的 `komari-linux-amd64` → 更新后自证 `I-AM-SERVER`（节点报废）。
+
+结论：**这条防线不是装饰**，升级上游 agent 代码时必须保留；临时 release/tag 验完已删除。
+
+### 11.2 构建脚本自带的两道门禁
+
+`./scripts/build-agent.sh` 除了算出源码树哈希（`AGENT_SOURCE_TREE_SHA256`）外，还：
+
+1. 把补丁回放到上游源码后，与仓库里的 `install-agent.sh` / `install-agent.ps1` **逐字节比对**
+   ——防止上游文件变了而仓库成品没重新生成；
+2. 检查两个安装脚本里 pin 的默认版本（`default_agent_version` / `$DefaultAgentVersion`）
+   等于本次 `KOMARI_VERSION`——防止发版忘了同步（除非 `KOMARI_VERSION` 与仓库默认值不同，
+   这种情况按临时构建处理，只告警）。
+
+### 11.3 升级 agent 的上游 pin
+
+1. 改 `scripts/agent-pin.env` 的 `KOMARI_AGENT_COMMIT`（先看上游 diff 里 `update/`、`cmd/`、
+   `install.sh` 是否变结构，补丁可能失效）。
+2. `./scripts/build-agent.sh --only linux/amd64`：补丁失效会明确报错；哈希变化会打印实际值。
+3. 按提示把 `AGENT_SOURCE_TREE_SHA256` 更新为新值，并在提交信息里说明。
+4. 安装脚本若也变了：把 `.build/agent-src/install.sh`（补丁已应用）拷回 `install-agent.sh`，
+   `install.ps1` 同理，并确认 `default_agent_version` 与版本线一致。
+5. 重跑构建脚本，确认两道门禁通过。
+
+### 11.4 已经装出去的上游 agent 怎么办
+
+我们**无法**远程改变别人机器上已装的上游 agent：它内部指向 `komari-monitor/komari-agent`，
+默认每 6 小时自更新到上游最新（当前 `1.5.10`）。能做的只有引导重装（面板里的安装命令已经
+指向我们的脚本）。服务器侧**不做版本闸门**，上游 agent 仍能正常上报（协议 v1/v2 未变）。

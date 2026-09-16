@@ -2,7 +2,7 @@
 
 轻量、自托管的服务器监控：**单个 Go 二进制 + 内嵌 Web 前端**，由轻量 agent 上报指标。
 
-本仓库是**自维护分支**，版本线从 **0.0.1** 起步（当前 **0.0.3**），独立演进——**不跟随上游 1.5.x**。
+本仓库是**自维护分支**，版本线从 **0.0.1** 起步（当前 **0.0.4**），独立演进——**不跟随上游 1.5.x**。
 
 ## 与上游的关系
 
@@ -17,6 +17,8 @@
   邮件、ServerChan 等）、通知设置页面均不存在。
 - **移除内嵌 JS 运行时**（`pkg/jsruntime`）：它本是插件与 JavaScript 通知渠道的宿主，随二者一并移除。
 - **后台“发现新版本”检查指向本仓库**，不再提示升级到上游 1.5.x。
+- **agent 也由我们发布**：二进制作为本仓库 release 的资产（`komari-agent-<os>-<arch>`），
+  自更新目标指向本仓库，**默认关闭自动更新**；镜像为 `ghcr.io/zhemed/komari-agent`。
 - **默认主题产物 vendor 进仓库**：无需网络与 Node 即可构建后端。
 - **安装脚本指向本仓库并锁定 tag**，不会安装上游版本。
 - 仓库历史只包含我们自己的提交（上游代码以单个快照根提交引入）。
@@ -55,7 +57,28 @@ sudo bash install-komari.sh
 ```
 
 安装到 `/opt/komari`、创建 `komari` systemd 服务、默认端口 `25774`。
-脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.3`，`KOMARI_REPO` 可覆盖）。
+脚本从本仓库 release 下载（`KOMARI_TAG` 默认 `0.0.4`，`KOMARI_REPO` 可覆盖）。
+
+### 安装 agent（被监控节点）
+
+面板「节点 → 添加」里生成的命令即为我们的安装脚本，也可以直接用：
+
+```bash
+# Linux / macOS（默认装到 /opt/komari-agent，创建同名 systemd/launchd 服务）
+wget -qO- https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-agent.sh | sudo bash -s -- \
+  -e <面板地址> -t <节点 Token>
+
+# Windows（管理员 PowerShell）
+iwr 'https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-agent.ps1' -UseBasicParsing -OutFile install-agent.ps1; .\install-agent.ps1 -e <面板地址> -t <节点 Token>
+```
+
+- **自动更新默认关闭**：agent 不会自己去拉新版本。需要跟随我们的发布时加
+  `--enable-auto-update`（或设 `AGENT_ENABLE_AUTO_UPDATE=1`）。
+- 安装脚本常用参数（其余参数原样透传给 agent 二进制）：
+  `--install-dir <目录>`、`--install-service-name <服务名>`、`--install-version <版本|latest>`、
+  `--install-ghproxy <代理>`。
+- 容器方式：`docker run -d --name komari-agent --restart=always ghcr.io/zhemed/komari-agent:latest -e <面板地址> -t <节点 Token>`
+  （容器内会自动跳过二进制自更新，升级请换镜像）。
 
 ### Docker
 
@@ -65,8 +88,8 @@ sudo bash install-komari.sh
 KOMARI_STATIC=1 ./scripts/build-komari.sh          # 产出 bin/komari（静态）
 mkdir -p /tmp/komari-ctx && cp bin/komari /tmp/komari-ctx/komari-linux-amd64
 cp Dockerfile /tmp/komari-ctx/
-docker build -t komari:0.0.3 /tmp/komari-ctx
-docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.3
+docker build -t komari:0.0.4 /tmp/komari-ctx
+docker run -d --name komari -p 25774:25774 -v komari-data:/app/data komari:0.0.4
 ```
 
 > `Dockerfile` 用 `ARG TARGETOS/TARGETARCH`（默认 `linux/amd64`）定位构建上下文里的
@@ -92,7 +115,15 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 ```
 
 版本号与提交 hash 由脚本以 ldflags 注入（与上游口径一致）：
-`CurrentVersion` 默认 `0.0.1`，可用 `KOMARI_VERSION` 覆盖。
+默认版本来自 `scripts/version.env`（发版只改那一处），可用 `KOMARI_VERSION` 覆盖。
+
+### 构建 agent（纯 Go，不需要 zig）
+
+```bash
+./scripts/build-agent.sh                    # 14 个平台 → dist/agent/
+./scripts/build-agent.sh --only linux/amd64 # 单平台快跑
+./scripts/build-agent-image.sh --push       # 三平台镜像并推送 ghcr（需 docker login）
+```
 
 ### 重新生成前端产物（需要网络 + Node）
 
@@ -107,8 +138,9 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 ### 提交前自检
 
 ```bash
-GOPROXY=off ./scripts/build-komari.sh        # 离线构建（验证产物完整）
+GOPROXY=off ./scripts/build-komari.sh        # 离线构建（依赖已在本地模块缓存时可用；本仓库没有 vendor/）
 go build ./... && go vet ./... && go test ./...
+./scripts/build-agent.sh --only linux/amd64  # 改了 agent 补丁时：验证补丁可回放 + 安装脚本一致
 ```
 
 本仓库**没有 CI**（上游流水线已移除，避免产出与我们对不上的工件），以上命令需本地执行。
@@ -130,10 +162,12 @@ go build ./... && go vet ./... && go test ./...
 ## 版本与发布
 
 - 版本号形如 `0.0.x`，发版**递增 patch 位**（前端版本比较只取 `x.y.z` 三段，带后缀的 tag 不会被识别为更新）。
-- 发布流程（手动）：
-  1. `KOMARI_STATIC=1 ./scripts/build-komari.sh`
-  2. 资产命名为 `komari-linux-<arch>`（与 `install-komari.sh` 的期望一致）
-  3. `gh release create <tag> komari-linux-amd64 ...`
+- 发布流程（手动，完整清单见 [docs/MAINTAINING.md](./docs/MAINTAINING.md) §3.4）：
+  1. 同步 `scripts/version.env`、`install-komari.sh`、`install-agent.sh`、`install-agent.ps1` 的版本字面量
+  2. `KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh`（arm64 同理）
+  3. `./scripts/build-agent.sh`（14 个 agent 资产）
+  4. `gh release create <tag> -R zhemed/komari dist/komari-linux-* dist/agent/komari-agent-*`
+  5. `./scripts/build-agent-image.sh --push`（镜像 tag 与 release 同版本）
 
 ## 来源与许可
 

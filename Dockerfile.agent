@@ -1,0 +1,31 @@
+# Komari Agent 容器镜像（zhemed/komari 发行线）
+#
+# 来源：上游 komari-monitor/komari-agent 的 Dockerfile
+#       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
+# 改动：
+#   1) ARG 给了默认值（与仓库根 Dockerfile 同口径），普通 docker build 也能跑
+#   2) 装 ca-certificates / tzdata（面板走 https 与本地时区）
+#   3) 容器标记文件保留：agent 检测到后会跳过二进制自更新
+#      （见 scripts/patches-agent/0001-own-update-line.patch）
+#
+# 构建入口是 scripts/build-agent-image.sh（它准备上下文并调 buildx）：
+# 上下文里必须已有 komari-agent-${TARGETOS}-${TARGETARCH} 这套产物。
+FROM alpine:3.21
+
+WORKDIR /app
+
+# Docker buildx 会在构建时自动填充这些变量；默认值让普通 docker build 也能工作
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --chmod=755 komari-agent-${TARGETOS}-${TARGETARCH} /app/komari-agent
+
+RUN touch /.komari-agent-container
+
+ENTRYPOINT ["/app/komari-agent"]
+# 运行时请指定参数
+# Please specify parameters at runtime.
+# eg: docker run ghcr.io/zhemed/komari-agent -e example.com -t token
+CMD ["--help"]

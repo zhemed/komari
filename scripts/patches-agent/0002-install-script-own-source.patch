@@ -1,0 +1,155 @@
+diff --git a/install.sh b/install.sh
+index 9d925f3..f00fca7 100755
+--- a/install.sh
++++ b/install.sh
+@@ -1,5 +1,21 @@
+ #!/bin/sh
+ 
++# ---------------------------------------------------------------------------
++# Komari Agent 安装脚本（zhemed/komari 发行线）
++#
++# 来源：上游 komari-monitor/komari-agent 的 install.sh
++#       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
++# 本文件由 scripts/patches-agent/0002-install-script-own-source.patch 生成，
++# 改动点：
++#   1) 下载源改为本仓库 zhemed/komari 的 release（agent 资产与服务器同 tag 发布）
++#   2) 默认安装目录由 /opt/komari 改为 /opt/komari-agent（避免与服务器 /opt/komari 撞车）
++#   3) 默认安装脚本 pin 的版本（与本仓库 release 的资产一一对应），
++#      需要最新版用 --install-version latest
++#   4) 移除上游的 Snapshot 通道（本仓库不发布 Snapshot-* 版本）
++#   5) Git Bash（MINGW）下补上 Windows 资产名的 .exe 后缀（上游此处会 404）
++# 重新生成方式见 docs/MAINTAINING.md 的“agent 发行线”一节。
++# ---------------------------------------------------------------------------
++
+ # Color definitions for terminal output
+ RED='\033[0;31m'
+ GREEN='\033[0;32m'
+@@ -39,8 +55,11 @@ log_config() {
+ EUID=${EUID:-$(id -u)}
+ 
+ # Default values
++# 本 fork 的发行线参数，集中在这里，避免仓库名散落各处
++agent_repo="zhemed/komari"
++default_agent_version="0.0.4"
+ service_name="komari-agent"
+-target_dir="/opt/komari"
++target_dir="/opt/komari-agent"
+ github_proxy=""
+ install_version="" # New parameter for specifying version
+ install_dir_specified=false
+@@ -53,10 +72,10 @@ os_type=$(uname -s)
+ case $os_type in
+     Darwin)
+         os_name="darwin"
+-        target_dir="/usr/local/komari"  # Use /usr/local on macOS
++        target_dir="/usr/local/komari-agent"  # Use /usr/local on macOS
+         # Check if we can write to /usr/local, fallback to user directory
+         if [ ! -w "/usr/local" ] && [ "$EUID" -ne 0 ]; then
+-            target_dir="$HOME/.komari"
++            target_dir="$HOME/.komari-agent"
+             log_info "No write permission to /usr/local, using user directory: $target_dir"
+         fi
+         ;;
+@@ -68,7 +87,7 @@ case $os_type in
+         ;;
+     MINGW*|MSYS*|CYGWIN*)
+         os_name="windows"
+-        target_dir="/c/komari"  # Use C:\komari on Windows
++        target_dir="/c/komari-agent"  # Use C:\komari-agent on Windows
+         ;;
+     *)
+         log_error "Unsupported operating system: $os_type"
+@@ -121,7 +140,7 @@ komari_args="${komari_args# }"
+ if [ "$EUID" -ne 0 ] && [ "$install_dir_specified" = false ]; then
+     case "$os_name" in
+         linux|freebsd)
+-            target_dir="${XDG_DATA_HOME:-$HOME/.local/share}/komari"
++            target_dir="${XDG_DATA_HOME:-$HOME/.local/share}/komari-agent"
+             ;;
+     esac
+ fi
+@@ -320,59 +339,23 @@ esac
+ log_info "Detected OS: ${GREEN}$os_name${NC}, Architecture: ${GREEN}$arch${NC}"
+ 
+ file_name="komari-agent-${os_name}-${arch}"
++# Windows 资产上游加了 .exe 后缀；Git Bash 走的也是这条路径，缺后缀会 404
++if [ "$os_name" = "windows" ]; then
++    file_name="${file_name}.exe"
++fi
+ 
+-resolve_snapshot_version() {
+-    snapshot_api_url="https://api.github.com/repos/komari-monitor/komari-agent/releases?per_page=100"
+-    if [ -n "$github_proxy" ]; then
+-        snapshot_api_urls="${github_proxy}/${snapshot_api_url} ${snapshot_api_url}"
+-    else
+-        snapshot_api_urls="$snapshot_api_url"
+-    fi
+-
+-    for api_url in $snapshot_api_urls; do
+-        if ! releases_json=$(curl -fsSL --connect-timeout 15 \
+-            -H "Accept: application/vnd.github+json" \
+-            -H "User-Agent: komari-agent-installer" \
+-            "$api_url"); then
+-            releases_json=""
+-        fi
+-
+-        if [ -n "$releases_json" ]; then
+-            RESOLVED_SNAPSHOT_VERSION=$(printf '%s\n' "$releases_json" |
+-                grep -o '"tag_name":[[:space:]]*"Snapshot-[^"]*"' |
+-                sed 's/.*"\(Snapshot-[^"]*\)".*/\1/' |
+-                LC_ALL=C sort -r |
+-                head -n 1)
+-            if [ -n "$RESOLVED_SNAPSHOT_VERSION" ]; then
+-                return 0
+-            fi
+-        fi
+-
+-        if [ "$api_url" != "$snapshot_api_url" ]; then
+-            log_warning "Failed to resolve snapshot releases through GitHub proxy, retrying directly."
+-        fi
+-    done
+-
+-    return 1
+-}
+-
+-version_to_install="latest"
++# 版本解析：默认装本脚本 pin 的版本（与本仓库 release 里的 agent 资产一一对应），
++# --install-version <版本> 可指定，--install-version latest 装最新 release。
++# 上游的 Snapshot 通道（tag 形如 Snapshot-YYYYMMDD）在本仓库不存在，直接拒绝。
++version_to_install="$default_agent_version"
+ if [ -n "$install_version" ]; then
+     if [ "$install_version" = "snapshot" ]; then
+-        log_info "Resolving the latest snapshot version..."
+-        if ! resolve_snapshot_version; then
+-            log_error "Failed to resolve the latest snapshot version."
+-            exit 1
+-        fi
+-        version_to_install="$RESOLVED_SNAPSHOT_VERSION"
+-        log_success "Latest snapshot version: ${GREEN}$version_to_install${NC}"
+-    else
+-        log_info "Attempting to install specified version: ${GREEN}$install_version${NC}"
+-        version_to_install="$install_version"
++        log_error "本仓库不提供 snapshot 通道；请使用 --install-version <版本> 或 latest。"
++        exit 1
+     fi
+-else
+-    log_info "No version specified, installing the latest version."
++    version_to_install="$install_version"
+ fi
++log_info "安装版本: ${GREEN}$version_to_install${NC}（脚本 pin 的默认版本，可用 --install-version 覆盖）"
+ 
+ # Construct download URL
+ if [ "$version_to_install" = "latest" ]; then
+@@ -383,10 +366,10 @@ fi
+ 
+ if [ -n "$github_proxy" ]; then
+     # Use proxy for GitHub releases
+-    download_url="${github_proxy}/https://github.com/komari-monitor/komari-agent/releases/${download_path}/${file_name}"
++    download_url="${github_proxy}/https://github.com/${agent_repo}/releases/${download_path}/${file_name}"
+ else
+     # Direct access to GitHub releases
+-    download_url="https://github.com/komari-monitor/komari-agent/releases/${download_path}/${file_name}"
++    download_url="https://github.com/${agent_repo}/releases/${download_path}/${file_name}"
+ fi
+ 
+ log_step "Creating installation directory: ${GREEN}$target_dir${NC}"

@@ -2,7 +2,7 @@
 
 本文件记录**本 fork 特有**的构建契约。上游文档不覆盖这些约定，改动构建相关文件前必读。
 
-适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`Dockerfile`。
+适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`install-agent.sh`、`install-agent.ps1`、`Dockerfile`、`Dockerfile.agent`。
 （本仓库已无 `.github/` 流水线——上游 CI 已于 2026-09-16 移除，见 §2 末尾与 `docs/MAINTAINING.md` §4。）
 
 ---
@@ -48,7 +48,10 @@
 
 ### 1.4 版本号语义（0.0.x 自有版本线）
 
-`CurrentVersion` 由 `scripts/build-komari.sh` 注入，默认 `0.0.3`。
+`CurrentVersion` 由 `scripts/build-komari.sh` 注入；默认版本**只**写在 `scripts/version.env`
+（当前 `0.0.4`），`build-komari.sh` 与 `build-agent.sh` 都 source 它。
+面向用户的字面量另有 `install-komari.sh` 的 `REPO_TAG`、`install-agent.sh` 的
+`default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`（后两处有门禁兜底，见 1.6）。
 前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段且要求严格递增，
 因此 `0.0.1-fix1` 这类 tag **永远不会**被判为"可更新"；发新版本必须递增 patch 位（`0.0.2`）。
 
@@ -69,9 +72,29 @@
 
 **必须保留、不要连带删除**：
 
-- `pkg/jsruntime/` —— 被 `utils/messageSender/javascript` 使用，**不是插件专用**。
+- `pkg/jsruntime/` —— 插件系统移除时它仍被 `utils/messageSender/javascript` 使用而**保留**，
+  但该消费者已在 0.0.3 随通知系统一并删除，**现在它也已不在仓库里**（别按旧结论找它）。
 - 主题系统与主题市场 —— 它们没有版本门禁，不受版本号影响。
 - 数据库中的历史插件表（孤儿表，保留即可，不做破坏性迁移）。
+
+### 1.6 agent 发行线契约（0.0.4 起）
+
+上游 agent 只做**源码依赖**，不 fork 到我们仓库（自有仓库只有 `zhemed/komari` 一个）：
+
+- 源码 pin：`scripts/agent-pin.env` 的 `KOMARI_AGENT_COMMIT`（当前 `9e532e04…`）；
+  浅克隆后打 `scripts/patches-agent/*.patch`，再算源码树哈希 `AGENT_SOURCE_TREE_SHA256` 并强制校验。
+- 构建：`scripts/build-agent.sh` 纯 Go 交叉编译（`CGO_ENABLED=0`），**不需要 zig/gcc**，
+  矩阵与上游 `build_all.sh` 一致 = **14** 个平台（排除 windows/arm、darwin/{386,arm}、非 linux 的 loong64）。
+- 资产名必须是 `komari-agent-<os>-<arch>[.exe]`：安装脚本、前端生成的命令、agent 自更新的资产匹配
+  三者都按这个名字找。
+- **自更新必须带资产过滤** `Filters: []string{"^komari-agent-"}`：`go-github-selfupdate` 按
+  **后缀**（如 `linux-amd64`）匹配资产，不过滤会让 agent 刷成同 release 里的服务器二进制
+  （`komari-linux-amd64`）。实测证据见 `docs/MAINTAINING.md` §11.1，**升级上游时不得去掉**。
+- 自更新目标固定 `Repo = "zhemed/komari"`（源码默认 + 构建期 `-X` 双保险）；
+  **默认关闭自动更新**（`EnableAutoUpdate` 默认 false，`--enable-auto-update` 才开）。
+- 安装脚本是上游 `install.sh` / `install.ps1` 的 vendor + 补丁：默认安装目录 `/opt/komari-agent`
+  （**不要**改回 `/opt/komari`，会和服务器的目录撞车），默认装脚本 pin 的版本。
+  `build-agent.sh` 会把补丁回放结果与仓库成品**逐字节比对**，不一致即失败。
 
 ## 2. 构建与验证命令
 
@@ -81,6 +104,9 @@
 KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
 KOMARI_STATIC=1 ./scripts/build-komari.sh                      # 发布用：linux/amd64 静态（需 zig）
 KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
+./scripts/build-agent.sh                    # agent：14 个平台 → dist/agent/（纯 Go，无需 zig）
+./scripts/build-agent.sh --only linux/amd64 # agent：单平台 + 两道门禁校验（改 agent 补丁后必跑）
+./scripts/build-agent-image.sh              # agent 镜像：本地单平台构建（--push 才推 ghcr）
 ```
 
 **静态构建是发布的前提**：`Dockerfile` 基于 `alpine:3.21`（musl），glibc 动态二进制在其中
@@ -89,7 +115,10 @@ zig 缺失时 `KOMARI_STATIC=1` 必须**明确报错**，不得静默退化为�
 
 改构建相关文件后的最小验证：
 
-1. `GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh` —— 必须成功（证明 vendor 生效、无需网络）。
+1. `GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh` —— 在**模块缓存已预热**的机器上必须成功。
+   ⚠️ 本仓库**没有 `vendor/` 目录**（实测：`GOMODCACHE=<空目录> GOPROXY=off` 会报
+   `module lookup disabled by GOPROXY=off`），所以它验证的是"依赖已在本地"，不是"依赖随仓库下发"。
+   完全离线的冷机器需要先联网 `go mod download`。
 2. 启动二进制，日志须含 `Komari Monitor 0.0.1 (hash: <git rev-parse HEAD>)`。
 3. `curl` 校验 `/install`、`/assets/*.js`、`/favicon.ico`、`/themes/default/komari-theme.json` 均 200，
    且 JS 字节数与 `web/public/defaultTheme/dist/` 下同名文件一致。
@@ -110,3 +139,6 @@ zig 缺失时 `KOMARI_STATIC=1` 必须**明确报错**，不得静默退化为�
 - 不要把 `install-komari.sh` 的下载路径改回 `releases/latest`（那会安装上游 1.5.x）。
 - 不要把 vendored 产物标记为生成物排除出 git——本仓库的可离线构建完全依赖它。
 - 不要重新引入插件系统（见 1.5）。
+- 不要去掉 agent 自更新的资产过滤 `Filters`（见 1.6；去掉会让节点被刷成服务器二进制）。
+- 不要把 agent 版本号改回上游的 `1.x` 线，也不要把 agent 源码 fork 成本仓库的 vendored 目录——
+  我们只 pin + 打补丁（见 1.6）。
