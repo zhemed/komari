@@ -90,8 +90,6 @@ func DebugContext / InfoContext / WarnContext / ErrorContext(ctx, component, mes
 | `client-api` | 9 | `web/api/client/report.go:102`、`:158` |
 | `oauth` | 8 | `web/oauth/factory/factory.go:22` |
 | `config` | 6 | `internal/config/config.go:108`、`:125`、`:202` |
-| `message-sender` | 4 | `utils/messageSender/factory/factory.go:22` |
-| `JavaScript` | 4 | `pkg/jsruntime/console/console.go:102-108`（唯一带大写的取值） |
 | `scheduler` | 2 | `internal/scheduler/scheduler.go:206` |
 | `clients` | 2 | `database/clients/*` |
 | `audit` | 2 | `database/auditlog/log.go:21`、`:34` |
@@ -112,9 +110,8 @@ func DebugContext / InfoContext / WarnContext / ErrorContext(ctx, component, mes
   `logger.Errorf("server", "Failed to get OIDC provider config: %v", err)`（`internal/server/runtime.go:64`）、
   `logger.Errorf("server", "cleanup %q failed: %v", cleanup.name, err)`（`:168`）、
   `logger.ErrorArgs("client-api", "Failed to read request body:", err)`（`web/api/client/report.go:102`）。
-- **Debug**：几乎没人用——全仓库**只有 1 处**：`logger.Debug("JavaScript", message)`
-  （`pkg/jsruntime/console/console.go:102`）。
-  除非你在写 jsruntime 的 console 桥，否则不要新增 Debug 日志。
+- **Debug**：**当前全仓库 0 处**（唯一的使用者 `pkg/jsruntime` 已在 0.0.3 删除）。
+  需要排查问题时可以临时加，但不要把它当常规输出——真要留就得顺手更新这张表。
 - **Fatalf**：仅启动期不可恢复失败。全仓库 **9 处**：`cmd/server.go:38`、`:44`、`:50`、`:63`、`:76`、
   `:89`、`:111`、`:120` + `database/dbcore/dbcore.go:324`。
   它记 ERROR 后直接 `os.Exit(1)`（`utils/log/log.go:175-178`）。可恢复失败一律不用。

@@ -32,7 +32,7 @@ Token string `json:"token,omitempty" gorm:"type:varchar(255);unique;not null"`
 - 可空时间用 `*time.Time` + `gorm:"type:timestamp"`（`database/models/models.go:37`、`database/models/task.go:18`）。
 - 列名与 json 键不一致时显式 `column:`：`DefaultOn bool `json:"default_on" gorm:"column:all_clients;not null;default:false"``（`database/models/pingTask.go:20`）——改列名时保持 json 键不变，前端契约不破。
 - 变长数组字段存 JSON 文本列：`Clients StringArray `json:"clients" gorm:"type:longtext"``（`database/models/pingTask.go:19`、`database/models/task.go:7`、`database/models/notification.go:19`）。
-- 结构化配置同样存 JSON 字符串列：`Addition string `json:"addition" gorm:"type:longtext" default:"{}"``（`database/models/oauth.go:5`、`database/models/messageSender.go:7`）、`Data string `json:"data" gorm:"type:longtext" default:"{}"``（`database/models/theme.go:68`）。
+- 结构化配置同样存 JSON 字符串列：`Addition string `json:"addition" gorm:"type:longtext" default:"{}"``（`database/models/oauth.go:5`；通知系统的 `messageSender.go` 已在 0.0.3 删除）、`Data string `json:"data" gorm:"type:longtext" default:"{}"``（`database/models/theme.go:68`）。
 
 `TableName()` 全仓库**只有三处**（都在 configs 相关）：`internal/config/config.go:20-22` → `"configs"`、
 `internal/migrations/migrations.go:46-48`、`:79-81`（`legacyModelConfig` / `legacyConfig`）→ `"configs"`。
@@ -178,7 +178,7 @@ checkpoint 会检查 busy 标志并报错而非静默继续（`:48-60`）。非 
 **准确的现状表述**（不要写成"永不 DROP"）：运行期不删表；需要退场的表**优先改名保留**，
 仅当数据已被迁移进新结构或必须重建同名表时才 DROP。
 
-- 改名保留的正例：`db.Migrator().RenameTable("client_infos", "client_infos_backup")`（`internal/migrations/migrations.go:417`）+ 日志 `Data migration completed, old table has been backed up as client_infos_backup`（`:420`）。
+- 改名保留的正例：`db.Migrator().RenameTable("client_infos", "client_infos_backup")`（`internal/migrations/migrations.go:315`）+ 日志 `Data migration completed, old table has been backed up as client_infos_backup`（`:318`）。
 - 重建同名表的反例：旧宽表 `configs` → KV 的迁移会 `DropTable("configs")` 后重建（`internal/migrations/migrations.go:328`），在事务内先落数据；`LoadNotification` 旧形状也会被重建（`internal/migrations/migrations.go:178-184`）。
 - 旧监控 4 表 `records / records_long_term / gpu_records / ping_records`（`internal/migrations/legacy_monitoring.go:27`）在启动阶段**不删**，只在管理员显式执行升级向导后才删（`internal/migrations/legacy_monitoring.go:178-195`，drop 实现 `:666-677`）。
 - 兼容项清理删的是**配置行**而非表：`migrateDeprecatedMetricRetentionConfig` 删 `metric_retention_days`（`internal/migrations/migrations.go:139-144`）、`migrateRemovedCompatibilityConfig` 删 `nezha_compat_enabled` / `nezha_compat_listen` / `low_resource_mode`（`:146-155`）。

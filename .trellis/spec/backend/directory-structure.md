@@ -41,7 +41,7 @@ cmd → internal/server → web/router → web/rpc/jsonrpc + web/api/*
 - `web/rpc/jsonrpc/*` 依赖 `database/*`、`internal/config`、`pkg/rpc`、`web/agent`（`web/rpc/jsonrpc/common.go:11-20`），**不**直接写 SQL。
 - `database/records/records.go:6-8` 依赖 `internal/metricstore`：所有负载/GPU/ping 时序数据走 metric store，不再走 GORM 旧表。
 - `pkg/` 基本自洽：`pkg/metric/store.go:17` 只向下用 `internal/sqlitetune`；`pkg/rpc/context.go:10` 只依赖 `database/models`（共享 DTO）。
-- `pkg/jsruntime` 里的 `panic` 是 goja 抛 JS 异常的**正确**机制，不要当错误处理反例改掉。
+- （历史）`pkg/jsruntime` 曾用 `panic` 抛 goja 的 JS 异常；该包已在 0.0.3 删除，现状见 `error-handling.md`。
 - `utils/notifier/traffic.go:15`、`utils/pingSchedule.go:12`、`utils/renewal/renewal.go:13` 反向依赖 `web/agent` 的在线状态——这是既有耦合，新增 `utils/` 包时不要扩大这类反向依赖。
 
 ## 3. 命名与放置约定
@@ -69,7 +69,8 @@ cmd → internal/server → web/router → web/rpc/jsonrpc + web/api/*
 
 - 只在**本进程**内使用、会读配置或全局状态 → `internal/`（例：`internal/config`、`internal/scheduler`）。
 - 自包含、可单独测试、不读全局配置 → `pkg/`（例：`pkg/metric`、`pkg/timeutil`）。
-- `pkg/jsruntime` 是显式例外：它被 `utils/messageSender/javascript` 使用，**不是插件专用**，移除插件系统时刻意保留（`build-and-pinning.md` §1.5）。
+- （历史）`pkg/jsruntime` 曾在移除插件系统时被刻意保留（消费者是 JavaScript 通知渠道），
+  0.0.3 删除通知系统后它一并消失；`build-and-pinning.md` §1.5 记的是这段历史。
 
 ### 3.4 模型只放 `database/models/`
 

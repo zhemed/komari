@@ -66,12 +66,15 @@ go build ./... && go vet ./... && go test ./...
 唯一"无同名源码"的测试文件是 `web/api/public/test_db_test.go`——它是测试基建（只有 `TestMain`），
 不是某个函数的测试。
 
-测试最富的包：`pkg/metric`（19 个）、`web/rpc/jsonrpc`（8 个）、`pkg/jsruntime`（7 个）、
-`internal/metricstore`（4 个）、`database/models`（3 个）、`internal/migrations`（3 个）。
+测试最富的包（2026-09-16 实测，全仓 77 个 `*_test.go`）：`pkg/metric`（19 个）、
+`web/rpc/jsonrpc`（8 个）、`agent/monitoring/unit`（5 个）、`internal/metricstore`（4 个）、
+`agent/server`（4 个）、`web/api/admin`（3 个）。前端与 agent 源码 vendor 进本仓库后，
+`agent/` 下的测试同样归我们维护（其中 3 个依赖外网，见 `docs/MAINTAINING.md` §7）。
 
 **大量目录没有测试**（55 个），包括 `cmd/`、`internal/config/`、`database/accounts/`、
-`database/clients/`、`database/auditlog/`、`web/router/`、`web/upload/`、
-`utils/messageSender/` 的 8 个渠道子包。给这些地方加代码时，"有测试"不是既有惯例。
+`database/clients/`、`database/auditlog/`、`web/router/`、`web/upload/`。
+给这些地方加代码时，"有测试"不是既有惯例；反过来，`pkg/metric`、`web/rpc/jsonrpc`、
+`internal/metricstore` 这几个包改动时应当补测试（现有测试密度最高）。
 
 ### 4.2 断言：默认手写，testify 是例外
 
@@ -201,12 +204,14 @@ if apiResponse.Code != http.StatusNotFound { ... }
 以下都是本 fork 与上游的差异点，违反会直接破坏可构建性（详细理由见 `build-and-pinning.md`）：
 
 1. **不要重新引入插件系统**。`internal/plugin/`、插件市场、插件 RPC、`/api/plugin/*`、
-   前端插件页面均已删除，升级上游代码时若被带回必须剔除。保留物：`pkg/jsruntime/`（非插件专用）、
-   主题系统、数据库里的历史插件表。
+   前端插件页面均已删除，升级上游代码时若被带回必须剔除。**保留物只有**：主题系统与主题市场、
+   数据库里的历史插件表（孤儿表）。`pkg/jsruntime/` 与 `utils/messageSender/` 已在 0.0.3
+   随通知系统一并删除，不要再按"插件专用例外"的旧结论去找它们。
 2. **不要把 `web/public/defaultTheme/` 排除出 git**。它被 `//go:embed` 引用
    （`web/public/public.go:18`），缺失时 `web/public/public.go:130` panic、`go build` 直接失败。
-   当前有 **442** 个受版本控制的文件；`web/public/.gitignore:6` 的 `# defaultTheme/*` 保持注释状态。
-   首次提交曾因忽略它漏掉 448 个文件。
+   当前有 **431** 个受版本控制的文件；`web/public/.gitignore:6` 的 `# defaultTheme/*` 保持注释状态。
+   首次提交曾因忽略它漏掉 448 个文件。改前端后用 `scripts/build-frontend.sh` 重建：它整体替换该目录，
+   并校验目录树哈希与 `scripts/frontend-build.env` 一致。
 3. **不要 `git push upstream`**，也不要扩大 `upstream` 的 fetch refspec（当前只取到 tag 1.4.3）。
 4. **不要把 `install-komari.sh` 的下载路径改回 `releases/latest`**（会装到上游 1.5.x）。
 5. **不要把 Go 依赖说成"vendor"**：仓库根**没有** `vendor/` 目录，`.gitignore:26` 的 `# vendor/` 是注释掉的；

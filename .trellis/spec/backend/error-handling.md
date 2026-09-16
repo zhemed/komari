@@ -128,18 +128,18 @@ api.RespondError(c, http.StatusInternalServerError, "读取主题目录失败: "
 `GinRecovery` 的实际行为（`utils/log/gin.go:34-48`）：`recover()` → 记 `Error("http", "panic recovered", ...)`，
 字段含 `error`/`method`/`path` → `c.AbortWithStatus(500)`。**不**回 JSON body，也**不**重抛。
 
-允许 panic 的场合（本仓库仅此几处非 jsruntime panic）：
+允许 panic 的场合（全仓库仅此几处）：
 
 | 位置 | 场景 |
 |---|---|
 | `internal/config/config.go:29` | `SetDb` 时 `AutoMigrate(ConfigItem)` 失败——配置库不可用等于不可启动 |
 | `web/public/public.go:130` | `defaultTheme` 嵌入目录缺失，构建/部署错误，早期暴露 |
 | `utils/geoip/geoip.go:60` | 读取不到 GeoIP 配置 |
-| `web/oauth/factory/factory.go:19`、`utils/messageSender/factory/factory.go:19` | 注册项构造返回 nil |
+| `web/oauth/factory/factory.go:19` | 注册项构造返回 nil |
 | `pkg/rpc/registry.go:44` | `MustRegister` 便捷注册失败（仅 `init()` 期使用） |
 
-`pkg/jsruntime/**` 里大量 `panic(vm.NewGoError(...))` / `vm.NewTypeError(...)` 是 goja
-**抛 JS 异常的唯一方式**，属于正确用法，review 时不要"修"。
+（历史）`pkg/jsruntime/**` 曾用 `panic(vm.NewGoError(...))` 抛 goja 的 JS 异常；该包已在 0.0.3
+删除，仓库里现在没有任何"用 panic 跨 JS 边界"的场景。
 
 其它受控 recover 点（panic 不跨边界）：
 
@@ -186,5 +186,5 @@ logger.Fatalf("server", "server startup failed at %q: %v", "bootstrap", err)
 - 在 RPC handler 里 `logger.Error(...)` 之后再返回错误 → 与 `GinLogger` 的 5xx 记录重复；handler 不记日志。
 - 把 `InternalError` 当成"参数不对"的兜底 → 前端无法区分；参数问题一律 `InvalidParams`。
 - 忘写 `api.RequireSensitive2FA()` 却让 handler 直接执行敏感动作 → 见 `web/router/router.go:124`、`:140` 的正确写法。
-- 在 `pkg/jsruntime` 之外模仿 `panic(vm.NewGoError(...))` → goja 之外没有 JS 边界，会直接 500 且无上下文。
+- 模仿已删除的 goja 桥那样用 `panic` 传业务错误 → 没有 JS 边界，会直接 500 且丢上下文；业务错误用返回 error。
 - 新增可恢复失败却用 `logger.Fatalf` → 进程直接退出，绕过 §7 的阶段化错误上报。
