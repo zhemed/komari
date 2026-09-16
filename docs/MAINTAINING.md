@@ -360,6 +360,15 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
 - **包可见性只能手点**：用户级 ghcr 包的可见性无法用 API 改（`PATCH /user/packages/...`
   实测一律 404，连已公开的包也一样），新建的包默认 **private**。要公开得去
   `https://github.com/users/<user>/packages/container/<包名>/settings` → Change visibility → Public。
-- 验证公开可拉：`DOCKER_CONFIG=<空目录> docker manifest inspect ghcr.io/zhemed/komari:latest`
-  （匿名成功即公开；`:latest` 与 `:<版本>` 都要过一遍）。
+  当前状态（2026-09-16）：`komari` 与 `komari-agent` 都已人工设为 **public**。
+- 验证公开可拉（发版后必跑）：空凭据目录能成功即为公开——
+  ```bash
+  mkdir -p /tmp/dockerclean
+  for t in 0.0.4 latest; do
+    DOCKER_CONFIG=/tmp/dockerclean docker manifest inspect "ghcr.io/zhemed/komari:$t" >/dev/null && echo "komari:$t ok"
+    DOCKER_CONFIG=/tmp/dockerclean docker manifest inspect "ghcr.io/zhemed/komari-agent:$t" >/dev/null && echo "komari-agent:$t ok"
+  done
+  ```
+  0.0.4 实测：四个 tag 全部匿名可拉，服务器镜像匿名 `docker run` 后 `/install` 200、
+  数据落在挂载卷。
 - Dockerfile 里带 `org.opencontainers.image.source` 标签，ghcr 包页面会链回本仓库。
