@@ -43,5 +43,6 @@
 `scripts/build-server-image.sh` 与双镜像发布（带 OCI 标签）、README 内命令逐条实测、
 规范两处同步（README 定位、镜像脚本入范围）。提交 `fc7cf35`。
 
-**唯一未完成项**：两个 ghcr 包（`komari`、`komari-agent`）仍是 private，需人工在网页上点成
-Public（API 改不了），之后用 `DOCKER_CONFIG=<空目录> docker manifest inspect` 验证匿名可拉再归档。
+剩余项已关闭：用户把两个 ghcr 包手点成 Public 后，四个 tag（`:0.0.4`/`:latest` × 两个包）
+经空凭据目录验证**匿名可拉**；服务器镜像用空凭据 `docker run` 起来 `/install` 200、数据落卷，
+agent 镜像匿名 `--help` 正常。验收全部通过。
