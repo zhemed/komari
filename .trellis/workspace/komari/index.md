@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
+- **Total Sessions**: 9
 - **Last Active**: 2026-09-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~189 | Active |
+| `journal-1.md` | ~212 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-09-16 | Session 8: agent 从 1.5.10 退回 1.4.3 同期血统（发 0.0.5），motd 告警事件复盘 | `3ab871e`, `7b61d17` | `main` |
 | 8 | 2026-09-16 | Session 7 收尾: 镜像公开验证通过（README 的 docker run 已可匿名使用） | `fc7cf35`, `dbc0410` | `main` |
 | 7 | 2026-09-16 | Session 7: README 改成产品视角短文 + 发布服务器镜像 ghcr.io/zhemed/komari | `fc7cf35` | `main` |
 | 6 | 2026-09-16 | Session 6: agent 自有发行线（0.0.4）——单仓库发布 agent、默认关自更新、自建镜像 | `2ba82cc`, `1a2288d`, `5d047d8`, `4e88360` | `main` |

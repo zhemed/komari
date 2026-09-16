@@ -187,3 +187,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 9: Session 8: agent 从 1.5.10 退回 1.4.3 同期血统（发 0.0.5），motd 告警事件复盘
+<!-- trellis-session: v=2 fp=04ae88c07655353b -->
+
+**Date**: 2026-09-16
+**Task**: Session 8: agent 从 1.5.10 退回 1.4.3 同期血统（发 0.0.5），motd 告警事件复盘
+**Branch**: `main`
+
+### Summary
+
+用户在本机 /etc/motd 看到 '[Komari] Remote control is enabled on this device' 告警并怀疑我们拉到了 1.5。查证：告警不是入侵（是 agent 自己写的，cmd/warn_linux.go 注入，触发条件是远程控制开着），但版本确实漂了——0.0.4 的 agent 误 pin 上游 agent tag 1.5.10（2026-09-15），比服务器/前端 1.4.3（2026-08-13）晚一个月，motd 注入来自 79d8d45 增强安全提醒（2026-09-14）。(1) 处置：pin 退回 1186aafb（2026-08-07，1.4.3 之前最后一个 agent 提交，协议 v2/自动发现/参数面齐全）；安装脚本补丁 0002/0003 按旧版重做（旧版是 #!/bin/bash、无 snapshot 通道），install-agent.sh/.ps1 重新 vendor；发 0.0.5（17 资产 + 镜像 :0.0.5/:latest）。(2) 机制化防线：build-agent.sh 新增 pin 日期硬校验（不得超过 KOMARI_AGENT_MAX_COMMIT_DATE=2026-08-13），反例已验证退出码 1。(3) 本机：清 /etc/motd、重装 agent（身份复用同一 uuid）、服务器升 0.0.5（二进制 sha256 与 release 资产一致）、面板 0.0.5/节点在线。(4) 退回代价逐条核对：丢 3 个检测修复（AMD GPU sysfs/Android FUSE/macOS nullfs）+ 安装脚本两处改进；文件访问/终端重连/上传链路我们调不到，不算损失且攻击面更小。(5) 两次踩坑记录进文档：MAINTAINING §11.6 讲这条告警是什么、§11.5 讲为什么不跟 1.5、§7 记升级重启后 komari.db-wal 偶发 unlink 导致外部读到旧数据（已排除外部只读连接与升级代码，处置=重启一次服务）；同时修正 README 错写的文件管理（我们这条血统没有）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3ab871e` | fix(agent): agent 退回 1.4.3 同期代码，去掉 1.5 时代的行为；发 0.0.5 |
+| `7b61d17` | fix(guard): 禁止 agent pin 晚于服务器基线；记录升级后 WAL 偶发 unlink 现象 |
+
+### Status
+
+[OK] **Completed**
