@@ -52,8 +52,8 @@
 ## 2.1 仓库自检（一条命令跑完机械检查）
 
 ```bash
-./scripts/check-repo.sh          # 秒级：版本字面量、文档路径/锚点、脚本语法、脏文件、密钥扫描、产物哈希、无克隆上游
-./scripts/check-repo.sh --full   # 追加：go build/vet/test、离线构建、agent 三道门禁
+./scripts/check-repo.sh          # 秒级 8 项：版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门
+./scripts/check-repo.sh --full   # 追加第 9-11 项：go build/vet/test、离线构建、agent 三道门禁
 ```
 
 它只做**能机械判定**的检查，不猜意图；任何一项不通过都会打印具体文件与原因并以非 0 退出。
@@ -352,10 +352,12 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   `markPresence=true`，`report_v2.go:53`）。本机 agent 从未进过回退/降级（日志里只有
   "WebSocket connected using v2 protocol"）。
 
-- **升级弹窗在未登录时会显示按钮**（2026-09-17 实测发现，观感问题）：`upgradeStatus` 为 null
-  （未登录或状态接口失败）时，按钮条件 `upgradeStatus?.enabled !== false` 求值为真，访客点击会得到
-  `RPC Error -32041: Permission denied`。管理员路径与功能本身正常；下次发版把条件收紧为
-  `upgradeStatus && upgradeStatus.enabled !== false` 即可。
+- **升级弹窗未登录时会显示按钮（已修，2026-09-17 复核）**：当时的条件是 `upgradeStatus?.enabled !== false`，
+  `upgradeStatus` 为 null（未登录或状态接口失败）时求值为真，访客点击会得到
+  `RPC Error -32041: Permission denied`。现在两处按钮都已收紧为
+  `upgradeStatus && upgradeStatus.enabled !== false`（`frontend/src/components/admin/AdminPanelBar.tsx:633`、
+  `frontend/src/components/admin/AdminPanelBar.tsx:714`），状态未知时不渲染按钮。
+  本条目从"待修"改为"已修"，保留记录以免重复排查。
 
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。

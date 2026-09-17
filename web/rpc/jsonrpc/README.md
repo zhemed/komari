@@ -42,16 +42,16 @@
 | `client:*` | client |
 | `admin:*` | admin |
 
-声明自定义权限（供插件使用）：
+声明自定义权限（自定义命名空间用）：
 
 ```go
-rpc.Allow("plugin:*", rpc.RoleClient)        // 整个命名空间
-rpc.Allow("plugin:publicStat", rpc.RoleGuest) // 更具体的方法级规则可放宽
-rpc.RegisterNamespace("plugin", rpc.RoleAdmin) // 等价于 Allow("plugin:*", admin)
+rpc.Allow("custom:*", rpc.RoleClient)         // 整个命名空间
+rpc.Allow("custom:publicStat", rpc.RoleGuest) // 更具体的方法级规则可放宽
+rpc.RegisterNamespace("custom", rpc.RoleAdmin) // 等价于 Allow("custom:*", admin)
 ```
 
-由于按特异性裁决，`plugin:*`=admin 与 `plugin:publicStat`=guest 可共存：访客能调用 `publicStat`，
-其余 `plugin:*` 方法仍要求 admin。
+由于按特异性裁决，`custom:*`=admin 与 `custom:publicStat`=guest 可共存：访客能调用 `publicStat`，
+其余 `custom:*` 方法仍要求 admin。
 
 ## 注册一个 RPC 方法
 
@@ -95,16 +95,18 @@ func GetClient(c *gin.Context) {
 
 handler 退化为薄适配层：解析 gin 参数 → 调 RPC → 把响应映射回原 REST JSON 形状（保持前端契约不变）。
 
-## 插件扩展点（地基已就位，插件本身待实现）
+## 扩展点（注册/注销与 ACL）
 
-`pkg/rpc` 已提供供插件运行时使用的接口：
+`pkg/rpc` 提供运行时增删方法与声明权限的接口。**本仓库没有插件系统**（0.0.1 起已整体移除，
+见 `docs/MAINTAINING.md` §5），这些接口当前只服务于仓库内部注册与测试：
 
 - `rpc.Register(method, handler)` / `rpc.MustRegister` — 注册方法（禁止 `rpc.` 保留前缀，重复注册报错）。
-- `rpc.Unregister(method) bool` — 动态注销方法并清理元数据（供插件卸载），保留前缀不可注销。
+- `rpc.Unregister(method) bool` — 动态注销方法并清理元数据，保留前缀不可注销。
 - `rpc.Allow(pattern, minRole)` — 声明式 ACL 规则，支持通配符。
 - `rpc.RegisterNamespace(namespace, requiredRole)` — 为整个命名空间声明所需角色。
 
-插件既可 `rpc.Invoke` 调用已有方法，也可注册自己的命名空间方法并用 `Allow` 声明权限，复用统一的权限校验与分发。
+调用方既可 `rpc.Invoke` 调用已有方法，也可注册自己的命名空间方法并用 `Allow` 声明权限，
+复用统一的权限校验与分发。
 
 ## 已迁移接口（REST → RPC2）
 
@@ -113,7 +115,7 @@ handler 退化为薄适配层：解析 gin 参数 → 调 RPC → 把响应映�
 
 | 命名空间 | 方法（文件） |
 | --- | --- |
-| `admin` | client CRUD、ping task、session/settings/weight、notification（load/offline/traffic）、clipboard、provider（messageSender/oidc）、task 查询、system（logs/cloudflared/exec/test）、xtermjs |
+| `admin` | client CRUD、ping task、session/settings/weight、clipboard、provider（messageSender/oidc）、task 查询、system（logs/cloudflared/exec/test）、xtermjs |
 | `public` | getMe、getNodesInformation、getPublicSettings、getVersion、getClientRecentRecords、getRecordsByUUID、getPingRecords、getPublicPingTasks、recordVisitorEvent |
 | `client` | getPingTasks、uploadPingResult、taskResult |
 
@@ -136,6 +138,6 @@ r.GET("/api/admin/client/:uuid", jsonRpc.Bind("admin:getClient", jsonRpc.WithPat
 ### 保留为 REST 的接口（不走 RPC 桥）
 
 二进制/流/重定向/特殊鉴权类，集中在 `web/api/admin`（2fa/theme/backup/update/oauth 绑定）、
-`web/api/public`（login/logout/oauth/plugin）、`web/api/client`（report WS+POST、v2 RPC、uploadBasicInfo、terminal、AutoDiscovery 注册）。
+`web/api/public`（login/logout/oauth）、`web/api/client`（report WS+POST、v2 RPC、uploadBasicInfo、terminal、AutoDiscovery 注册）。
 
 agent v1/v2 上报的核心逻辑已统一到 `web/api/client/ingest.go`。

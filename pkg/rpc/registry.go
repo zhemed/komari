@@ -33,7 +33,7 @@ func Register(method string, h Handler) error {
 	handlers[method] = h
 	muHandlers.Unlock()
 	// Every registered method must be inspectable through rpc.help, including
-	// plugin-owned methods that do not provide explicit metadata.
+	// methods whose registrant did not provide explicit metadata.
 	ensureMeta(method)
 	return nil
 }

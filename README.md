@@ -114,11 +114,13 @@ docker run -d --name komari-agent --restart always \
 
 维护者视角的内容都在 [docs/MAINTAINING.md](./docs/MAINTAINING.md)：构建契约与版本固定、
 前后端与 agent 源码（都在本仓库内）、发布清单、agent 发行线、容器镜像、数据目录与备份、回滚方式。
-提交前自检：
+提交前自检（一条命令，含版本口径/文档锚点/产物哈希/Trellis 流程闸门）：
 
 ```bash
-go build ./... && go vet ./... && go test ./...
+./scripts/check-repo.sh          # 秒级；发版前用 --full 追加 Go 门禁、离线构建、agent 门禁
 ```
+
+想单独跑 Go 三件套也行：`go build ./... && go vet ./... && go test ./...`
 
 ## 维护与许可
 
