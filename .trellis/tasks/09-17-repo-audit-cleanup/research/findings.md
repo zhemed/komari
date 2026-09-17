@@ -95,3 +95,21 @@
 - Go 侧未做"死函数/死包"级分析（只有 `go vet` 与构建通过；未跑 deadcode 类工具）；
 - 前端"死文件"只做了人工确认的两类，不做全量判定（误报率高，已在 B4 注明原因）；
 - 未审计 `frontend/node_modules`、`.build/gopath` 等第三方内容。
+
+---
+
+# 执行结果（用户 2026-09-17 全选 B 类后的处理）
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| A1-A3 文档/注释残留 | ✅ 已清理并提交 `fc1b597` | `grep -n "plugin\|notification" web/rpc/jsonrpc/README.md` → 空 |
+| A4-A6 口径对齐（§7 已修项、§2.1 检查项、README 自检命令） | ✅ | `./scripts/check-repo.sh` 全部通过 |
+| B1 `.build` 瘦身 | ✅ 3.7G → **451M** | 保留 `tools/`（zig 工具链 449M）、`shots/`、`rel-notes-*.md`、`rel-server.sha256`、`traffic-samples.csv`、`traffic_sampler.py`；其余一次性实验/缓存全部删除（`du -sh .build`） |
+| B2 `dist/` 精简 | ✅ 236M → **12K** | 只留 `komari-SHA256SUMS`、`komari-agent-SHA256SUMS`（0.0.16 的 18 个资产已在 GitHub Release） |
+| B3 删本地分支 | ✅ 已删 | 删前记录 SHA `9d2bb44`，恢复方法写进 MAINTAINING §10；`git branch -a` 只剩 main |
+| B4 前端死代码 | ✅ 已清 + 重建 + 重新固定哈希 | 删 2 个无引用 Context 与 5×71 行 plugin 文案块；哈希 `b860e30d…` → `cc8f1c10…` |
+| B5 Dockerfile 钉 digest | ✅ 两个 Dockerfile 都改为 `alpine:3.21@sha256:48b0309c…07d` | `docker pull` 该 digest 成功；MAINTAINING §7 条目改写（含"安全更新不再自动进来"的代价） |
+| B5 agent 外网测试 | ✅ 默认跳过（`KOMARI_AGENT_ONLINE_TESTS=1` 才跑） | `cd agent && go test ./server/...` → `ok … 0.005s`（离线全绿，原为 34s 后 3 红） |
+
+> 未做（明确留给后续）：把升级 E2E 脚本（`.build/e2e_upgrade.py`，已删）重写为仓库内正式工具；
+> Go 侧 deadcode 扫描；面板"文档"链接指向上游的修正（需前端补丁 + 发版）。

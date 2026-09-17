@@ -359,17 +359,22 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   `frontend/src/components/admin/AdminPanelBar.tsx:714`），状态未知时不渲染按钮。
   本条目从"待修"改为"已修"，保留记录以免重复排查。
 
-- **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
-  同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
+- **两个 Dockerfile 的基础镜像已钉到 digest**（2026-09-17，仓库体检）：
+  `alpine:3.21@sha256:48b0309c…07d`（Docker Hub 上的 manifest list，2026-04-17 的快照），
+  这样同一份源码在不同时间构建的镜像可复现。代价：上游 3.21.x 的安全更新**不再自动进来**，
+  要手动更新 digest（改两个 Dockerfile 后重跑 `scripts/build-server-image.sh` /
+  `scripts/build-agent-image.sh` 验证）。二进制产物本身一直是可复现的。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
-- **agent 自带测试里有 3 个依赖外网的**：`agent/server/task_test.go` 的 `TestICMPPing` /
-  `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的外部目标，在无外网或目标不可达的机器上必然失败
-  （实测本机 34s 后 3 个全红，其余包全绿）。本地自检用离线安全子集：
+- **agent 自带测试里的 3 个外网用例已改为默认跳过**（2026-09-17，仓库体检）：
+  `agent/server/task_test.go` 的 `TestICMPPing` / `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的
+  外部目标，在无外网或目标不可达的机器上必然失败（当时实测本机 34s 后 3 个全红）。现在这三个用例
+  开头调用 `requireOnlineTests(t)`：未设置环境变量时 `t.Skip`，所以离线 `go test ./...` 也能全绿；
+  要验真实链路时显式打开：
 
   ```bash
-  (cd agent && go test ./monitoring/... ./terminal/... ./update/...)
+  (cd agent && KOMARI_AGENT_ONLINE_TESTS=1 go test ./server/...)
   ```
-  正因如此，`scripts/build-agent.sh` **不把 agent 测试当发布门禁**（会变成 flaky）。
+  `scripts/build-agent.sh` 仍然**不把 agent 测试当发布门禁**——外网用例即便改成可选，仍是 flaky 来源。
 - **偶发：升级重启后 `data/komari.db-wal` 被 unlink，外部读到旧数据**（2026-09-16 实测一次）。
   现象：`0.0.4 → 0.0.5` 升级重启后，服务端进程持有 `komari.db-wal`/`-shm` 的 fd，但文件已从
   目录消失（`ls -l /proc/<pid>/fd` 显示 `(deleted)`），此时用外部 `sqlite3` 读 `./data/komari.db`
@@ -420,9 +425,12 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 - **历史已于 2026-09-16 重写**：上游 835 个提交不再出现在历史中。上游代码以**单个快照根提交**
   引入（`chore: import komari 1.4.3 (upstream bf6b45ec) as our 0.0.1 code snapshot`），
   我们自己的提交重挂在该根之上，提交粒度保留。
-- 重写前的最后一次提交保留在**本地分支 `backup/pre-rewrite`**（未推送）上，作为回滚锚点。
-  因此旧 journal 里记录的 hash（如 `18305a9`、`77f36da`）在重写后**已不可达**，只具历史意义；
-  需要时以 `backup/pre-rewrite` 为准。
+- 重写前的最后一次提交（`9d2bb44`，`docs: 用分支引用替代硬编码的重写前 HEAD`）曾保留在本地分支
+  `backup/pre-rewrite` 上作为回滚锚点；**该分支已于 2026-09-17 删除**（仓库体检，用户确认：
+  重写已稳定、分支只剩噪声）。因此旧 journal 里记录的 hash（如 `18305a9`、`77f36da`）
+  在重写后**已不可达**，只具历史意义。若日后确需找回：在 `git gc` 清理悬空对象之前
+  （默认约 90 天）可用 `git branch backup/pre-rewrite 9d2bb44` 复原；再往后只能从
+  `upstream` remote 取回上游侧的历史。
 - 「代码来源」由 `LICENSE` / `NOTICE` / `README.md` / 根提交信息承载，而不再由逐行历史承载。
 - 需要取回上游历史做 backport 时：`git fetch upstream --tags`（`upstream` remote 保留）。
 - 本地曾存在的 68 个上游 tag 已删除，避免上游对象长期驻留；本仓库只推送自己的 tag。
