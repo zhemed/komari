@@ -31,7 +31,7 @@ type Settings struct {
 	CustomBody string `json:"custom_body" default:""`
 
 	// 通知
-	UpdatedAt                  time.Time
+	UpdatedAt time.Time
 }
 
 const (
@@ -58,7 +58,7 @@ const (
 	CustomHeadKey             = "custom_head"
 	CustomBodyKey             = "custom_body"
 
-	UpdatedAtKey                  = "updated_at"
-	XtermjsSettingsKey            = "xtermjs_settings"
-	ThemeMarketSourcesKey         = "theme_market_sources"
+	UpdatedAtKey          = "updated_at"
+	XtermjsSettingsKey    = "xtermjs_settings"
+	ThemeMarketSourcesKey = "theme_market_sources"
 )

@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/komari-monitor/komari/database/auditlog"
-	"github.com/komari-monitor/komari/internal/metricstore"
+	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/internal/config"
+	"github.com/komari-monitor/komari/internal/metricstore"
 	logger "github.com/komari-monitor/komari/utils/log"
 )
 
@@ -81,6 +82,16 @@ func (a *App) InitStores() error {
 		auditlog.EventLog("error", fmt.Sprintf("Failed to initialize metric store: %v", err))
 		return err
 	}
+	// 跨重启的流量累计：先把已落库的累计读进内存，再注册钩子，
+	// 这样报告批次一开始就能把重置感知的增量累加上去（见 database/models/traffic.go）。
+	if err := clients.InitTrafficTotals(); err != nil {
+		logger.Warn("server", "Failed to load persisted traffic totals", "error", err)
+	}
+	metricstore.SetTrafficAccumulator(func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) {
+		if err := clients.AccumulateTraffic(uuid, totalUp, totalDown, deltaUp, deltaDown); err != nil {
+			logger.ErrorArgs("server", "Failed to persist traffic total:", err)
+		}
+	})
 	metricstore.StartReportBatcher()
 	a.addCleanup("metric-report-batcher", metricstore.StopReportBatcher)
 	// A store-to-store migration holds the exclusive operation lease. Stop it

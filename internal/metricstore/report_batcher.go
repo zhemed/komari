@@ -33,6 +33,26 @@ type reportTrafficValues struct {
 
 var reportTrafficStates sync.Map
 
+// trafficAccumulator 由上层（internal/server）注册：把重置感知的流量增量交给持久累计。
+// metricstore 刻意不 import database/*，保持分层；未注册时（例如单元测试）什么也不做。
+var (
+	trafficAccumulatorMu sync.RWMutex
+	trafficAccumulator   func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64)
+)
+
+// SetTrafficAccumulator 注册流量累计回调；传 nil 注销。
+func SetTrafficAccumulator(fn func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64)) {
+	trafficAccumulatorMu.Lock()
+	trafficAccumulator = fn
+	trafficAccumulatorMu.Unlock()
+}
+
+func currentTrafficAccumulator() func(string, int64, int64, int64, int64) {
+	trafficAccumulatorMu.RLock()
+	defer trafficAccumulatorMu.RUnlock()
+	return trafficAccumulator
+}
+
 const (
 	reportBatchInterval     = 3 * time.Second
 	reportBatchQueueSize    = 4096
@@ -335,6 +355,15 @@ func writePendingPingRecords(ctx context.Context, pending *[]models.PingRecord) 
 	return nil
 }
 
+// trafficAccumulation 是"这一次上报要累加多少"的中间结果。
+type trafficAccumulation struct {
+	uuid      string
+	totalUp   int64
+	totalDown int64
+	deltaUp   int64
+	deltaDown int64
+}
+
 func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, error) {
 	if len(reports) == 0 {
 		return nil, nil
@@ -353,6 +382,7 @@ func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, er
 	copy(prepared, reports)
 	points := make([]metric.Point, 0, len(reports)*20)
 	pendingStates := make(map[*reportTrafficState]reportTrafficValues)
+	accumulations := make([]trafficAccumulation, 0, len(prepared))
 	for i, report := range prepared {
 		stateValue, _ := reportTrafficStates.LoadOrStore(report.UUID, &reportTrafficState{})
 		state := stateValue.(*reportTrafficState)
@@ -386,7 +416,11 @@ func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, er
 		if !values.timestamp.IsZero() && !report.UpdatedAt.After(values.timestamp) {
 			report.UpdatedAt = values.timestamp.Add(time.Millisecond)
 		}
-		agentRestart := values.hasUptime && report.Uptime < values.uptime
+		// 仅当两次上报都带有效的开机时长时才把"回退"当成 agent 重启：
+		// v2 协议的报告没有 uptime 字段（服务端读到 0），而同一节点可能同时走 v1 POST
+		// 与 v2 WS 两条通道上报，零值会让每次 v1→v2 切换都被误判成重启，
+		// 那条上报的流量增量就被强制置 0（实测表现为整分钟丢流量）。
+		agentRestart := values.hasUptime && report.Uptime > 0 && values.uptime > 0 && report.Uptime < values.uptime
 		counterResetUp := values.hasUp && report.Network.TotalUp < values.totalUp
 		counterResetDown := values.hasDown && report.Network.TotalDown < values.totalDown
 		trafficUp := int64(0)
@@ -398,6 +432,13 @@ func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, er
 			trafficDown = TrafficCounterDelta(report.Network.TotalDown, values.totalDown)
 		}
 		points = append(points, reportMetricPoints(report, trafficUp, trafficDown)...)
+		accumulations = append(accumulations, trafficAccumulation{
+			uuid:      report.UUID,
+			totalUp:   report.Network.TotalUp,
+			totalDown: report.Network.TotalDown,
+			deltaUp:   trafficUp,
+			deltaDown: trafficDown,
+		})
 		values.timestamp = report.UpdatedAt
 		values.hasUp = true
 		values.totalUp = report.Network.TotalUp
@@ -411,6 +452,12 @@ func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, er
 
 	if err := s.WriteBatch(ctx, points); err != nil {
 		return nil, err
+	}
+	// 指标写成功之后再把增量交给持久累计（写失败就不该计流量）。
+	if accumulate := currentTrafficAccumulator(); accumulate != nil {
+		for _, a := range accumulations {
+			accumulate(a.uuid, a.totalUp, a.totalDown, a.deltaUp, a.deltaDown)
+		}
 	}
 	for state, values := range pendingStates {
 		state.mu.Lock()

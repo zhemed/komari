@@ -21,6 +21,10 @@ func DeleteClient(clientUuid string) error {
 	if err != nil {
 		return err
 	}
+	// 累计流量表是独立的一张表（见 database/models/traffic.go），节点删了它也要跟着删。
+	if err := DeleteTrafficTotal(clientUuid); err != nil {
+		return err
+	}
 	return nil
 }
 

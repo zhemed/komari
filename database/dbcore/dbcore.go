@@ -453,6 +453,8 @@ func doInitialize() error {
 		&models.PingTask{},
 		&models.OidcProvider{},
 		&models.ThemeConfiguration{},
+		// 本仓库自有扩展：跨重启的流量累计（见 database/models/traffic.go）
+		&models.ClientTrafficTotal{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tables: %w", err)

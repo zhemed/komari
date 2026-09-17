@@ -480,3 +480,91 @@ func assertMetricAggregate(t *testing.T, s *metric.Store, metricName, entityID s
 		t.Fatalf("aggregate %s = %#v, want value=%v count=%d", metricName, points, want, wantCount)
 	}
 }
+
+// 验证流量累计钩子：批次写入成功后，按“重置感知”的增量回调上层（服务端持久累计靠它）。
+// 钩子本身不做持久化，这里只断言传给上层的参数正确。
+func TestWriteReportFeedsTrafficAccumulator(t *testing.T) {
+	ctx := context.Background()
+	useReportTestStore(t, nil)
+
+	type call struct {
+		uuid               string
+		totalUp, totalDown int64
+		deltaUp, deltaDown int64
+	}
+	var calls []call
+	SetTrafficAccumulator(func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) {
+		calls = append(calls, call{uuid, totalUp, totalDown, deltaUp, deltaDown})
+	})
+	t.Cleanup(func() { SetTrafficAccumulator(nil) })
+
+	base := time.Now().UTC().Truncate(time.Minute).Add(5 * time.Second)
+	report := v1.Report{
+		UUID:      "acc-node",
+		UpdatedAt: base,
+		Network:   v1.NetworkReport{TotalUp: 100, TotalDown: 200},
+	}
+	if _, err := WriteReport(ctx, report); err != nil {
+		t.Fatalf("write first report: %v", err)
+	}
+	report.UpdatedAt = base.Add(3 * time.Second)
+	report.Network = v1.NetworkReport{TotalUp: 150, TotalDown: 260}
+	if _, err := WriteReport(ctx, report); err != nil {
+		t.Fatalf("write second report: %v", err)
+	}
+	// 机器重启：计数器归零，增量必须是 0（累计不能回退）。
+	report.UpdatedAt = base.Add(6 * time.Second)
+	report.Network = v1.NetworkReport{TotalUp: 20, TotalDown: 30}
+	if _, err := WriteReport(ctx, report); err != nil {
+		t.Fatalf("write reset report: %v", err)
+	}
+
+	want := []call{
+		{"acc-node", 100, 200, 0, 0},
+		{"acc-node", 150, 260, 50, 60},
+		{"acc-node", 20, 30, 0, 0},
+	}
+	if len(calls) != len(want) {
+		t.Fatalf("accumulator calls = %d, want %d: %+v", len(calls), len(want), calls)
+	}
+	for i := range want {
+		if calls[i] != want[i] {
+			t.Fatalf("call %d = %+v, want %+v", i, calls[i], want[i])
+		}
+	}
+}
+
+// v2 协议的报告不带 uptime（服务端读到 0），而同一节点可能同时用 v1（带 uptime）
+// 与 v2（不带）两条通道上报。零值不能被判成 agent 重启，否则交错上报会把流量增量清零。
+func TestWriteReportKeepsTrafficWhenUptimeMissing(t *testing.T) {
+	ctx := context.Background()
+	s := useReportTestStore(t, nil)
+	base := time.Now().UTC().Truncate(time.Minute).Add(5 * time.Second)
+	report := v1.Report{
+		UUID:      "mixed-protocol-node",
+		UpdatedAt: base,
+		Uptime:    1000, // v1 报告：带开机时长
+		Network:   v1.NetworkReport{TotalUp: 100, TotalDown: 200},
+	}
+	if _, err := WriteReport(ctx, report); err != nil {
+		t.Fatalf("write v1 report: %v", err)
+	}
+
+	report.UpdatedAt = base.Add(3 * time.Second)
+	report.Uptime = 0 // v2 报告：没有 uptime 字段
+	report.Network = v1.NetworkReport{TotalUp: 150, TotalDown: 260}
+	if _, err := WriteReport(ctx, report); err != nil {
+		t.Fatalf("write v2 report: %v", err)
+	}
+
+	report.UpdatedAt = base.Add(6 * time.Second)
+	report.Uptime = 1006 // 回到 v1 报告
+	report.Network = v1.NetworkReport{TotalUp: 200, TotalDown: 320}
+	if _, err := WriteReport(ctx, report); err != nil {
+		t.Fatalf("write v1 report again: %v", err)
+	}
+
+	// 三条上报的增量都应当被记录：0 / 50 / 50（而不是被误判重启而清零）。
+	assertMetricValues(t, s, MetricTrafficUp, report.UUID, base.Add(-time.Second), base.Add(time.Minute), []float64{0, 50, 50})
+	assertMetricValues(t, s, MetricTrafficDown, report.UUID, base.Add(-time.Second), base.Add(time.Minute), []float64{0, 60, 60})
+}

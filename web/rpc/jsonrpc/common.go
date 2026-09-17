@@ -286,6 +286,10 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 
 	meta := rpc.MetaFromContext(ctx)
 	latest := agent_runtime.GetLatestReport() // map[string]*v1.Report (copy)
+	// 跨重启的流量累计（本仓库自有扩展）：卡片“总流量”与流量阈值进度用它，
+	// 而不是 agent 报的“开机以来计数器”——后者在机器重启后会归零。
+	// 见 database/models/traffic.go 与 docs/MAINTAINING.md §3.6。
+	trafficTotals := clients.GetAllTrafficTotals()
 	onlineUUIDs := agent_runtime.GetAllOnlineUUIDs()
 	onlineSet := make(map[string]bool, len(onlineUUIDs))
 	for _, uuid := range onlineUUIDs {
@@ -355,6 +359,11 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			return
 		}
 		stats := getPingStatsForNode(uuid, pingTasks)
+		// 优先用持久累计；还没有累计行时（该节点刚接入或本次功能刚上线）回退到实时计数器。
+		totalUp, totalDown := rep.Network.TotalUp, rep.Network.TotalDown
+		if t, ok := trafficTotals[uuid]; ok {
+			totalUp, totalDown = t.Up, t.Down
+		}
 		rl := recordLike{
 			Client:         uuid,
 			Time:           rep.UpdatedAt,
@@ -372,8 +381,8 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			DiskTotal:      rep.Disk.Total,
 			NetIn:          rep.Network.Down,
 			NetOut:         rep.Network.Up,
-			NetTotalUp:     rep.Network.TotalUp,
-			NetTotalDown:   rep.Network.TotalDown,
+			NetTotalUp:     totalUp,
+			NetTotalDown:   totalDown,
 			Process:        rep.Process,
 			Connections:    rep.Connections.TCP + rep.Connections.UDP,
 			ConnectionsUdp: rep.Connections.UDP,
