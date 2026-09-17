@@ -462,3 +462,43 @@
 
 - 下一次真实发版时验证"升到最新"的点击路径（本轮 0.0.9 已是最新，只能验 ErrUpToDate 分支），并补记到任务/规范
 - 可选：给升级接口加 2FA（rpc.MarkSensitive）需要前端补二次验证提示流程；或加签名校验（minisign/GPG）
+
+
+## Session 17: 容器形态暴露可复制的升级命令（发布 0.0.10）
+<!-- trellis-session: v=2 fp=93bbcc7122f83f9f -->
+
+**Date**: 2026-09-17
+**Task**: 容器形态暴露可复制的升级命令（发布 0.0.10）
+**Branch**: `main`
+
+### Summary
+
+用户问"Docker 部署升级到 0.0.9 后能否在网页升级"，回答时发现 0.0.9 的实现缺口：容器形态下 supported=false，取回 pull_command 的唯一入口（升级按钮）被同一条件隐藏，用户只看得到"不支持"的提示、拿不到命令——与服务端能力（真实容器已验证返回 manual:true + pull_command）不一致。修法：弹窗底部与每条 release 行在"不支持一键升级但可拿到命令"时改为"复制升级命令"，复用同一接口与展示块；5 语言加 copy_pull_command；前端产物重建并更新 FRONTEND_TREE_SHA256（25e318e2→abd793b3）；版本线 0.0.9→0.0.10 并发布（18 资产 + 两个镜像）。实测：真实容器里用浏览器完成完整点击路径（弹窗显示 6 个"复制升级命令"，点击后出现容器提示 + docker pull ghcr.io/zhemed/komari:0.0.10 + 复制命令按钮，截图留证）；顺带把之前标为"未覆盖"的升到最新路径真实跑通（生产 0.0.9→0.0.10，二进制与 release 资产逐字节一致，审计日志有记录）。过程中还实测了容器升级形态本身：0.0.5 容器 → 0.0.9（pull + 重建）数据完整（节点/累计流量/指标），服务端自动生成 data/backup/upgrade-*.zip；并把该步骤写进 MAINTAINING §14.4.2。另记录一处未修的观感问题：未登录时按钮仍渲染（状态为 null 时条件求值为真），点击得到 Permission denied，已写入 §7 待办。踩坑记录：批量替换版本字面量时因匹配串写错中断、只改了一半就提交，被 check-repo 抓到 4 项不一致后补齐（b976210）。
+
+### Main Changes
+
+- 弹窗底部与每条 release 行：不支持一键升级时改为"复制升级命令"，复用 admin:upgradeServer 的 manual 返回与展示块
+- 5 语言加 upgrade.copy_pull_command；前端产物重建并更新 FRONTEND_TREE_SHA256
+- 0.0.10 发布：18 资产 + ghcr 两个镜像四标签；MAINTAINING §14.4.2 写清容器升级步骤
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f24b743` | fix(ui): 容器/无 systemd 形态下暴露可复制的升级命令（0.0.10） |
+| `b976210` | chore(release): 补齐 0.0.10 版本字面量 |
+
+### Testing
+
+- [OK] 真实容器浏览器实操：复制升级命令 → 容器提示 + docker pull ghcr.io/zhemed/komari:0.0.10 + 复制按钮（截图）
+- [OK] 升到最新路径真实跑通：生产 0.0.9 → 0.0.10，二进制与 release 资产一致，服务 active，审计有记录
+- [OK] 容器 0.0.5 → 0.0.9（pull + 重建）数据完整 + 服务端自动备份 data/backup/upgrade-*.zip
+- [OK] check-repo.sh --full 全绿；生产最终运行 0.0.10（= 最新发布），测试凭据已清空，测试容器与临时文件已清理
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 收紧按钮条件为 upgradeStatus && upgradeStatus.enabled !== false（未登录时不该渲染按钮），下次发版带上
