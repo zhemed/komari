@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 20
+- **Total Sessions**: 21
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~620 | Active |
+| `journal-1.md` | ~653 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-09-17 | 修"点升级后卡住、必须手动刷新"（0.0.16） | `585f02d` | `main` |
 | 20 | 2026-09-17 | 去掉升级弹窗里的 Github 按钮（0.0.15） | `b6bc4d7` | `main` |
 | 19 | 2026-09-17 | 容器零配置网页升级（0.0.13 引入，0.0.14 修两个缺陷） | `247aa9f`, `5b478ee` | `main` |
 | 18 | 2026-09-17 | 容器一键升级：docker socket + helper 重建容器（0.0.11 引入，0.0.12 修缺陷） | `c663d96`, `c434af7` | `main` |

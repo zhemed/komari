@@ -618,3 +618,36 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: 修"点升级后卡住、必须手动刷新"（0.0.16）
+<!-- trellis-session: v=2 fp=734bb4c1cacb822d -->
+
+**Date**: 2026-09-17
+**Task**: 修"点升级后卡住、必须手动刷新"（0.0.16）
+**Branch**: `main`
+
+### Summary
+
+用户实测反馈：点"立即升级"后弹窗停在"下载新版本中…"、按钮灰着不动，必须手动刷新页面。根因：容器内替换是 execve 替换当前进程，会**切断面板正在使用的那条 RPC2 连接**，而原实现是 await 状态调用 → 永久挂住（既不返回也不报错），于是轮询循环停死、也不会自动刷新；二进制 + systemd 形态的服务重启同样会断连，属同一类问题。修法：① 每次状态调用加 4s 超时；② 新增独立的 /api/version 轮询（普通 HTTP，不依赖会被切断的连接），版本变为目标值即自动刷新页面；③ 失败或 6 分钟超时都恢复按钮可用并给出提示，不再卡在灰按钮。实测（真实容器 + 浏览器，点完不再碰页面）：容器访问日志显示 13:54:49/50/52 有 /api/version 轮询、13:54:53 替换完成、13:54:55 页面自行重新加载 /admin/dashboard + 静态资源 —— 即点一下后约 2 秒页面自动刷新为新版本，全程无手动刷新；截图 .build/shots/upgrade-auto-reload.png。发布 0.0.16（18 资产 + 两个镜像）。
+
+### Main Changes
+
+- frontend/src/components/admin/AdminPanelBar.tsx：pollUpgrade → followUpgrade（每次调用带超时 + 双通道：状态轮询 + 独立版本轮询 + 自动刷新 + 失败/超时恢复按钮）
+- 前端产物重建并更新 FRONTEND_TREE_SHA256（6c158ec6→b860e30d）；版本线 0.0.15→0.0.16 并发布（含镜像）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `585f02d` | fix(ui): 升级后自动跟随版本变化，修"卡在下载中、必须手动刷新"（0.0.16） |
+
+### Testing
+
+- [OK] 容器访问日志证据：升级完成后 2 秒内出现 /admin/dashboard 与静态资源的重新加载，未手动刷新
+- [OK] 状态轮询带超时后界面不再永久卡住（观测到 downloading→completed 的阶段推进）
+- [OK] check-repo.sh 全绿；容器 supported=true、原地替换后容器 ID 不变
+
+### Status
+
+[OK] **Completed**
