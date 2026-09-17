@@ -104,7 +104,8 @@ untracked_src="$(git status --porcelain frontend agent 2>/dev/null | grep -cE '^
 
 # ---------- 5. 敏感串扫描 ----------
 head_ "5. 敏感串扫描（密钥/私钥）"
-hits="$(git grep -nIE "(ghp_[A-Za-z0-9]{20,}|github_pat_|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)" -- . 2>/dev/null | grep -v '^frontend/' || true)"
+# 排除 vendored 前端、以及本脚本自己（它的正则里必然包含这些模式）。
+hits="$(git grep -nIE "(ghp_[A-Za-z0-9]{20,}|github_pat_|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)" -- . 2>/dev/null | grep -vE '^(frontend/|scripts/check-repo\.sh:)' || true)"
 [ -z "$hits" ] && ok "未发现形如 token/私钥的字符串" || { bad "疑似密钥："; echo "$hits" | head -5 | sed 's/^/      /'; }
 
 # ---------- 6. 前端产物哈希 ----------

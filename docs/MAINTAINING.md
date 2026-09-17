@@ -164,11 +164,29 @@ CLI 的帮助文本里保留着上游作者署名（`Made by Akizon77 with love.
 | `./data/metrics.db` | 指标库 |
 | `./data/theme/` | 已安装主题 |
 | `./data/backup/` | 备份归档 |
+| `komari.db` 的 `client_traffic_totals` | **跨重启的流量累计**（本仓库自有扩展，`database/models/traffic.go`） |
 
 - 数据目录跟**工作目录**走（Docker 镜像里是 `/app/data`，systemd 单元里是 `/opt/komari/data`）。
 - 二进制的版本标识（`CurrentVersion-VersionHash`）与库中记录不一致时，启动会先把整个 `./data`
   打包到 `data/backup/upgrade-<时间>.zip` 再继续（见 §7 最后一条）。
 - 后台可以上传备份并自动重启以应用。
+
+#### 流量累计为什么单独存一张表
+
+上游把面板“总流量”直接显示 agent 报的**开机以来计数器**（`/proc/net/dev`），因此**机器一重启，
+这个数字就归零**——历史上无法保存流量。我们的做法：服务端复用 metric store 已经算好的
+**重置感知增量**（`internal/metricstore/report_batcher.go` 的 `TrafficCounterDelta`），
+在 `client_traffic_totals` 里持续累加：
+
+- 首次见到某节点用**当时的计数器做基线**（避免功能上线后数字跳变），之后只加增量；
+- 因此 **agent 重启、机器重启（计数器归零）、服务端重启都不会让累计回退**；
+- 面板的卡片“总流量”和流量阈值进度读的是它（`web/rpc/jsonrpc/common.go` 的
+  `getNodesLatestStatus`）；没有累计行时回退到实时计数器；
+- 删除节点会一并删除该行（`database/clients/client.go` 的 `DeleteClient`）。
+
+接线方式：`internal/server/metric_store.go` 在 metric store 就绪后调用
+`clients.InitTrafficTotals()` 并用 `metricstore.SetTrafficAccumulator(...)` 注册回调，
+metricstore 不反向依赖 `database/*`。
 
 ## 4. 与上游的解耦点
 
@@ -237,6 +255,16 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 - **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
   `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本仓库（无插件/无通知）
   有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
+- **流量增量偶发"整分钟偏低"**（2026-09-17 实测，属上游既有行为，未完全定位）：
+  同一节点会**同时**用 v1 POST 与 v2 WS 两条通道上报，两条通道的计数器快照不完全一致。
+  逐桶核对（同一分辨率下 本桶 Σ增量 vs 相邻桶计数器差值）显示：多数分钟比值 0.9~1.2，
+  但个别分钟只有 0.0x（例如 05:38 整分钟只记到 5.5 KB，而计数器涨了 190 KB）；
+  逐条样本的 min/max 还显示增量"扎堆"（一条 2.7 MB、其余约 144 B）。
+  已修掉其中一条确因：**v2 协议的报告没有 `uptime` 字段**，服务端读到 0，
+  而回退判定用 `report.Uptime < values.uptime`，于是每次 v1→v2 切换都被误判成 agent 重启、
+  该条上报的增量被清零（修复见 `report_batcher.go` 的 `agentRestart` 判定 + 回归测试
+  `TestWriteReportKeepsTrafficWhenUptimeMissing`）。残留的"扎堆"现象还需给上报流加临时日志
+  才能真正定性，方向是在"服务端在 v2 活跃时忽略 v1 指标上报"与"agent 只走一条通道"之间选一个。
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。

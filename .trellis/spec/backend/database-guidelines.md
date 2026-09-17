@@ -11,6 +11,16 @@
 其余走 `default` 返回 `unsupported database type: ... (supported: sqlite)`。
 CLI 绑定见 `cmd/root.go:39-40`（`--db-type` / `--database`，默认 `./data/komari.db`）。
 
+## 0. 本仓库自有的表（不是上游的）
+
+- `client_traffic_totals`（`database/models/traffic.go`）：跨重启的流量累计。上游把“总流量”
+  显示成 agent 的开机计数器（机器重启即归零），我们改为在服务端累加**重置感知增量**并落库。
+  写入走 `database/clients/traffic.go`（内存 + SQLite），由 metricstore 批次写入的钩子驱动
+  （`internal/server/metric_store.go` 装配）。改这条链路时注意：
+  - 首次见到节点用计数器做**基线**，不重复累加当次增量；
+  - 增量可能为 0（计数器没变），此时跳过写库但**不要**把行删掉；
+  - 读路径是内存快照（`GetAllTrafficTotals`），重启时由 `InitTrafficTotals()` 重新加载。
+
 ## 1. GORM 模型风格（`database/models/*.go`）
 
 **每个字段同时带 `json` 与 `gorm` tag，json 键一律 snake_case 且与列名一致。**
