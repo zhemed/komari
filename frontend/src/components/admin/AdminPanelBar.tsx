@@ -107,7 +107,12 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
     | "completed";
   interface UpgradeStatusInfo {
     phase: UpgradePhase;
-    mode?: "binary" | "docker-recreate" | "manual" | "download-only";
+    mode?:
+      | "binary"
+      | "docker-recreate"
+      | "container-replace"
+      | "manual"
+      | "download-only";
     detail?: string;
     from?: string;
     to?: string;
@@ -130,12 +135,19 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   // 是否由服务端自动完成升级（二进制替换或重建容器）；manual/download-only 只能给命令或只下载。
   const canAutoUpgrade = !!upgradeStatus?.supported;
   const isDockerRecreate = upgradeStatus?.mode === "docker-recreate";
+  const isContainerReplace = upgradeStatus?.mode === "container-replace";
   const autoUpgradeLabel = (version: string) =>
     isDockerRecreate
       ? t("upgrade.upgrade_now_container", "立即升级（重建容器）到 {{version}}", {
           version,
         })
-      : t("upgrade.upgrade_now", "立即升级到 {{version}}", { version });
+      : isContainerReplace
+        ? t(
+            "upgrade.upgrade_now_inplace",
+            "立即升级（容器内替换）到 {{version}}",
+            { version },
+          )
+        : t("upgrade.upgrade_now", "立即升级到 {{version}}", { version });
 
   const upgradePhaseLabel = (phase?: UpgradePhase) => {
     switch (phase) {
@@ -148,7 +160,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
           ? t("upgrade.phase_recreating", "正在重建容器…")
           : t("upgrade.phase_replacing", "替换二进制中…");
       case "restarting":
-        return t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…");
+        return isContainerReplace
+          ? t("upgrade.phase_inplace_restart", "正在容器内原地重启，等待新版本上线…")
+          : t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…");
       case "failed":
         return t("upgrade.phase_failed", "升级失败");
       case "completed":
@@ -622,6 +636,14 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                         {t(
                           "upgrade.docker_socket_hint",
                           "该模式通过挂载的 Docker socket 拉取镜像并重建容器——等于把宿主控制权交给本容器，请确认这是你想要的。",
+                        )}
+                      </div>
+                    )}
+                    {isContainerReplace && (
+                      <div className="text-xs text-muted-foreground">
+                        {t(
+                          "upgrade.inplace_hint",
+                          "容器内替换二进制并原地重启：不需要挂载、不需要额外配置；但之后重建容器（docker rm + run / compose up）会退回镜像里的版本——想与镜像完全一致，请挂 /var/run/docker.sock 使用重建容器模式。",
                         )}
                       </div>
                     )}

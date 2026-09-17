@@ -93,6 +93,10 @@ const (
 	ModeBinary Mode = "binary"
 	// ModeDockerRecreate：容器 + 挂了 docker socket —— 拉镜像 → helper 容器重建自身容器。
 	ModeDockerRecreate Mode = "docker-recreate"
+	// ModeContainerReplace：容器 + 没有可用 socket —— 在容器内替换二进制后原地重执行
+	// （唯一"零配置"的容器网页升级方式：不要求挂载、不要求 restart 策略）。
+	// 代价：**重建容器**会退回镜像里的版本（docker restart 不会）。
+	ModeContainerReplace Mode = "container-replace"
 	// ModeManual：容器但没挂 socket —— 只给可复制的 pull 命令，不替换任何东西。
 	ModeManual Mode = "manual"
 	// ModeDownloadOnly：无 systemd 的前台运行 —— 只下载，不替换不退出。
@@ -107,13 +111,15 @@ type Plan struct {
 	TargetImage     string `json:"target_image,omitempty"`
 	SocketPath      string `json:"socket_path,omitempty"`
 	SelfContainerID string `json:"-"`
-	AssetName       string `json:"asset_name,omitempty"`
-	Manual          bool   `json:"manual"` // 容器：必须手工拉镜像，服务端不做任何替换
-	PullCommand     string `json:"pull_command,omitempty"`
-	DownloadOnly    bool   `json:"download_only"` // 无服务管理器：只下载，不替换不退出
-	DownloadPath    string `json:"download_path,omitempty"`
-	assetURL        string
-	checksum        string
+	// InContainer：true 表示替换后应"原地重执行"而不是只退出。
+	InContainer  bool   `json:"in_container,omitempty"`
+	AssetName    string `json:"asset_name,omitempty"`
+	Manual       bool   `json:"manual"` // 容器：必须手工拉镜像，服务端不做任何替换
+	PullCommand  string `json:"pull_command,omitempty"`
+	DownloadOnly bool   `json:"download_only"` // 无服务管理器：只下载，不替换不退出
+	DownloadPath string `json:"download_path,omitempty"`
+	assetURL     string
+	checksum     string
 }
 
 // Result 是执行结果。
@@ -127,6 +133,8 @@ type Result struct {
 	HelperContainerID string `json:"helper_container_id,omitempty"`
 	// HandledByHelper：true 表示后续动作由 helper 完成，调用方**不要**自己退出进程。
 	HandledByHelper bool `json:"handled_by_helper,omitempty"`
+	// InContainer：true 表示应当在当前进程内原地重执行新二进制（容器零配置升级）。
+	InContainer bool `json:"in_container,omitempty"`
 }
 
 // Prepare 解析目标版本、做前置检查、取校验和，产出可执行计划。
@@ -165,22 +173,28 @@ func Prepare(ctx context.Context, o Options, tag string) (Plan, error) {
 		return Plan{}, err
 	}
 	if env.Container {
-		// 容器形态分两种：
-		//  - 挂了 docker socket → 通过 Docker API 重建自身容器（真正的一键升级，2026-09-17 起支持）；
-		//  - 没挂 socket → 只给可复制的拉取命令（原行为，不回归）。
+		// 容器形态三种：
+		//  1) 挂了可用 docker socket → 通过 Docker API 重建自身容器（与镜像保持一致）；
+		//  2) 没挂 socket → **在容器内替换二进制 + 原地重执行**（零配置，网页一键升级）；
+		//  3) 二进制目录不可写（只读 rootfs 等）→ 只给可复制的拉取命令。
 		selfID, sockErr := dockerSocketReady(ctx, o.socketPath())
-		if sockErr != nil {
+		if sockErr == nil {
+			o.SelfContainerID = selfID
+			plan.Mode = ModeDockerRecreate
+			plan.TargetImage = o.resolveTargetImage(ctx, target.Tag)
+			plan.SocketPath = o.socketPath()
+			plan.SelfContainerID = selfID
+			return plan, nil
+		}
+		if !env.DirWritable {
 			plan.Mode = ModeManual
 			plan.Manual = true
 			plan.PullCommand = PullHint(o.image(), target.Tag)
 			return plan, nil
 		}
-		o.SelfContainerID = selfID
-		plan.Mode = ModeDockerRecreate
-		plan.TargetImage = o.resolveTargetImage(ctx, target.Tag)
-		plan.SocketPath = o.socketPath()
-		plan.SelfContainerID = selfID
-		return plan, nil
+		plan.Mode = ModeContainerReplace
+		plan.InContainer = true
+		// 下面继续走"二进制替换"的资产/校验和解析
 	}
 	assetName, ok := ServerAssetName(runtime.GOOS, runtime.GOARCH)
 	if !ok {
@@ -203,13 +217,16 @@ func Prepare(ctx context.Context, o Options, tag string) (Plan, error) {
 		return Plan{}, fmt.Errorf("%s 里 %s 的校验和为空", ChecksumAssetName, assetName)
 	}
 
-	plan.Mode = ModeBinary
+	if plan.Mode == "" {
+		plan.Mode = ModeBinary
+	}
 	plan.AssetName = assetName
 	plan.assetURL = asset.URL
 	plan.checksum = sum
 
-	if !env.Systemd {
+	if !env.Systemd && !env.Container {
 		// 没有服务管理器接手：只下载 + 给命令，绝不自杀式退出。
+		// （容器不算"没人接手"：替换后我们会原地重执行，或退出交给 docker 的 restart 策略。）
 		plan.DownloadOnly = true
 		plan.Mode = ModeDownloadOnly
 		plan.DownloadPath = filepath.Join(o.updatesDir(env), assetName)
@@ -291,7 +308,7 @@ func Execute(ctx context.Context, o Options, p Plan) (Result, error) {
 		return Result{}, err
 	}
 
-	res := Result{From: p.From, To: p.To, BackupPath: backup}
+	res := Result{From: p.From, To: p.To, BackupPath: backup, InContainer: p.InContainer}
 	SetStatus(Status{Phase: PhaseRestarting, From: p.From, To: p.To, BackupPath: backup, Running: true})
 	_ = SaveState(o.StateDir, Status{Phase: PhaseRestarting, From: p.From, To: p.To, BackupPath: backup})
 	return res, nil

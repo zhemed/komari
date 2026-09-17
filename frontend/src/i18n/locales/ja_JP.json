@@ -1331,10 +1331,12 @@
       "enable_description": "無効にするとパネルに更新ボタンが表示されず、API も更新要求を拒否します。コンテナや systemd なしの構成は元々ワンクリック更新できません。",
       "enable_title": "手動ワンクリック更新を有効にする",
       "hint_container": "コンテナ内では新しいイメージを取得してコンテナを作り直してください",
+      "inplace_hint": "コンテナ内でバイナリを差し替えて再実行します（マウントや追加設定は不要）。ただし後でコンテナを作り直すとイメージのバージョンに戻ります。完全に一致させたい場合は /var/run/docker.sock をマウントしてください。",
       "install_version": "このバージョンをインストール",
       "phase_completed": "準備完了",
       "phase_downloading": "新しいバージョンをダウンロード中…",
       "phase_failed": "更新に失敗しました",
+      "phase_inplace_restart": "コンテナ内で再起動中、新バージョンの起動を待っています…",
       "phase_replacing": "バイナリを置き換え中…",
       "phase_restarting": "サービスを再起動中、新バージョンの起動を待っています…",
       "phase_verifying": "チェックサムとバイナリを検証中…",
@@ -1347,7 +1349,8 @@
       "title": "サーバー更新",
       "unsupported": "この構成ではワンクリック更新は利用できません（コンテナはイメージを取得、フォアグラウンド実行は手動で置き換えてください）",
       "upgrade_now": "{{version}} に更新",
-      "upgrade_now_container": "{{version}} へ更新（コンテナを再作成）"
+      "upgrade_now_container": "{{version}} へ更新（コンテナを再作成）",
+      "upgrade_now_inplace": "{{version}} へ更新（コンテナ内でバイナリ差し替え）"
   },
   "userAgent": {
     "android": "Android",

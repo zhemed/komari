@@ -185,30 +185,6 @@ func TestSanityCheckRejectsWrongVersionBinary(t *testing.T) {
 	}
 }
 
-func TestPrepareContainerReturnsPullCommandOnly(t *testing.T) {
-	ctx := context.Background()
-	dir := t.TempDir()
-	fake := newFakeReleaseServer(t, "0.0.8", []byte("payload"), false)
-	o := Options{
-		Repo: "owner/repo", CurrentTag: "0.0.7", BinaryPath: filepath.Join(dir, "komari"), StateDir: dir,
-		VersionLister: fake.client(), Probe: probeFor("0.0.8"),
-		Env: &Environment{Container: true, Systemd: true, DirWritable: true},
-		// 不存在的 socket：确保走"没挂 socket"的手工分支，不受测试机环境（是否装了 docker）影响
-		SocketPath: filepath.Join(dir, "no-such-docker.sock"),
-	}
-	plan, err := Prepare(ctx, o, "")
-	if err != nil {
-		t.Fatalf("容器形态不应报错（要给出可操作提示）：%v", err)
-	}
-	if !plan.Manual || plan.PullCommand != "docker pull ghcr.io/zhemed/komari:0.0.8" {
-		t.Fatalf("容器形态应只给拉取命令，实际 %+v", plan)
-	}
-	res, err := Execute(ctx, o, plan)
-	if err != nil || !res.DownloadOnly {
-		t.Fatalf("容器形态 Execute 不应做任何替换：%+v %v", res, err)
-	}
-}
-
 func TestPrepareWithoutSystemdDownloadsOnly(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -285,15 +261,42 @@ func TestFetchChecksumsMissingAssetGivesActionableError(t *testing.T) {
 	}
 }
 
-// 容器里没挂可用的 docker socket 时必须回落到手工模式（不能试图重建容器）。
-func TestPrepareContainerWithoutUsableSocketStaysManual(t *testing.T) {
+// 容器 + 没挂 socket + 目录可写 → 零配置的"容器内替换二进制"模式（用户的核心需求：
+// 不要求挂 socket、不要求换部署形态）。
+func TestPrepareContainerWithoutSocketUsesInPlaceReplace(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	fake := newFakeReleaseServer(t, "0.0.8", []byte("payload"), false)
 	o := Options{
 		Repo: "owner/repo", CurrentTag: "0.0.7", BinaryPath: filepath.Join(dir, "komari"), StateDir: dir,
 		VersionLister: fake.client(), Probe: probeFor("0.0.8"),
-		Env:        &Environment{Container: true, Systemd: true, DirWritable: true},
+		Env:        &Environment{Container: true, DirWritable: true},
+		SocketPath: filepath.Join(dir, "missing.sock"),
+	}
+	plan, err := Prepare(ctx, o, "0.0.8")
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if plan.Mode != ModeContainerReplace || !plan.InContainer {
+		t.Fatalf("容器无 socket 时应为 container-replace，实际 mode=%s inContainer=%v", plan.Mode, plan.InContainer)
+	}
+	if plan.Manual || plan.DownloadOnly {
+		t.Fatalf("该模式应真的替换二进制：%+v", plan)
+	}
+	if plan.AssetName == "" {
+		t.Fatalf("应解析出平台资产，实际 %+v", plan)
+	}
+}
+
+// 容器 + 没 socket + 目录不可写（只读 rootfs 等）→ 才回落到手工模式给命令。
+func TestPrepareContainerReadOnlyFallsBackToManual(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	fake := newFakeReleaseServer(t, "0.0.8", []byte("payload"), false)
+	o := Options{
+		Repo: "owner/repo", CurrentTag: "0.0.7", BinaryPath: filepath.Join(dir, "komari"), StateDir: dir,
+		VersionLister: fake.client(), Probe: probeFor("0.0.8"),
+		Env:        &Environment{Container: true, DirWritable: false},
 		SocketPath: filepath.Join(dir, "missing.sock"),
 	}
 	plan, err := Prepare(ctx, o, "0.0.8")
@@ -301,7 +304,7 @@ func TestPrepareContainerWithoutUsableSocketStaysManual(t *testing.T) {
 		t.Fatalf("Prepare: %v", err)
 	}
 	if plan.Mode != ModeManual || !plan.Manual {
-		t.Fatalf("无 socket 时应为手工模式，实际 mode=%s manual=%v", plan.Mode, plan.Manual)
+		t.Fatalf("只读目录时应回落 manual，实际 mode=%s manual=%v", plan.Mode, plan.Manual)
 	}
 	if !strings.Contains(plan.PullCommand, "docker pull ") {
 		t.Fatalf("手工模式要给出可复制命令：%q", plan.PullCommand)

@@ -1331,10 +1331,12 @@
       "enable_description": "When disabled the panel hides the upgrade buttons and the API rejects upgrade requests. Container and non-systemd deployments cannot self-upgrade regardless.",
       "enable_title": "Enable manual one-click upgrade",
       "hint_container": "In a container, pull the new image and recreate the container",
+      "inplace_hint": "Replaces the binary inside the container and re-executes it: no mounts, no extra configuration. Note: recreating the container later (docker rm + run / compose up) reverts to the image's version — mount /var/run/docker.sock if you want the container-recreate mode instead.",
       "install_version": "Install this version",
       "phase_completed": "Ready",
       "phase_downloading": "Downloading the new version…",
       "phase_failed": "Upgrade failed",
+      "phase_inplace_restart": "Restarting in place inside the container, waiting for the new version…",
       "phase_replacing": "Replacing the binary…",
       "phase_restarting": "Restarting the service, waiting for the new version…",
       "phase_verifying": "Verifying checksum and binary…",
@@ -1347,7 +1349,8 @@
       "title": "Server upgrade",
       "unsupported": "One-click upgrade is not supported in this deployment (pull the image in containers, replace manually when running in the foreground)",
       "upgrade_now": "Upgrade to {{version}}",
-      "upgrade_now_container": "Upgrade (recreate container) to {{version}}"
+      "upgrade_now_container": "Upgrade (recreate container) to {{version}}",
+      "upgrade_now_inplace": "Upgrade (in-place binary swap) to {{version}}"
   },
   "userAgent": {
     "android": "Android",

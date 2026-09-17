@@ -270,8 +270,13 @@ func CurrentMode(ctx context.Context, socketPath string) Mode {
 		}
 		return ModeDownloadOnly
 	}
+	_ = err
 	if _, err := dockerSocketReady(ctx, socketPath); err == nil {
 		return ModeDockerRecreate
+	}
+	if env.DirWritable {
+		// 容器里也能在容器内替换二进制（零配置），不是"只能给命令"
+		return ModeContainerReplace
 	}
 	return ModeManual
 }

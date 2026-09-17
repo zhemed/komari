@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.12）
+# 维护本仓库（komari 自维护版 · 当前 0.0.13）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.12**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.13**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.12`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.13`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -635,10 +635,19 @@ KOMARI_TAG=<旧版本> bash install-komari.sh
 
 ### 14.6 容器一键升级（挂 docker socket 时，0.0.11 起；0.0.12 修 helper 缺陷）
 
-**更正旧说法**：§14.4.2 曾把"容器不能自升级"写成架构限制 —— 那是**取舍**，不是事实：
-容器里替换二进制能生效（只是重建容器会退回镜像版本）。0.0.11 起提供真正的容器一键升级：
-把 socket 挂进来即可，服务端用 Docker Engine API 拉取目标镜像，再由一个 **helper 容器**
-（用目标镜像启动、只挂 socket 与数据目录）把本容器按原配置 + 新镜像重建。
+**更正旧说法（两次）**：§14.4.2 一度把"容器不能自升级"写成架构限制——那是**取舍**；
+后来又写成"必须挂 socket 才能网页升级"——那也过头了：0.0.13 起**不挂 socket 也能在容器内升级**
+（容器内替换二进制 + 原地重执行）。挂 socket 只是"版本与镜像完全一致"的**充分条件**：
+
+| 形态 | 能否网页升级 | 版本与镜像一致 | 需要的额外配置 |
+|---|---|---|---|
+| 二进制 + systemd | ✅ | — | 无 |
+| 容器（默认，不挂 socket） | ✅ 容器内替换 + 原地重执行 | ❌ 重建容器会回退 | 无 |
+| 容器 + 挂 `/var/run/docker.sock` | ✅ 拉镜像 + 重建容器 | ✅ | 挂 socket（=宿主 root 等价权限） |
+| 只读 rootfs 容器 | ❌ 只能给命令 | — | — |
+
+服务端的重建容器实现（挂 socket 时）：用 Docker Engine API 拉取目标镜像，再由一个 **helper 容器**
+（用当前镜像启动、只挂 socket 与数据目录）把本容器按原配置 + 新镜像重建。
 
 ```bash
 docker run -d --name komari --restart always --network host \
@@ -679,10 +688,13 @@ helper 一启动就退出；当时 helper 还配了 `AutoRemove`，现场被一�
 
 容器有两种升级方式：
 
-1. **面板一键升级（推荐，0.0.11 起）**：`docker run` 时挂上 `/var/run/docker.sock`，
-   之后在面板里点升级即可 —— 这是容器形态唯一的"网页升级"实现方式，**要这个功能就必须挂 socket**
-   （见 §14.6）；
-2. **手工升级（没挂 socket 时的唯一方式）**：拉新镜像 + 用同一个数据卷重建容器：
+1. **面板一键升级（推荐，0.0.11 起，0.0.13 起零配置可用）**：容器里点一下即可。两种底层方式：
+   - **不挂 socket（默认，0.0.13 起）**：容器内下载 release 资产 → 校验 `komari-SHA256SUMS` →
+     自检 → 备份 + 原子替换 → `syscall.Exec` 原地重执行（PID 不变、不需要 restart 策略）。
+     代价：**重建容器**会退回镜像版本（`docker restart` 不会）；
+   - **挂 `/var/run/docker.sock`（可选）**：改为拉镜像 + helper 重建容器，版本与镜像完全一致；
+     代价是容器获得宿主 root 等价权限（见 §14.6）；
+2. **手工升级**（只读 rootfs 等无法替换的场景，或你想手工控制）：拉新镜像 + 用同一个数据卷重建容器：
 
 ```bash
 docker pull ghcr.io/zhemed/komari:latest       # 或固定版本号（每次发版都会移动 :latest）

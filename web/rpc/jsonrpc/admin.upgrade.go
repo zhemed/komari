@@ -211,6 +211,14 @@ func runServerUpgrade(opts upgrade.Options, plan upgrade.Plan) {
 		logger.Infof("upgrade", "已下载 %s 到 %s（当前进程没有 systemd 接管，未替换二进制）", res.To, res.DownloadPath)
 		return
 	}
+	if res.InContainer {
+		// 容器零配置升级：原地重执行新二进制（PID 不变，不需要 restart 策略）。
+		if execErr := upgrade.SelfExec(opts.BinaryPath); execErr != nil {
+			logger.Warnf("upgrade", "原地重执行失败（%v），回落为退出进程交给容器重启策略", execErr)
+		} else {
+			return
+		}
+	}
 	if res.HandledByHelper {
 		// 容器重建模式：helper 会负责停掉本容器并用新镜像重建，这里**不能**自己退出
 		// （我们一退出，docker 会按 restart 策略把我们拉起来，和 helper 抢改名/端口）。
@@ -289,7 +297,7 @@ func upgradeStateDir() string {
 // 二进制 + systemd，或容器 + 可用的 docker socket（重建容器）。
 func upgradeSupports(ctx context.Context, socket string) bool {
 	switch upgrade.CurrentMode(ctx, socket) {
-	case upgrade.ModeBinary, upgrade.ModeDockerRecreate:
+	case upgrade.ModeBinary, upgrade.ModeDockerRecreate, upgrade.ModeContainerReplace:
 		return true
 	default:
 		return false

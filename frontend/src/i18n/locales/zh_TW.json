@@ -1331,10 +1331,12 @@
       "enable_description": "關閉後面板不再顯示升級按鈕，介面也會拒絕升級請求。容器與無 systemd 的部署本來就無法一鍵升級。",
       "enable_title": "啟用手動一鍵升級",
       "hint_container": "容器內請拉取新映像檔後重建容器",
+      "inplace_hint": "容器內替換二進位檔並原地重啟：不需掛載、不需額外設定；但之後重建容器（docker rm + run / compose up）會退回映像檔裡的版本——想與映像檔完全一致，請掛 /var/run/docker.sock 使用重建容器模式。",
       "install_version": "安裝此版本",
       "phase_completed": "已就緒",
       "phase_downloading": "下載新版本中…",
       "phase_failed": "升級失敗",
+      "phase_inplace_restart": "正在容器內原地重啟，等待新版本上線…",
       "phase_replacing": "替換二進位檔中…",
       "phase_restarting": "正在重啟服務，等待新版本上線…",
       "phase_verifying": "校驗並自檢中…",
@@ -1347,7 +1349,8 @@
       "title": "伺服器升級",
       "unsupported": "目前部署形態不支援一鍵升級（容器請拉映像檔，前景執行請手動替換）",
       "upgrade_now": "立即升級到 {{version}}",
-      "upgrade_now_container": "立即升級（重建容器）到 {{version}}"
+      "upgrade_now_container": "立即升級（重建容器）到 {{version}}",
+      "upgrade_now_inplace": "立即升級（容器內替換）到 {{version}}"
   },
   "userAgent": {
     "android": "安卓",

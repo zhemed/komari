@@ -1331,10 +1331,12 @@
       "enable_description": "Jika dinonaktifkan, panel tidak menampilkan tombol pembaruan dan API menolak permintaan pembaruan. Deployment container dan tanpa systemd memang tidak bisa memperbarui sendiri.",
       "enable_title": "Aktifkan pembaruan manual sekali klik",
       "hint_container": "Di dalam container, tarik image baru lalu buat ulang container",
+      "inplace_hint": "Mengganti biner di dalam container lalu menjalankannya kembali: tanpa mount, tanpa konfigurasi tambahan. Catatan: membuat ulang container nanti akan kembali ke versi image — mount /var/run/docker.sock jika ingin mode buat ulang container.",
       "install_version": "Pasang versi ini",
       "phase_completed": "Siap",
       "phase_downloading": "Mengunduh versi baru…",
       "phase_failed": "Pembaruan gagal",
+      "phase_inplace_restart": "Menjalankan ulang di dalam container, menunggu versi baru…",
       "phase_replacing": "Mengganti biner…",
       "phase_restarting": "Me-restart layanan, menunggu versi baru…",
       "phase_verifying": "Memverifikasi checksum dan biner…",
@@ -1347,7 +1349,8 @@
       "title": "Pembaruan server",
       "unsupported": "Pembaruan sekali klik tidak didukung pada mode ini (container: tarik image, foreground: ganti manual)",
       "upgrade_now": "Perbarui ke {{version}}",
-      "upgrade_now_container": "Perbarui (buat ulang container) ke {{version}}"
+      "upgrade_now_container": "Perbarui (buat ulang container) ke {{version}}",
+      "upgrade_now_inplace": "Perbarui (ganti biner di dalam container) ke {{version}}"
   },
   "userAgent": {
     "android": "Android",
