@@ -19,14 +19,15 @@ func SelfExec(binaryPath string) error {
 	if binaryPath == "" {
 		return fmt.Errorf("empty binary path")
 	}
-	exe, err := os.Executable()
+	// 注意：**不要**用 os.Executable() 做等值校验。二进制替换是"旧文件改名成备份 + 新文件占位"，
+	// 而 /proc/self/exe 跟随 inode —— 替换后它指向的是备份文件（实测踩到，导致每次都误判失败）。
+	// 这里只确认目标文件存在且可执行，然后 exec 它；版本正确性已由替换前的自检保证。
+	info, err := os.Stat(binaryPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("新二进制不可用（%s）：%w", binaryPath, err)
 	}
-	if exe != binaryPath {
-		// 允许传路径做校验，但真正 exec 的是"被替换后的那个文件"，两者应一致；
-		// 不一致说明调用方弄错了路径，宁可报错也不要执行错的文件。
-		return fmt.Errorf("SelfExec 路径不一致：参数 %s，当前可执行文件 %s", binaryPath, exe)
+	if info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("新二进制没有执行位：%s（%v）", binaryPath, info.Mode().Perm())
 	}
 	if err := syscall.Exec(binaryPath, os.Args, os.Environ()); err != nil {
 		return fmt.Errorf("exec %s 失败：%w", binaryPath, err)

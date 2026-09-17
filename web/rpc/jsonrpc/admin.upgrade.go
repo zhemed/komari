@@ -97,7 +97,7 @@ func adminGetServerUpgradeSettings(_ context.Context, _ *rpc.JsonRpcRequest) (an
 		// mode 决定前端文案：binary=二进制替换；docker-recreate=重建容器；
 		// manual=容器没挂 socket，只能给命令；download-only=无 systemd，只下载。
 		"mode":      string(mode),
-		"supported": mode == upgrade.ModeBinary || mode == upgrade.ModeDockerRecreate,
+		"supported": upgradeSupports(context.Background(), s.Socket),
 		"platform":  upgradePlatform(),
 		"socket":    s.Socket,
 	}, nil
@@ -253,7 +253,7 @@ func adminUpgradeStatus(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.Jso
 		"current_version": utils.CurrentVersion,
 		"enabled":         settings.Enabled,
 		"repo":            settings.Repo,
-		"supported":       mode == upgrade.ModeBinary || mode == upgrade.ModeDockerRecreate,
+		"supported":       upgradeSupports(context.Background(), settings.Socket),
 		"platform":        upgradePlatform(),
 	}, nil
 }
