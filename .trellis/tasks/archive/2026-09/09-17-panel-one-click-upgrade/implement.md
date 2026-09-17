@@ -106,4 +106,9 @@
   本轮 0.0.9 已是最新（只能验到 `ErrUpToDate` 分支）。它与"安装指定版本"共用同一段
   `Execute` 代码，差异仅在目标选择（`LatestStable` vs `FindRelease`，均有单测）；
   下一次真实发版时会自然覆盖，届时补记。
-- **容器分支**：只有单测覆盖（没有在容器里跑真实容器场景）。
+- ~~**容器分支**：只有单测覆盖~~ → **2026-09-17 追加实测**：真实容器（0.0.9 镜像）里
+  `admin:getServerUpgradeSettings` 返回 `supported=false`，`admin:upgradeServer{tag:0.0.8}`
+  返回 `manual:true` + `pull_command: "docker pull ghcr.io/zhemed/komari:0.0.8"`，未做任何替换。
+  顺带实测 0.0.5 容器 → 0.0.9 的升级路径：pull + 重建容器后数据完整
+  （节点数、累计流量 3549.4/1376.0 MB、metric rollups 全在），且服务端在版本变化前
+  自动生成 `data/backup/upgrade-<时间>.zip`。

@@ -627,6 +627,26 @@ KOMARI_TAG=<旧版本> bash install-komari.sh
 并加了回归测试断言"被自检的文件必须可执行"（去掉修复即 FAIL，验证过测试不是永真）。
 要避开这段窗口：0.0.8 用 `install-komari.sh` 升一次，之后面板升级即可正常工作。
 
+### 14.4.2 容器部署怎么升级（实测于 2026-09-17）
+
+容器里**不能**自替换二进制，正确做法是"拉新镜像 + 用同一个数据卷重建容器"：
+
+```bash
+docker pull ghcr.io/zhemed/komari:0.0.9        # 或 :latest（每次发版都会移动）
+docker stop komari && docker rm komari
+docker run -d --name komari --restart always --network host \
+  -v ./data:/app/data ghcr.io/zhemed/komari:0.0.9
+```
+
+- `docker restart` / `docker compose restart` **不会**升级（还是旧镜像），必须是 pull + 重建；
+  compose 用户用 `docker compose pull && docker compose up -d`；
+- 数据在数据卷里（`-v ./data:/app/data`），重建容器不影响；
+- 升级前后对比实测（0.0.5 → 0.0.9，用生产库副本）：节点数、累计流量、metric rollups 全部保留；
+- 服务端在版本变化前会自己备份：`./data/backup/upgrade-<时间>.zip`
+  （日志行 `[upgrade-backup] … before upgrade`）；
+- 建议固定版本号（`:0.0.9`）而不是 `:latest`，便于回滚与复现；
+- 想要面板内一键升级，只能改用"二进制 + systemd"形态（`install-komari.sh`）。
+
 ### 14.5 安全边界（诚实写明）
 
 - 面板因此获得"下载并执行代码"的能力 → 限制为管理员 RPC、固定仓库、审计日志（`auditlog`）、可开关；
