@@ -60,6 +60,35 @@
 涉及的检查项与"为什么这样查"都写在脚本头部注释里。**改文档/脚本后应当跑一次快速检查，
 发版前跑一次 `--full`。**
 
+## 2.2 流程闸门：Trellis 强制规则（2026-09-17 起）
+
+用户定调：**调用 Trellis 不是口头承诺，是强制规则**；范围取最严——**任何会话工作，包括
+只读调查（看代码、查日志、读库定位原因），开工第一步都必须先建 Trellis 任务**。
+
+| 层 | 实现 | 拦什么 | 绕过 |
+|---|---|---|---|
+| ① 当场拦 | `.githooks/pre-commit`、`.githooks/commit-msg`（`core.hooksPath=.githooks`） | 暂存区含**非 `.trellis/`** 改动时：没有 `status=in_progress` 的任务 → 拒绝；消息里没有 `[task:<slug>]` → 拒绝 | `git commit --no-verify`（git 内建，封不死） |
+| ② 事后审计 | `./scripts/check-trellis-gate.sh`，已接入 `check-repo.sh` **第 8 项** | 逐个提交核对（跳过 merge 与纯 `.trellis/` 提交）：改动非 `.trellis/` 就必须带 `[task:…]` | 无法绕过：跑一次检查就暴露，且**发版前必须跑 `--full`** |
+| ③ 远程兜底 | `.github/workflows/trellis-gate.yml`（push / PR） | 同一次审计，在 GitHub 上直接标红 | 无法绕过（删工作流是可见动作） |
+
+**每个新克隆要跑一次**（`core.hooksPath` 是本地配置，不随仓库分发）：
+
+```bash
+./scripts/install-git-hooks.sh          # 装闸门
+./scripts/check-trellis-gate.sh         # 自检：闸门已装 + 提交可追溯
+```
+
+提交消息统一带任务锚点（slug = `.trellis/tasks/<MM-DD>-<slug>` 去掉日期前缀）：
+
+```
+feat: 一句话说明 [task:container-inplace-self-upgrade]
+```
+
+刻意放行的两类：**纯 `.trellis/` 改动**（journal、任务归档、闸门自身）与 **merge 提交**。
+
+> **诚实边界**：机器能强制的是"提交前必须有任务"。"只读调查也先建任务"没有可审计的产物，
+> 靠 `AGENTS.md`「强制规则」+ journal 留痕，**不是自动的**，别把它说成自动。
+
 ## 3. 日常操作
 
 ### 3.1 构建（只需 Go，不需要网络与 Node）
@@ -128,8 +157,8 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
    ```bash
    ./scripts/gen-release-sums.sh        # 产出 dist/komari-SHA256SUMS（两行：amd64/arm64）
    ```
-4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含版本字面量一致性、文档锚点、
-   `go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希）。
+4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含第 8 项 Trellis 流程闸门、版本字面量一致性、
+   文档锚点、`go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希）。
    自检里的 agent 门禁构建到 `.build/check-agent`，**不会动 `dist/`**；反过来说，
    `scripts/build-agent.sh` 默认写的就是 `dist/agent` 并会先清空该目录，别拿它当临时构建用。
 5. `git tag <版本> && git push origin <版本>`
@@ -147,7 +176,8 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 
 tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TAG` 拉取）。
 **同一个 release 里同时有服务器与 agent 资产是必需形态**——agent 靠补丁 0001 的资产过滤
-区分两者（见 §11.1）。**本仓库没有 CI**（上游流水线已移除），发布必须手动执行以上步骤。
+区分两者（见 §11.1）。**本仓库没有发布流水线**（上游流水线已移除），发布必须手动执行以上步骤；唯一的 CI 是
+`trellis-gate`（§2.2 的流程审计，不产出任何资产，也不替代这里的发布步骤）。
 
 > **`gh` 陷阱（0.0.1 发布时实际踩到）**：本仓库有两个 remote（`origin`=自有、`upstream`=只读参考），
 > `gh release create` 可能把仓库解析成 `upstream`，报

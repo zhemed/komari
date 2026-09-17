@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Trellis 强制闸门 · 第一层（提交消息必须能追溯到任务）
+#
+# 与 pre-commit 同一条件：暂存区含非 .trellis/ 改动时，消息里必须有 [task:<slug>]，
+# 且该 slug 对应一个真实任务（进行中或已归档）。
+#
+set -uo pipefail
+
+msg_file="${1:-}"
+[ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
+
+repo="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$repo" || exit 0
+
+[ -f "$(git rev-parse --git-path MERGE_HEAD)" ] && exit 0
+
+staged="$(git diff --cached --name-only)"
+[ -z "$staged" ] && exit 0
+if ! printf '%s\n' "$staged" | grep -qv '^\.trellis/'; then exit 0; fi
+
+slug="$(grep -oE '\[task:[A-Za-z0-9._-]+\]' "$msg_file" | head -1 | sed 's/^\[task://; s/\]$//')"
+
+if [ -z "$slug" ]; then
+  printf '\n\033[31m[Trellis 闸门]\033[0m 拒绝提交：消息里没有任务锚点 [task:<slug>]。\n\n'
+  printf '  正确格式（锚点放消息末尾即可）：\n'
+  printf '    feat: 一句话说明 [task:trellis-mandatory-gate]\n\n'
+  printf '  slug 用 .trellis/tasks/<MM-DD>-<slug> 去掉日期前缀的部分。\n'
+  exit 1
+fi
+
+if ! compgen -G ".trellis/tasks/*-${slug}" >/dev/null && ! compgen -G ".trellis/tasks/archive/*/*-${slug}" >/dev/null; then
+  printf '\n\033[31m[Trellis 闸门]\033[0m 拒绝提交：找不到任务 slug「%s」。\n\n' "$slug"
+  printf '  现有任务目录：\n'
+  find .trellis/tasks -maxdepth 1 -mindepth 1 -type d -name '[0-9][0-9]-*' -printf '    %%f\n' 2>/dev/null || true
+  printf '  已归档任务可用：ls .trellis/tasks/archive/*/\n'
+  exit 1
+fi
+
+exit 0

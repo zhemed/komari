@@ -1,0 +1,28 @@
+name: trellis-gate
+
+# Trellis 强制闸门 · 第三层（远程兜底）
+#
+# 本地 git hook 可以被 `git commit --no-verify` 绕过；这个工作流在 GitHub 上再核对一遍：
+# 凡改动非 .trellis/ 文件的提交，消息里必须有 [task:<slug>]，否则这次运行直接失败（红叉）。
+# 审计脚本与本地 check-repo 第 8 项是同一个：scripts/check-trellis-gate.sh
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出完整历史（审计需要起点之后的每个提交）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 审计提交是否都绑定了 Trellis 任务
+        run: ./scripts/check-trellis-gate.sh --audit-only

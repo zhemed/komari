@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Trellis 强制闸门 · 第一层（提交当场拦截）
+#
+# 规则：暂存区里出现**非 .trellis/ 的改动**时，必须存在进行中的 Trellis 任务。
+# 例外（刻意放行的两类）：
+#   1. 纯 .trellis/ 改动：journal、任务归档、jsonl、闸门自身——这些是流程产物，不该被拦；
+#   2. merge 提交：被合并的提交各自有历史与审计，合并动作本身不产生新改动。
+#
+# 绕过：git commit --no-verify（git 内建，封不死）。但 scripts/check-trellis-gate.sh
+# 的审计与 CI 会把这类提交揪出来——绕过留痕，这正是设计。
+#
+set -uo pipefail
+
+repo="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$repo" || exit 0
+
+[ -f "$(git rev-parse --git-path MERGE_HEAD)" ] && exit 0
+
+staged="$(git diff --cached --name-only)"
+[ -z "$staged" ] && exit 0
+
+# 纯 .trellis/ 改动 → 放行
+if ! printf '%s\n' "$staged" | grep -qv '^\.trellis/'; then exit 0; fi
+
+active=""
+for f in "$repo"/.trellis/tasks/*/task.json; do
+  [ -f "$f" ] || continue
+  if grep -q '"status"[[:space:]]*:[[:space:]]*"in_progress"' "$f"; then active="$f"; break; fi
+done
+
+if [ -z "$active" ]; then
+  printf '\n\033[31m[Trellis 闸门]\033[0m 拒绝提交：改动里有非 .trellis/ 文件，但没有进行中的 Trellis 任务。\n\n'
+  printf '  1) 先建任务（连只读调查也要建，规则见 AGENTS.md「强制规则」）：\n'
+  printf '       python3 .trellis/scripts/task.py create "<标题>" --slug <slug> -d "<描述>"\n'
+  printf '       python3 .trellis/scripts/task.py start <MM-DD-slug>\n'
+  printf '  2) 用带任务锚点的消息提交：\n'
+  printf '       git commit -m "feat: … [task:<slug>]"\n\n'
+  printf '  说明见 docs/MAINTAINING.md「流程闸门」与 .trellis/spec/guides/trellis-gate-guide.md\n'
+  exit 1
+fi
+
+exit 0

@@ -8,6 +8,7 @@
 #
 # 设计原则：只做**能机械判定**的检查，不猜测意图；发现不一致就打印并计入失败，
 # 全部通过时以 0 退出。发版前应当跑一次 --full（见 docs/MAINTAINING.md §3.4）。
+# 第 8 项是流程闸门（scripts/check-trellis-gate.sh）：提交必须绑定 Trellis 任务。
 #
 set -uo pipefail
 
@@ -82,16 +83,23 @@ done
   || true
 
 # ---------- 3. 脚本语法 ----------
-head_ "3. 脚本语法"
+head_ "3. 脚本语法 + 工作流 YAML"
 syn_fail=0
-for s in scripts/*.sh install-komari.sh install-agent.sh; do
+for s in scripts/*.sh install-komari.sh install-agent.sh .githooks/pre-commit .githooks/commit-msg; do
   if head -1 "$s" | grep -q "sh$" && ! head -1 "$s" | grep -q "bash"; then
     sh -n "$s" 2>/dev/null || { bad "$s 语法错误"; syn_fail=$((syn_fail + 1)); }
   else
     bash -n "$s" 2>/dev/null || { bad "$s 语法错误"; syn_fail=$((syn_fail + 1)); }
   fi
 done
-[ "$syn_fail" = 0 ] && ok "scripts/*.sh + 两个安装脚本语法正常"
+for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
+  [ -f "$wf" ] || continue
+  if command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; then
+    python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$wf" 2>/tmp/check-repo-yaml.log \
+      || { bad "$wf YAML 解析失败（$(tail -1 /tmp/check-repo-yaml.log)）"; syn_fail=$((syn_fail + 1)); }
+  fi
+done
+[ "$syn_fail" = 0 ] && ok "scripts/*.sh + 安装脚本 + .githooks 语法正常，工作流 YAML 可解析"
 
 # ---------- 4. 跟踪文件卫生 ----------
 head_ "4. 不该入库的东西没入库"
@@ -126,23 +134,29 @@ head_ "7. 构建脚本不克隆上游"
 clones="$(grep -nE "^\s*(git clone|git fetch)" scripts/*.sh | grep -v "^\s*#" || true)"
 [ -z "$clones" ] && ok "scripts/ 里没有构建期 git clone/fetch" || { bad "仍有构建期克隆："; echo "$clones" | sed 's/^/      /'; }
 
+# ---------- 8. Trellis 流程闸门 ----------
+head_ "8. Trellis 流程闸门（hooks 已装 + 提交可追溯）"
+# 规则与三层闸门见 AGENTS.md「强制规则」、docs/MAINTAINING.md「流程闸门」。
+# 这里跑第二层审计：本地 hooks 是否安装 + 起点之后每个改动提交是否都带 [task:<slug>]。
+"${SCRIPT_DIR}/check-trellis-gate.sh" || bad "Trellis 闸门未通过（见上面 ✗ 行）"
+
 # ---------- 慢检查 ----------
 if [ "${FULL}" = "1" ]; then
-  head_ "8. Go 质量门禁"
+  head_ "9. Go 质量门禁"
   if go build ./... && go vet ./... && go test ./... >/tmp/check-repo-test.log 2>&1; then
     ok "go build / vet / test 全绿"
   else
     bad "Go 门禁失败（详见 /tmp/check-repo-test.log）"; tail -3 /tmp/check-repo-test.log | sed 's/^/      /'
   fi
 
-  head_ "9. 离线构建（模块缓存已预热时）"
+  head_ "10. 离线构建（模块缓存已预热时）"
   if GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh >/dev/null 2>&1; then
     ok "GOPROXY=off 构建成功"
   else
     bad "离线构建失败（本仓库没有 vendor/，需要模块缓存已预热）"
   fi
 
-  head_ "10. agent 构建门禁"
+  head_ "11. agent 构建门禁"
   # 必须换输出目录：build-agent.sh 默认写 dist/agent 且开头就 rm -rf 该目录，
   # 直接跑会把刚构建好的发版资产清成单平台产物（2026-09-17 实际踩到——按
   # docs/MAINTAINING.md §3.4 的顺序“先建资产、再跑 --full”，自检把 14 个 agent 产物冲掉）。
