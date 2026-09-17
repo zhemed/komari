@@ -281,3 +281,46 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: 发布 0.0.6（流量跨重启）+ 本机部署改用 release 资产验证
+<!-- trellis-session: v=2 fp=cf53dfc490cabd44 -->
+
+**Date**: 2026-09-17
+**Task**: 发布 0.0.6（流量跨重启）+ 本机部署改用 release 资产验证
+**Branch**: `main`
+
+### Summary
+
+把流量持久累计这一轮维护收口成正式发布，并把本机部署从本地自建二进制切换为‘用户能下载到的那些 release 资产’，做到已发布=正在跑。版本线 0.0.5 → 0.0.6（四处字面量），提交后打 tag，服务端 amd64/arm64 静态资产 + agent 14 平台资产 + komari-agent-SHA256SUMS 共 17 个资产挂到 0.0.6 release；ghcr 推 zhemed/komari 与 zhemed/komari-agent 的 0.0.6/latest 四标签并匿名校验可拉取。随后按用户路径重装本机：服务器走 install-komari.sh 升级（下载产物 sha256 与本地构建产物逐字节一致，版本行 0.0.6 (hash: 7cbd25d…)），agent 走 install-agent.sh 并复用 auto-discovery 身份（版本 0.0.6，UUID 不变）。验证：DB client_traffic_totals 在服务端重启后仍在且继续增长，面板 getNodesLatestStatus 的 net_total_up/down 与库中数值完全一致（2324.2MB/827.6MB），面板卡片与概览均显示 2.27GB/829.4MB，节点在线、uptime 跟随系统而非被重启清零；/etc/motd 不存在（此前 agent 误写安全提醒的后遗症已清干净）。全量自检唯一失败项是上轮文档里把路径写成花括号合并形式 agent/protocol/{v1,v2,transport} 导致路径校验解析不了，已拆成三条真实路径并单独补一个 docs 提交推送。
+
+### Main Changes
+
+- 版本线 0.0.5 → 0.0.6，提交 7cbd25d 后再打 tag（保证二进制内嵌 hash 与 tag 指向的提交一致）
+- release 0.0.6 挂 17 个资产：服务端 linux/amd64+arm64、agent 14 平台、komari-agent-SHA256SUMS
+- ghcr 推送 zhemed/komari 与 zhemed/komari-agent 的 0.0.6 + latest，四个标签均匿名可拉取
+- 本机部署改用 release 资产重装（服务器+agent），不再跑本地自建二进制，验证已发布=正在跑
+- docs(maintaining) §13：把 agent/protocol/{v1,v2,transport} 拆成三条真实路径，修复 check-repo 路径校验失败
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7cbd25d` | chore(release): 版本线 0.0.5 → 0.0.6 |
+| `5b5f5c5` | docs(maintaining): 修正 §13 协议实现路径写法，让 check-repo 路径校验可解析 |
+
+### Testing
+
+- [OK] 服务器/IP 二进制与 release 资产 sha256 逐字节一致；面板页脚显示 0.0.6 (7cbd25d)
+- [OK] agent 已部署二进制 sha256 与发布清单 SHA256SUMS 中 komari-agent-linux-amd64 一行完全一致
+- [OK] client_traffic_totals 跨升级重启存活并继续增长；面板 net_total_up/down 与库中数值一致
+- [OK] check-repo.sh --full 九项除文档路径外全绿，修复后快速自检全部通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 残留个分钟级流量增量噪声（60s 桶压成 300s）需要临时逐条上报日志才能定性，属独立小课题
+- 面板未显示每节点协议版本（v1/v2），可选加一个字段方便判断节点走的哪条通道

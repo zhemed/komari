@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~283 | Active |
+| `journal-1.md` | ~326 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-09-17 | 发布 0.0.6（流量跨重启）+ 本机部署改用 release 资产验证 | `7cbd25d`, `5b5f5c5` | `main` |
 | 12 | 2026-09-17 | Session 11: 流量历史跨重启保存（服务端持久累计）+ 修 v2 上报缺 uptime 的增量清零 | `10e5605`, `df4f08f` | `main` |
 | 11 | 2026-09-16 | Session 10: 全面维护——说明口径换成我们自己的版本 + 新增仓库自检脚本 | `8cc30ef`, `1ca69c4`, `f1186a2` | `main` |
 | 10 | 2026-09-16 | Session 9: 前端与 agent 源码全部 vendor 进仓库（完全自有） | `bfb96ad`, `ea28dc0`, `7759a77` | `main` |
