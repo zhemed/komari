@@ -255,16 +255,25 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 - **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
   `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本仓库（无插件/无通知）
   有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
-- **流量增量偶发"整分钟偏低"**（2026-09-17 实测，属上游既有行为，未完全定位）：
-  同一节点会**同时**用 v1 POST 与 v2 WS 两条通道上报，两条通道的计数器快照不完全一致。
+- **流量增量偶发"整分钟偏低"**（2026-09-17 实测，属上游既有行为，**原因未定位**）：
   逐桶核对（同一分辨率下 本桶 Σ增量 vs 相邻桶计数器差值）显示：多数分钟比值 0.9~1.2，
   但个别分钟只有 0.0x（例如 05:38 整分钟只记到 5.5 KB，而计数器涨了 190 KB）；
   逐条样本的 min/max 还显示增量"扎堆"（一条 2.7 MB、其余约 144 B）。
-  已修掉其中一条确因：**v2 协议的报告没有 `uptime` 字段**，服务端读到 0，
-  而回退判定用 `report.Uptime < values.uptime`，于是每次 v1→v2 切换都被误判成 agent 重启、
-  该条上报的增量被清零（修复见 `report_batcher.go` 的 `agentRestart` 判定 + 回归测试
-  `TestWriteReportKeepsTrafficWhenUptimeMissing`）。残留的"扎堆"现象还需给上报流加临时日志
-  才能真正定性，方向是在"服务端在 v2 活跃时忽略 v1 指标上报"与"agent 只走一条通道"之间选一个。
+
+  **已经修掉的一条确因**：v2 协议的报告没有 `uptime` 字段，服务端读到 0，而"agent 是否重启"的
+  判据是 `report.Uptime < values.uptime`；节点从 v2 **降级**到 v1（v1 报告带真实开机时长）时会
+  互相误判成重启、把该条上报的增量清零。判据已改为"两次上报都必须带有效 uptime"
+  （`report_batcher.go`），回归测试 `TestWriteReportKeepsTrafficWhenUptimeMissing`。
+
+  **关于"两条通道"的更正**：agent 的设计是**同一时刻只走一条上报通道**——
+  v2 WebSocket（首选）→ 连不上时进 v2 HTTP POST 回退（报告 POST + 事件 pull 两条 POST 循环，
+  见 `agent/server/websocket.go` 的 `runPostFallback`/`runV2PullLoop`）→ v2 端点整体失败时
+  降级到 v1（`/api/clients/report`）直到连接断开。服务端日志里的 `online (POST session)` **不等于**
+  v1 通道：任何 POST 形态的 ingest 都会刷新 presence 而打出这条日志（v2 的 HTTP 入口也标
+  `markPresence=true`，`report_v2.go:53`）。本机 agent 从未进过回退/降级（日志里只有
+  "WebSocket connected using v2 protocol"），因此残留的"扎堆"现象**另有原因**，
+  下一步是给上报流加临时日志（通道、计数器、算出的增量）再定性，不要在没证据前改语义。
+
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
