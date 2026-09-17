@@ -493,7 +493,7 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 | 侧 | 实现 | 默认 |
 |---|---|---|
 | 服务端 | `protocol/v1/report.go`、`protocol/v2/{jsonrpc.go,networktest.go}`；路由 `/api/clients/report`（v1 WS/POST）与 `/api/clients/v2/rpc`（v2 WS/POST），见 `web/router/router.go:68-72` | 两套端点都开着，由 agent 选 |
-| agent | `agent/protocol/{v1,v2,transport}` | `--protocol-version` 默认 **2**（`AGENT_PROTOCOL_VERSION` 可覆盖） |
+| agent | `agent/protocol/v1`、`agent/protocol/v2`、`agent/protocol/transport` | `--protocol-version` 默认 **2**（`AGENT_PROTOCOL_VERSION` 可覆盖） |
 
 ### 13.1 时间线（上游实测）
 
