@@ -689,13 +689,8 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                               )}
                         </Button>
                       )}
-                      <a
-                        href={latestRelease?.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant="soft">Github</Button>
-                      </a>
+                      {/* 按用户要求（2026-09-17）去掉这里的 Github 按钮：升级弹窗只保留升级/复制命令操作，
+                          不再把用户引到 GitHub 发布页。关于页里的仓库链接保留不动。 */}
                     </div>
                   </div>
                 </Tips>
