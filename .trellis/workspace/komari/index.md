@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
+- **Total Sessions**: 16
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~419 | Active |
+| `journal-1.md` | ~464 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-09-17 | 面板一键升级服务器（0.0.8 功能 + 0.0.9 修 E2E 抓到的缺陷） | `c671364`, `6421ec9`, `8dea6a6` | `main` |
 | 15 | 2026-09-17 | 补建 Trellis 任务 + 更正未验证因果结论（流程违规整改） | `245bb91`, `ec3deb1` | `main` |
 | 14 | 2026-09-17 | 定位并修复流量图点值被除以采样条数（发布 0.0.7） | `48dca2e`, `fc7d6e8`, `2109504` | `main` |
 | 13 | 2026-09-17 | 发布 0.0.6（流量跨重启）+ 本机部署改用 release 资产验证 | `7cbd25d`, `5b5f5c5` | `main` |

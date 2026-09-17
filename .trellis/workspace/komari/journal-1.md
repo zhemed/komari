@@ -417,3 +417,48 @@
 
 - 把发布说明纳入版本管理（当前 .build/ 被 gitignore，公开说明的本地副本不受版本控制；建议 docs/releases/<版本>.md）
 - 可选：check-repo 增加 --claims 开关，人工触发特征词扫描（当前不作为默认门禁，避免误报疲劳）
+
+
+## Session 16: 面板一键升级服务器（0.0.8 功能 + 0.0.9 修 E2E 抓到的缺陷）
+<!-- trellis-session: v=2 fp=a9f39b17243c9cf6 -->
+
+**Date**: 2026-09-17
+**Task**: 面板一键升级服务器（0.0.8 功能 + 0.0.9 修 E2E 抓到的缺陷）
+**Branch**: `main`
+
+### Summary
+
+按批准的三项决策（范围=升到最新+指定版本/回滚；校验=SHA256+发版补服务端校验和资产；失败=不做自动回滚）实现面板一键升级。服务端新增 internal/upgrade（纯标准库，不引第三方自更新库）：Prepare 先判形态（容器→只给 pull 命令；无 systemd→仅下载；否则要求目录可写）再取 komari-SHA256SUMS；Execute 下载(流式 SHA256)→自检(新二进制 --help 输出含 Komari Monitor <tag>)→备份+原子替换；状态写 <二进制目录>/upgrade-state.json，Reconcile 把 restarting 收敛为 completed。RPC 四个（getServerUpgradeSettings/listServerReleases/upgradeServer/upgradeStatus），设置用扁平键 server_upgrade_enabled/server_update_repo 并在通用设置接口加校验钩子挡住非法仓库名。发版配套：新增 scripts/gen-release-sums.sh（资产 17→18），install-komari.sh 加尽力而为校验（旧版本无该资产时告警跳过，保住回滚路径）。前端：弹窗内立即升级/安装此版本/复制 pull 命令+进度与失败信息，系统设置页加开关与来源仓库，5 语言各 22 键，前端产物重建并更新 FRONTEND_TREE_SHA256（af0bd793→25e318e2）。E2E 实测（面板接口驱动）抓到真缺陷：Execute 下载后未补执行位就自检，fork/exec permission denied，导致 0.0.8 的一键升级必然失败（替换在自检之后，实测确认不破坏线上：版本与数据均未变）——修于 0.0.9 并加回归测试（注入探针断言被自检文件可执行，去掉修复即 FAIL，已验证不是永真测试），同时在 0.0.8 的公开发布说明追加更正段、MAINTAINING §14.4.1 记录窗口期绕行办法。实测覆盖：面板降级 0.0.9→0.0.7 与 0.0.9→0.0.8（二进制与 release 资产逐字节一致、数据单调不减、生成 komari.backup.<旧版本>）、已是最新分支返回明确提示、缺校验和资产被拒并提示用安装脚本、关闭开关后接口返回 PermissionDenied、非法仓库名被设置接口拒绝、审计日志 logs 表出现升级记录、清空 api_key 后旧凭据被拒。顺带给 0.0.7 的 release 补 komari-SHA256SUMS（按当时发布的二进制计算，哈希与发布记录一致），使回滚到 0.0.7 也可用。未覆盖并如实标注：真有更高版本时的"升到最新"点击路径（本轮 0.0.9 已是最新，只能验到 ErrUpToDate；与指定版本共用 Execute，差异在选择目标且有单测）、真实容器场景（仅单测）。
+
+### Main Changes
+
+- internal/upgrade/*：releases/download/install/state/upgrade 五个文件 + 单测；语义边界写进代码注释
+- web/rpc/jsonrpc/admin.upgrade.go：四个 admin RPC + 审计 + 退出口；validateUpgradeSettingChanges 接入 admin:editSettings
+- scripts/gen-release-sums.sh 新增；install-komari.sh 加 best-effort 校验（含 log_warn 助手）
+- 前端：AdminPanelBar 弹窗按钮与状态机、设置页开关与仓库、5 语言 22 键、前端哈希更新
+- 文档：MAINTAINING §14（能力/支持矩阵/不变量/救援命令/安全边界/0.0.8 缺陷记录）、§3.4 资产清单、README、spec/backend/server-upgrade.md
+- 发布 0.0.8（功能）与 0.0.9（修复），各 18 个资产 + ghcr 两个镜像四标签
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c671364` | feat(upgrade): 面板一键升级服务器（含指定版本/回滚） |
+| `6421ec9` | fix(upgrade): 自检前先补执行位，修 0.0.8 一键升级必然失败 |
+| `8dea6a6` | docs(task): 记录一键升级的端到端实测结果与未覆盖项 |
+
+### Testing
+
+- [OK] E2E：面板降级 0.0.9→0.0.7 / 0.0.9→0.0.8 成功且哈希一致；数据单调不减；备份文件生成；审计日志有记录
+- [OK] E2E 反例：0.0.6（缺校验和）被拒并给出可操作提示；已是最新返回明确提示；关闭开关后 PermissionDenied；非法仓库名被拒
+- [OK] 单测：校验和不符/自检版本行不符均不替换原二进制；执行位回归测试去掉修复即 FAIL
+- [OK] check-repo.sh --full 十项全绿；本机最终运行 0.0.9（已发布=正在跑），API Key 测试凭据已清空
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 下一次真实发版时验证"升到最新"的点击路径（本轮 0.0.9 已是最新，只能验 ErrUpToDate 分支），并补记到任务/规范
+- 可选：给升级接口加 2FA（rpc.MarkSensitive）需要前端补二次验证提示流程；或加签名校验（minisign/GPG）
