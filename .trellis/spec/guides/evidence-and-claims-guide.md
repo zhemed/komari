@@ -51,6 +51,31 @@ grep -rn "双通道\|扎堆\|确因\|实测表现为" --include="*.md" --include
 - 过程记录：`.trellis/tasks/**/prd.md`、`.trellis/workspace/**/journal-*.md`（含索引里的标题行）
 - 规范：`.trellis/spec/**`
 
+### 行为变更时：描述它的每一处都要同步（2026-09-17 新增，证据见下）
+
+结论被推翻要全落点更正；**行为变了**同样要把"描述这个行为的每一处"一次性改完。
+0.0.13 那轮只改了说明文字、漏了命令块与代码注释，导致 0.0.17 前的 README 自相矛盾
+（命令里挂着 `-v /var/run/docker.sock`，下一行却说"不需要任何挂载"）。
+
+固定动作：先用该行为的**特征词**全仓搜，再动手；改完再用同一组词复核一遍。
+
+```bash
+grep -rn "docker.sock\|没挂 socket\|只能改用" --include="*.md" --include="*.go" \
+  --include="*.tsx" --include="*.json" . | grep -v node_modules | grep -v "\.trellis/tasks/"
+```
+
+落点清单（覆盖本次实际改到的 11 处，按此对照，别只搜用户文档）：
+
+| 类别 | 具体位置 |
+|---|---|
+| 用户可见文档 | `README.md` 的示例命令块 + 功能点；`docs/MAINTAINING.md` 的支持矩阵、章节标题、示例命令注释、正文结论 |
+| 代码注释 | `internal/**`、`web/rpc/**` 里描述模式/触发条件的注释（最容易漏） |
+| 界面文案 | `frontend/src/i18n/locales/*.json` 五语 + 组件里的兜底硬编码字符串 |
+| 过程记录 | `.trellis/tasks/**/prd.md`、`.trellis/workspace/**/journal-*.md`、`.trellis/spec/**` |
+
+实测：本任务初判 7 处，全仓扫描后实际 11 处（多出 `MAINTAINING` §14.4.2 末条与 3 处代码注释）。
+**初判数字永远只是下界**——搜完再报数字。
+
 ---
 
 ## 发布前的强制检查（与 `docs/MAINTAINING.md` §3.4 配合）
