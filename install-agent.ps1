@@ -22,7 +22,7 @@ $InstallDir = Join-Path $Env:ProgramFiles "Komari Agent"
 $ServiceName = "komari-agent"
 # 本 fork 的发行线参数
 $AgentRepo = "zhemed/komari"
-$DefaultAgentVersion = "0.0.9"
+$DefaultAgentVersion = "0.0.10"
 $GitHubProxy = ""
 $KomariArgs = @()
 $InstallVersion = ""
