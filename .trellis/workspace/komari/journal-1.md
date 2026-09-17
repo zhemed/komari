@@ -258,3 +258,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: Session 11: 流量历史跨重启保存（服务端持久累计）+ 修 v2 上报缺 uptime 的增量清零
+<!-- trellis-session: v=2 fp=7879ea70a1193509 -->
+
+**Date**: 2026-09-17
+**Task**: Session 11: 流量历史跨重启保存（服务端持久累计）+ 修 v2 上报缺 uptime 的增量清零
+**Branch**: `main`
+
+### Summary
+
+用户报“重启后流量历史不能保存”。根因实测确认：面板总流量=agent 开机计数器(/proc/net/dev)，机器重启必归零；agent 的落盘统计 net_static.json 只在 --month-rotate 非 0 时启用（默认没开，文件都不存在）；服务端 metric store 的增量跨重启保留但只喂后台 24h 图。按用户选择做服务端持久累计：新增 client_traffic_totals 表与仓储层（内存快照+SQLite，启动加载）、metricstore 批次写入钩子回传重置感知增量（不反向依赖 database/*）、首次见节点用当前计数器做基线、面板 getNodesLatestStatus 改读累计值（卡片总流量与阈值进度随之跨重启可用）、删除节点联动清理。不改 agent → 所有已部署节点立即生效。验证：单测 5 个（含计数器归零不回退、重启重加载）；本地实测累计与 metric store 增量之和差 18KB≈一个上报周期，重启 agent/服务端期间单调不减，面板 1.88GiB/681MB 与库中一致。顺带修掉实测抓到的真 bug：v2 报告没有 uptime 字段（读到 0），而重启判定用 uptime 回退，v1/v2 双通道切换时把该条上报增量清零——判据改为两次都需有效 uptime + 回归测试。残留：双通道上报导致个别分钟增量仍偏低（已记入 MAINTAINING §7，需加临时日志才能定性，后续在“v2 活跃时忽略 v1 指标”与“agent 只走一条通道”间选一个）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `10e5605` | feat(traffic): 流量累计跨重启保存；修正 v2 上报缺 uptime 导致的增量清零 |
+| `df4f08f` | docs(traffic): 记录流量累计的设计与残留噪声；check-repo 排除自身误报 |
+
+### Status
+
+[OK] **Completed**
