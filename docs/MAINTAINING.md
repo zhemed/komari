@@ -484,3 +484,48 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 
 排查这类提示的正确姿势：`journalctl -u komari-agent | grep -i "remote control"`，
 以及确认 agent 的启动日志里 `Github Repo:` 指向 `zhemed/komari`（不是上游仓库）。
+
+## 13. 上报协议：v1 / v2 与"1.4 时期"的口径
+
+**结论**：我们冻结的 1.4.3 血统里，上报协议是 **v2 主力 + v1 兜底并存**（不是"v1 时代"，
+也不是 v2-only）。两条都实现在本仓库内，都要维护。
+
+| 侧 | 实现 | 默认 |
+|---|---|---|
+| 服务端 | `protocol/v1/report.go`、`protocol/v2/{jsonrpc.go,networktest.go}`；路由 `/api/clients/report`（v1 WS/POST）与 `/api/clients/v2/rpc`（v2 WS/POST），见 `web/router/router.go:68-72` | 两套端点都开着，由 agent 选 |
+| agent | `agent/protocol/{v1,v2,transport}` | `--protocol-version` 默认 **2**（`AGENT_PROTOCOL_VERSION` 可覆盖） |
+
+### 13.1 时间线（上游实测）
+
+- **2026-05-31**：服务端 `protocol/v2` 引入（`e149e8b refactor: remove legacy client APIs and support v2 pings`，
+  处于 1.2.0→1.2.3 之间）；同一时期 agent 也加了 v2（`9f088ab feat(protocol): add configurable v2 reporting support`）。
+- **1.4.0（2026-08-05）～ 1.4.3（2026-08-13）**：v1 与 v2 全程并存——我们导入的 1.4.3 快照里两套路由、
+  两套协议文件都在，可以直接 `git show <snapshot>:web/router/router.go` 核对。
+- **2026-08-29**：上游 **agent** 做了 `8fdab5b refactor: 仅保留v2协议，移除v1回退`——注意这在我们
+  agent pin（`1186aafb`，2026-08-07）**之后**，属于 agent 的 1.5 线（1.5.0 = 2026-09-14）。
+  也就是说"**v1 兜底是 1.4 时期的行为**"，我们冻结 1.4.3 同期 agent 正好把它保留下来。
+
+### 13.2 选择与降级（agent 侧）
+
+```
+默认 v2 WebSocket ──连不上/失败达阈值──▶ 降级 v1（直到该连接断开）──▶ 断开后重试 v2
+        └─ WS 重试次数用尽 ─▶ v2 HTTP POST 回退（报告 POST + 事件 pull 循环，仍在 v2 端点）
+```
+
+两个容易误判的点：
+
+1. **同一时刻只走一条上报通道**；`online (POST session)` 只是 presence 刷新日志，
+   v2 的 HTTP 入口也会打（`web/api/client/report_v2.go` 的 `ingestReport(..., 2, true)`），
+   **不能**当成"v1 通道在工作"的证据。
+2. **面板看不到也不能选协议版本**：服务端只在内存里记 v2 与否（`web/agent/connections.go` 的
+   `IsV2Client`），没有暴露给前端。
+
+### 13.3 维护策略（当前事实）
+
+- 两条通道最终都汇入 `web/api/client/ingest.go` 的 `ingestReport` → `metricstore.WriteReport`，
+  因此**新逻辑一律做在协议无关层**（指标、流量、数据库、面板 RPC），两条通道同时受益；
+  0.0.x 至今的改动（删插件/通知、流量跨重启累计）都属于这一类。
+- 改协议层时要同时看两条入口；v1 属**冻结兼容**（服务老 agent 与降级路径），
+  不要在没有理由的情况下删它——删掉会让只懂 v1 的节点失联，也让 agent 的兜底失去意义。
+- 与协议版本唯一相关的一次修复：v2 报告没有 `uptime` 字段，而"agent 是否重启"的判据依赖它，
+  于是 v1↔v2 切换时会误判并把增量清零（详见 §7）。
