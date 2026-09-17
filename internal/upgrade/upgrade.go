@@ -97,7 +97,8 @@ const (
 	// （唯一"零配置"的容器网页升级方式：不要求挂载、不要求 restart 策略）。
 	// 代价：**重建容器**会退回镜像里的版本（docker restart 不会）。
 	ModeContainerReplace Mode = "container-replace"
-	// ModeManual：容器但没挂 socket —— 只给可复制的 pull 命令，不替换任何东西。
+	// ModeManual：容器但二进制目录不可写（只读 rootfs 等）—— 只给可复制的 pull 命令，
+	// 不替换任何东西；没挂 socket 但目录可写走 ModeContainerReplace（零配置升级）。
 	ModeManual Mode = "manual"
 	// ModeDownloadOnly：无 systemd 的前台运行 —— 只下载，不替换不退出。
 	ModeDownloadOnly Mode = "download-only"

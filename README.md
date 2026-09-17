@@ -56,7 +56,6 @@ sudo bash install-komari.sh
 docker run -d --name komari --restart always \
   --network host \
   -v ./data:/app/data \
-  -v /var/run/docker.sock:/var/run/docker.sock \
   ghcr.io/zhemed/komari:latest
 ```
 
@@ -103,8 +102,9 @@ docker run -d --name komari-agent --restart always \
 
 - **面板内一键升级服务器**：管理端"有新版本"弹窗里可直接升级或安装指定版本（= 回滚）。
   二进制 + systemd 形态：下载后校验 `komari-SHA256SUMS`、替换前自检版本行、保留旧二进制备份；
-  容器形态：把 `/var/run/docker.sock` 挂进来即可由面板拉镜像并重建容器
-  （等于把宿主控制权交给该容器，请自行确认；没挂 socket 时只给可复制的 pull 命令）。
+  容器形态默认就是零配置：在容器内替换二进制并原地重启（不需要挂载、不需要 restart 策略）；
+  可选把 `/var/run/docker.sock` 挂进来改用"拉镜像 + 重建容器"模式（版本与镜像完全一致，
+  等于把宿主 root 等价权限交给该容器，请自行确认）。
 - agent 由本仓库发布（与服务器同一条 `0.0.x` 线、同一个 release），**默认不自动升级**；
   要跟随发布加 `--enable-auto-update`（或环境变量 `AGENT_ENABLE_AUTO_UPDATE=1`）
 - Windows 用 `install-agent.ps1`；全部平台/架构见 release 资产列表

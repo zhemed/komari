@@ -592,8 +592,9 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 | 部署形态 | 行为 |
 |---|---|
 | linux/amd64、linux/arm64 + systemd + 目录可写 | ✅ 下载 → 校验 → 自检 → 备份 + 原子替换 → 退出交 systemd 拉起 |
-| 容器 **挂了 docker socket** | ✅ 通过 Docker Engine API 拉镜像 + helper 容器重建自身容器（见 §14.6） |
-| 容器 **没挂 socket** | ⚠️ 不替换任何东西：仅返回 `docker pull ghcr.io/zhemed/komari:<tag>` 供复制 |
+| 容器（默认，不挂任何东西） | ✅ 容器内下载 → 校验 → 自检 → 替换二进制 → 原地重执行（0.0.13 起；版本可能与镜像不一致） |
+| 容器 + 挂 `/var/run/docker.sock`（**可选**增强） | ✅ 拉镜像 + helper 容器重建自身容器，版本与镜像完全一致（见 §14.6） |
+| 容器 + 只读 rootfs | ⚠️ 无法替换：仅返回 `docker pull ghcr.io/zhemed/komari:<tag>` 供复制 |
 | 无 systemd（前台裸跑） | ⚠️ 仅下载到 `<二进制目录>/upgrades/`（不可写则退到 `$TMPDIR/komari-upgrades`），不退出不替换 |
 | darwin / windows / 其它架构 | ❌ 没有发布资产，接口直接拒绝 |
 
@@ -633,7 +634,7 @@ KOMARI_TAG=<旧版本> bash install-komari.sh
 并加了回归测试断言"被自检的文件必须可执行"（去掉修复即 FAIL，验证过测试不是永真）。
 要避开这段窗口：0.0.8 用 `install-komari.sh` 升一次，之后面板升级即可正常工作。
 
-### 14.6 容器一键升级（挂 docker socket 时，0.0.11 起；0.0.12 修 helper 缺陷）
+### 14.6 容器一键升级（0.0.11 起；0.0.13 起不挂 socket 也能升级；0.0.12 修 helper 缺陷）
 
 **更正旧说法（两次）**：§14.4.2 一度把"容器不能自升级"写成架构限制——那是**取舍**；
 后来又写成"必须挂 socket 才能网页升级"——那也过头了：0.0.13 起**不挂 socket 也能在容器内升级**
@@ -652,14 +653,14 @@ KOMARI_TAG=<旧版本> bash install-komari.sh
 ```bash
 docker run -d --name komari --restart always --network host \
   -v ./data:/app/data \
-  -v /var/run/docker.sock:/var/run/docker.sock \   # ← 这一行让它能一键升级
-  ghcr.io/zhemed/komari:0.0.11
+  -v /var/run/docker.sock:/var/run/docker.sock \   # ← 想用"重建容器"模式才需要这一行（可选）
+  ghcr.io/zhemed/komari:latest
 ```
 
 - 重建时**逐字段沿用**旧容器的 `Config`/`HostConfig`/网络配置（卷、端口、restart 策略、env、别名…），
   只换镜像；容器名保持不变，旧容器改名为 `<名字>-old-<时间戳>` 并保留为**停止状态**（回滚点）；
 - 任何一步失败都会把旧容器改名回去并启动（helper 里完成回滚）；
-- 没挂 socket 时行为不变（只给可复制的命令），systemd 二进制形态也完全不受影响；
+- 没挂 socket 时走**容器内替换**（§14.2 第二行、§14.4.2），systemd 二进制形态也完全不受影响；
 - **安全边界**：docker socket ≈ 宿主 root。因此该模式只在 socket 存在时启用、仍受
   `server_upgrade_enabled` 开关约束、每次升级写审计日志，界面也会明确提示这一点；
 - 回滚：`docker start komari-old-<时间戳>`（旧容器仍在），或按 §14.4.2 用镜像 tag 重建；
@@ -710,7 +711,8 @@ docker run -d --name komari --restart always --network host \
 - 服务端在版本变化前会自己备份：`./data/backup/upgrade-<时间>.zip`
   （日志行 `[upgrade-backup] … before upgrade`）；
 - 建议固定版本号（`:0.0.9`）而不是 `:latest`，便于回滚与复现；
-- 想要面板内一键升级，只能改用"二进制 + systemd"形态（`install-komari.sh`）。
+- 默认形态（二进制 + systemd，或容器内替换）就能面板一键升级；只有**只读 rootfs** 等
+  无法写入二进制的场景才需要按上面手工重建容器（挂 socket 的重建模式是另一条可选路径）。
 
 ### 14.5 安全边界（诚实写明）
 

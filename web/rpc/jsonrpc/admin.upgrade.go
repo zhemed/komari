@@ -293,8 +293,8 @@ func upgradeStateDir() string {
 	return filepath.Dir(exe)
 }
 
-// upgradeSupports 返回当前形态能否**自动**完成升级：
-// 二进制 + systemd，或容器 + 可用的 docker socket（重建容器）。
+// upgradeSupports 返回当前形态能否**自动**完成升级：二进制 + systemd、
+// 容器 + 可用 docker socket（重建容器）、容器 + 可写目录（容器内替换）。
 func upgradeSupports(ctx context.Context, socket string) bool {
 	switch upgrade.CurrentMode(ctx, socket) {
 	case upgrade.ModeBinary, upgrade.ModeDockerRecreate, upgrade.ModeContainerReplace:

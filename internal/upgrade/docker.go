@@ -38,8 +38,10 @@ func dockerSocketReady(ctx context.Context, socketPath string) (selfID string, e
 
 // helperPayload 组装 helper 容器的创建请求。
 //
-// helper 用**目标镜像**启动（它必然带 docker-self-recreate 子命令），只挂 docker socket
-// 与数据目录（写状态文件用），不挂业务需要的其它卷；跑完由 daemon 自动删除。
+// helper 用**当前镜像**启动（0.0.12 起：本进程所在镜像必然带 docker-self-recreate 子命令；
+// 用目标镜像时，降级到 0.0.10 及更早的镜像没有该子命令，helper 会秒退），只挂 docker socket
+// 与数据目录（写状态文件用），不挂业务需要的其它卷；**不自动删除**——命名并打标签保留现场，
+// 由下一次升级前的清理或人工 `docker logs` 查因。
 func helperPayload(helperImage, helperName, selfID, targetImage, sanityTag, stateDir, socketPath, binaryPath string, binds []string) map[string]any {
 	if binaryPath == "" {
 		binaryPath = DefaultImageBinaryPath
