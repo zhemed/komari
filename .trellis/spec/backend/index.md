@@ -12,6 +12,7 @@
 | [Directory Structure](./directory-structure.md) | 目录分层、放置与命名约定 | **Filled** |
 | [Database Guidelines](./database-guidelines.md) | GORM 模型、AutoMigrate、配置存储、SQLite 调优 | **Filled** |
 | [Metric Query & Aggregation](./metric-query-aggregation.md) | 指标的聚合语义、queryMetrics 优先级、分辨率与桶值约定 | **Filled** |
+| [Server Upgrade](./server-upgrade.md) | 面板一键升级：模块职责、RPC、部署形态矩阵、不变量与测试要求 | **Filled** |
 | [Error Handling](./error-handling.md) | RPC/REST 错误返回、panic/recover 边界 | **Filled** |
 | [Logging Guidelines](./logging-guidelines.md) | `utils/log` API、模块名约定、级别使用 | **Filled** |
 | [Quality Guidelines](./quality-guidelines.md) | 测试写法、提交前必跑命令、已知遗留缺陷 | **Filled** |

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/build-and-pinning.md", "reason": "发布资产与 pin 契约：新增 komari-SHA256SUMS 必须同步这里"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "新增 admin RPC 的错误返回约定"}

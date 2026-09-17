@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.7）
+# 维护本仓库（komari 自维护版 · 当前 0.0.8）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.7**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.8**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.7`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.8`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -124,15 +124,21 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
    KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
    ```
 3. agent 全平台（14 个，纯 Go）：`./scripts/build-agent.sh`
+3.5 生成服务端校验和资产（面板一键升级按它校验下载内容，0.0.8 起必需）：
+   ```bash
+   ./scripts/gen-release-sums.sh        # 产出 dist/komari-SHA256SUMS（两行：amd64/arm64）
+   ```
 4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含版本字面量一致性、文档锚点、
    `go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希）。
    自检里的 agent 门禁构建到 `.build/check-agent`，**不会动 `dist/`**；反过来说，
    `scripts/build-agent.sh` 默认写的就是 `dist/agent` 并会先清空该目录，别拿它当临时构建用。
 5. `git tag <版本> && git push origin <版本>`
 6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes-file <说明.md> \
-      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/komari-agent-SHA256SUMS \
-      dist/agent/komari-agent-*`
-   （共 17 个资产：服务端 2 + agent 14 + `komari-agent-SHA256SUMS`；agent 安装脚本按清单校验）
+      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/komari-SHA256SUMS \
+      dist/komari-agent-SHA256SUMS dist/agent/komari-agent-*`
+   （共 18 个资产：服务端 2 + `komari-SHA256SUMS` + agent 14 + `komari-agent-SHA256SUMS`。
+   0.0.8 起服务端也有校验和资产——面板一键升级与 `install-komari.sh` 都按它校验；
+   缺该资产的旧 release（≤0.0.7）在升级界面里会被明确拒绝："请用 install-komari.sh 升级"）
 7. 推送镜像：`./scripts/build-server-image.sh --push && ./scripts/build-agent-image.sh --push`
 
 > **顺序很重要**：服务器二进制的版本 hash 来自构建时的 `git rev-parse HEAD`，
@@ -561,3 +567,62 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
   不要在没有理由的情况下删它——删掉会让只懂 v1 的节点失联，也让 agent 的兜底失去意义。
 - 与协议版本唯一相关的一次修复：v2 报告没有 `uptime` 字段，而"agent 是否重启"的判据依赖它，
   **若**发生 v1↔v2 切换就会误判并把增量清零（详见 §7；该缺陷存在但从未被证实触发过）。
+
+## 14. 面板一键升级（0.0.8 起）
+
+让管理员不必 SSH：在面板"有新版本"弹窗里点一下就完成升级。全部动作在**服务端**执行
+（`internal/upgrade`），前端只触发与展示进度。
+
+### 14.1 能做什么
+
+| 能力 | 说明 |
+|---|---|
+| 升到最新稳定版 | 取 release 列表里版本号最大的非 prerelease |
+| 安装指定版本 | 版本列表里选任意 tag（**回滚也走这条路**） |
+| 进度与结果 | `admin:upgradeStatus` 返回 `phase`（downloading/verifying/replacing/restarting/failed/completed）；进程重启后从状态文件读"上次结果" |
+| 开关与来源 | 系统设置 → "服务器升级"：`server_upgrade_enabled`（默认开）、`server_update_repo`（默认 `zhemed/komari`） |
+
+### 14.2 支持矩阵（写实，不假装都支持）
+
+| 部署形态 | 行为 |
+|---|---|
+| linux/amd64、linux/arm64 + systemd + 目录可写 | ✅ 下载 → 校验 → 自检 → 备份 + 原子替换 → 退出交 systemd 拉起 |
+| 容器 | ⚠️ 不替换二进制（会随容器重建丢失）：仅返回 `docker pull ghcr.io/zhemed/komari:<tag>` 供复制 |
+| 无 systemd（前台裸跑） | ⚠️ 仅下载到 `<二进制目录>/upgrades/`（不可写则退到 `$TMPDIR/komari-upgrades`），不退出不替换 |
+| darwin / windows / 其它架构 | ❌ 没有发布资产，接口直接拒绝 |
+
+### 14.3 不变量（改这块代码必须保持）
+
+1. **目标仓库只来自服务端配置**，接口不接受请求方传入的 URL（否则就是任意代码执行入口）。
+2. **替换前必须自检**：下载物跑 `<新二进制> --help`，输出里要出现 `Komari Monitor <tag>`。
+   注意本项目的二进制**没有** `--version` flag（实测退出码 1），别改成它。
+3. **校验和先行**：`komari-SHA256SUMS` 缺失或对不上就拒绝安装并删除临时文件；
+   旧版本缺该资产时给出"用 install-komari.sh"的可操作提示。
+4. **旧二进制不丢**：替换前 `os.Rename` 成 `<二进制>.backup.<旧版本>`；任何一步失败都不覆盖它。
+5. **不做自动回滚**（0.0.8 的明确决策）：新二进制若在初始化阶段就崩，它自己没机会执行回滚；
+   兜底是 systemd 启动限流（`StartLimitBurst=5`/10s 后进入 failed，不会无限重启）+
+   "安装指定版本"手工回退。
+
+### 14.4 升级失败怎么救（照抄命令即可）
+
+```bash
+# 1) 看状态与备份路径
+journalctl -u komari -n 50 --no-pager | grep upgrade
+ls -l /opt/komari/komari.backup.* /opt/komari/.komari-upgrade* 2>/dev/null
+
+# 2) 用备份直接换回去
+systemctl stop komari
+mv /opt/komari/komari.backup.<旧版本> /opt/komari/komari
+systemctl start komari
+
+# 3) 或者重装指定版本（等价于回滚，脚本会做校验）
+KOMARI_TAG=<旧版本> bash install-komari.sh
+```
+
+### 14.5 安全边界（诚实写明）
+
+- 面板因此获得"下载并执行代码"的能力 → 限制为管理员 RPC、固定仓库、审计日志（`auditlog`）、可开关；
+- **SHA256 只保证"下载内容与发布清单一致"**：发布账号/发布流水线被攻破时它不提供保护；
+  签名体系（minisign/GPG）留待后续；
+- 故意**没有**给 `admin:upgradeServer` 标记 `rpc.MarkSensitive`：那会让每次调用都必须带 2FA 码，
+  而面板目前没有该提示流程。若后续接上提示，应把它加入敏感方法。

@@ -23,6 +23,11 @@ log_step() {
     echo -e "${YELLOW}$1${NC}"
 }
 
+# 警告：不影响流程但需要用户知道（例如旧版本没有发布校验和）
+log_warn() {
+    echo -e "${YELLOW}[警告] $1${NC}"
+}
+
 
 # Global variables
 INSTALL_DIR="/opt/komari"
@@ -36,7 +41,7 @@ LISTEN_PORT=""
 # 本仓库只维护自有的 0.0.x 版本线：安装/升级一律走本仓库，避免落到上游 latest（已是 1.5.x）。
 REPO="${KOMARI_REPO:-zhemed/komari}"
 # 自有发布 tag：本仓库只维护自有版本线，故锁定 tag 而非使用 latest。
-REPO_TAG="${KOMARI_TAG:-0.0.7}"
+REPO_TAG="${KOMARI_TAG:-0.0.8}"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
 # TUI 工具: whiptail / dialog / 空（回退纯文本）
@@ -272,6 +277,49 @@ install_dependencies() {
     fi
 }
 
+# 校验下载产物（尽力而为）：
+# 0.0.8 起每个 release 都带 komari-SHA256SUMS；≤0.0.7 的 release 没有该资产，
+# 此时只告警不失败——否则"回滚到旧版本"这条路径会被自己堵死。
+verify_download_checksum() {
+    local file=$1
+    local arch=$2
+    local asset_name="komari-linux-${arch}"
+    local sums_url="https://github.com/${REPO}/releases/download/${REPO_TAG}/komari-SHA256SUMS"
+    local sums_tmp
+    sums_tmp=$(mktemp 2>/dev/null || echo "/tmp/komari-sums.$$")
+
+    if ! curl -fsL -o "$sums_tmp" "$sums_url" 2>/dev/null; then
+        log_warn "该版本没有发布校验和（komari-SHA256SUMS），跳过校验：$REPO_TAG"
+        rm -f "$sums_tmp"
+        return 0
+    fi
+
+    local want
+    want=$(awk -v name="$asset_name" '$2 == name || $2 == "*" name {print $1}' "$sums_tmp" | head -1)
+    rm -f "$sums_tmp"
+    if [ -z "$want" ]; then
+        log_warn "校验和清单里没有 $asset_name，跳过校验"
+        return 0
+    fi
+
+    local got
+    if command -v sha256sum >/dev/null 2>&1; then
+        got=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        got=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        log_warn "系统缺少 sha256sum/shasum，跳过校验"
+        return 0
+    fi
+
+    if [ "$got" != "$want" ]; then
+        log_error "校验和不匹配：期望 $want，实际 $got"
+        return 1
+    fi
+    log_success "校验和匹配 ($asset_name)"
+    return 0
+}
+
 # Get download URL based on channel
 get_download_url() {
     local arch=$1
@@ -354,6 +402,12 @@ install_binary() {
 
     if ! curl -fL -o "$BINARY_PATH" "$download_url"; then
         ui_msgbox "错误" "下载失败，请检查网络连接。"
+        return 1
+    fi
+
+    if ! verify_download_checksum "$BINARY_PATH" "$arch"; then
+        rm -f "$BINARY_PATH"
+        ui_msgbox "错误" "下载文件校验失败，已删除，请重试。"
         return 1
     fi
 
@@ -496,6 +550,14 @@ upgrade_komari() {
         mv "$backup_path" "$BINARY_PATH"
         systemctl start ${SERVICE_NAME}.service
         ui_msgbox "错误" "下载失败，已从备份恢复。"
+        return 1
+    fi
+    if ! verify_download_checksum "$download_tmp" "$arch"; then
+        rm -f "$download_tmp"
+        log_error "校验失败，正在从备份恢复"
+        cp "$backup_path" "$BINARY_PATH"
+        systemctl start ${SERVICE_NAME}.service
+        ui_msgbox "错误" "下载文件校验失败，已从备份恢复。"
         return 1
     fi
     mv "$download_tmp" "$BINARY_PATH"

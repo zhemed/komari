@@ -94,6 +94,146 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [releasesSince, setReleasesSince] = useState<GithubReleaseInfo[]>([]);
 
+  // ---- 一键升级（服务端自升级）相关状态 ----
+  // 说明：升级动作全部由服务端执行（下载/校验/替换二进制/退出交 systemd 重启），
+  // 前端只负责触发与展示进度；容器/无 systemd 等形态由服务端返回 supported=false 或 pull 命令。
+  type UpgradePhase =
+    | "idle"
+    | "downloading"
+    | "verifying"
+    | "replacing"
+    | "restarting"
+    | "failed"
+    | "completed";
+  interface UpgradeStatusInfo {
+    phase: UpgradePhase;
+    from?: string;
+    to?: string;
+    error?: string;
+    backup_path?: string;
+    updates_dir?: string;
+    running?: boolean;
+    current_version?: string;
+    enabled?: boolean;
+    supported?: boolean;
+    platform?: string;
+    repo?: string;
+  }
+  const [upgradeStatus, setUpgradeStatus] = useState<UpgradeStatusInfo | null>(
+    null,
+  );
+  const [upgradeNote, setUpgradeNote] = useState("");
+  const [pullCommand, setPullCommand] = useState("");
+
+  const upgradePhaseLabel = (phase?: UpgradePhase) => {
+    switch (phase) {
+      case "downloading":
+        return t("upgrade.phase_downloading", "下载新版本中…");
+      case "verifying":
+        return t("upgrade.phase_verifying", "校验并自检中…");
+      case "replacing":
+        return t("upgrade.phase_replacing", "替换二进制中…");
+      case "restarting":
+        return t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…");
+      case "failed":
+        return t("upgrade.phase_failed", "升级失败");
+      case "completed":
+        return t("upgrade.phase_completed", "已就绪");
+      default:
+        return "";
+    }
+  };
+
+  // 轮询升级状态；服务重启会让请求失败，此时按“重启中”继续等版本号变化。
+  const pollUpgrade = (targetTag?: string) => {
+    const startedAt = Date.now();
+    const tick = async () => {
+      if (Date.now() - startedAt > 5 * 60 * 1000) {
+        setUpgradeNote(
+          t("upgrade.timeout", "升级状态轮询超时，请刷新页面确认版本"),
+        );
+        return;
+      }
+      try {
+        const st = await call<any, UpgradeStatusInfo>("admin:upgradeStatus", {});
+        setUpgradeStatus(st);
+        if (st.phase === "failed") {
+          setUpgradeNote(st.error || t("upgrade.phase_failed", "升级失败"));
+          return;
+        }
+        const current = (publicInfo as any)?.version || versionInfo?.version;
+        if (targetTag && st.current_version === targetTag && current !== targetTag) {
+          setUpgradeNote(t("upgrade.done", "升级完成，页面即将刷新"));
+          setTimeout(() => window.location.reload(), 1500);
+          return;
+        }
+        setUpgradeNote(upgradePhaseLabel(st.phase));
+        setTimeout(tick, 1000);
+      } catch {
+        setUpgradeNote(
+          t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…"),
+        );
+        fetch("/api/version", { cache: "no-store" })
+          .then((r) => r.json())
+          .then((d) => {
+            const v = d?.data?.version;
+            if (targetTag && v === targetTag) {
+              setUpgradeNote(t("upgrade.done", "升级完成，页面即将刷新"));
+              setTimeout(() => window.location.reload(), 1000);
+              return;
+            }
+          })
+          .catch(() => undefined);
+        setTimeout(tick, 2000);
+      }
+    };
+    tick();
+  };
+
+  const startUpgrade = async (tag?: string) => {
+    setPullCommand("");
+    setUpgradeNote(t("upgrade.starting", "正在开始升级…"));
+    try {
+      const res = await call<
+        { tag?: string },
+        {
+          started?: boolean;
+          manual?: boolean;
+          pull_command?: string;
+          message?: string;
+          to?: string;
+          from?: string;
+        }
+      >("admin:upgradeServer", tag ? { tag } : {});
+      if (res?.manual) {
+        setPullCommand(res.pull_command || "");
+        setUpgradeNote(
+          res.message || t("upgrade.hint_container", "容器内请拉取新镜像后重建容器"),
+        );
+        return;
+      }
+      setUpgradeNote(t("upgrade.started", "升级已开始：下载并校验新版本…"));
+      pollUpgrade(res?.to || tag);
+    } catch (e: any) {
+      setUpgradeNote(e?.message || String(e));
+    }
+  };
+
+  // 打开有新版提示时先取一次状态（是否支持、开关是否关闭、上次结果）
+  useEffect(() => {
+    if (!updateAvailable) return;
+    let ignore = false;
+    call<any, UpgradeStatusInfo>("admin:upgradeStatus", {})
+      .then((st) => {
+        if (!ignore) setUpgradeStatus(st);
+      })
+      .catch(() => undefined);
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateAvailable]);
+
   const currentTheme = publicInfo?.theme;
 
   // 动态扩展菜单（主题注入页面）
@@ -415,11 +555,86 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                                 opacity: 0.5,
                               }}
                             />
+                            {upgradeStatus?.supported &&
+                              upgradeStatus?.enabled !== false && (
+                                <div className="flex justify-end">
+                                  <Button
+                                    size="1"
+                                    variant="soft"
+                                    disabled={!!upgradeStatus?.running}
+                                    onClick={() =>
+                                      startUpgrade(r.tag_name || r.name)
+                                    }
+                                  >
+                                    {t("upgrade.install_version", "安装此版本")}
+                                  </Button>
+                                </div>
+                              )}
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="flex justify-end">
+                    {/* 一键升级：状态、拉取命令与出错信息 */}
+                    {upgradeStatus?.enabled === false && (
+                      <div className="text-xs text-muted-foreground">
+                        {t(
+                          "upgrade.disabled",
+                          "一键升级已在设置中关闭（可在系统设置里打开）",
+                        )}
+                      </div>
+                    )}
+                    {upgradeStatus &&
+                      upgradeStatus.enabled !== false &&
+                      !upgradeStatus.supported && (
+                        <div className="text-xs text-muted-foreground">
+                          {t(
+                            "upgrade.unsupported",
+                            "当前部署形态不支持一键升级（容器请拉镜像，前台运行请手工替换）",
+                          )}
+                          {upgradeStatus.platform
+                            ? ` · ${upgradeStatus.platform}`
+                            : ""}
+                        </div>
+                      )}
+                    {upgradeNote && (
+                      <div className="text-xs text-muted-foreground">
+                        {upgradeNote}
+                      </div>
+                    )}
+                    {pullCommand && (
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs break-all">{pullCommand}</code>
+                        <Button
+                          size="1"
+                          variant="soft"
+                          onClick={() =>
+                            navigator.clipboard?.writeText(pullCommand)
+                          }
+                        >
+                          {t("upgrade.copy_command", "复制命令")}
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      {upgradeStatus?.supported &&
+                        upgradeStatus?.enabled !== false &&
+                        latestRelease && (
+                          <Button
+                            disabled={!!upgradeStatus?.running}
+                            onClick={() =>
+                              startUpgrade(
+                                latestRelease?.tag_name || latestRelease?.name,
+                              )
+                            }
+                          >
+                            {t("upgrade.upgrade_now", "立即升级到 {{version}}", {
+                              version:
+                                latestRelease?.tag_name ||
+                                latestRelease?.name ||
+                                "",
+                            })}
+                          </Button>
+                        )}
                       <a
                         href={latestRelease?.html_url}
                         target="_blank"

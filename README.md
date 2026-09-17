@@ -95,6 +95,8 @@ docker run -d --name komari-agent --restart always \
   ghcr.io/zhemed/komari-agent:latest -e <面板地址> -t <节点Token>
 ```
 
+- **面板内一键升级服务器**：管理端"有新版本"弹窗里可直接升级或安装指定版本（= 回滚）；
+  下载后校验 `komari-SHA256SUMS`、替换前自检版本行、保留旧二进制备份；容器部署只提示拉镜像。
 - agent 由本仓库发布（与服务器同一条 `0.0.x` 线、同一个 release），**默认不自动升级**；
   要跟随发布加 `--enable-auto-update`（或环境变量 `AGENT_ENABLE_AUTO_UPDATE=1`）
 - Windows 用 `install-agent.ps1`；全部平台/架构见 release 资产列表

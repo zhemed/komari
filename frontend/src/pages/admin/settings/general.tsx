@@ -118,6 +118,42 @@ export default function GeneralSettings() {
           </Flex>
         </Flex>
       </SettingCardCollapse>
+      <>
+        <label className="text-xl font-bold">
+          {t("upgrade.settings_title", "服务器升级")}
+        </label>
+        {/* 一键升级的开关与来源仓库（后端键：server_upgrade_enabled / server_update_repo） */}
+        <SettingCardSwitch
+          title={t("upgrade.enable_title", "启用手动一键升级")}
+          description={t(
+            "upgrade.enable_description",
+            "关闭后面板不再显示升级按钮，接口也会拒绝升级请求。容器与无 systemd 的部署本来就无法一键升级。"
+          )}
+          defaultChecked={settings.server_upgrade_enabled !== false}
+          onChange={async (checked) => {
+            await updateSettingsWithToast(
+              { server_upgrade_enabled: checked } as any,
+              t
+            );
+          }}
+          className="km-page-admin-settings-general km-setting-card"
+        />
+        <SettingCardShortTextInput
+          title={t("upgrade.repo_title", "升级来源仓库")}
+          description={t(
+            "upgrade.repo_description",
+            "形如 owner/repo，只从该仓库的 release 下载；默认指本项目自有仓库。"
+          )}
+          defaultValue={settings.server_update_repo || "zhemed/komari"}
+          placeholder="zhemed/komari"
+          OnSave={async (data) => {
+            await updateSettingsWithToast(
+              { server_update_repo: String(data).trim() } as any,
+              t
+            );
+          }}
+        />
+      </>
     </>
   );
 }

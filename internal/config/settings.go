@@ -61,4 +61,9 @@ const (
 	UpdatedAtKey          = "updated_at"
 	XtermjsSettingsKey    = "xtermjs_settings"
 	ThemeMarketSourcesKey = "theme_market_sources"
+
+	// 面板一键升级（见 internal/upgrade）：开关与目标仓库用扁平的独立键，
+	// 与设置页其它项一致（通用设置接口直接写这两个键，写入前有格式校验）。
+	ServerUpgradeEnabledKey = "server_upgrade_enabled"
+	ServerUpdateRepoKey     = "server_update_repo"
 )
