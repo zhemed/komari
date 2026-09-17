@@ -1326,6 +1326,7 @@
       "copy_command": "コマンドをコピー",
       "copy_pull_command": "更新コマンドをコピー",
       "disabled": "ワンクリック更新は設定で無効になっています",
+      "docker_socket_hint": "このモードはマウントされた Docker socket 経由でイメージを取得しコンテナを再作成します。コンテナにホスト相当の権限を与えることになります。",
       "done": "更新が完了しました。ページを再読み込みします",
       "enable_description": "無効にするとパネルに更新ボタンが表示されず、API も更新要求を拒否します。コンテナや systemd なしの構成は元々ワンクリック更新できません。",
       "enable_title": "手動ワンクリック更新を有効にする",
@@ -1345,7 +1346,8 @@
       "timeout": "更新状態のポーリングがタイムアウトしました。ページを再読み込みして確認してください",
       "title": "サーバー更新",
       "unsupported": "この構成ではワンクリック更新は利用できません（コンテナはイメージを取得、フォアグラウンド実行は手動で置き換えてください）",
-      "upgrade_now": "{{version}} に更新"
+      "upgrade_now": "{{version}} に更新",
+      "upgrade_now_container": "{{version}} へ更新（コンテナを再作成）"
   },
   "userAgent": {
     "android": "Android",

@@ -107,6 +107,8 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
     | "completed";
   interface UpgradeStatusInfo {
     phase: UpgradePhase;
+    mode?: "binary" | "docker-recreate" | "manual" | "download-only";
+    detail?: string;
     from?: string;
     to?: string;
     error?: string;
@@ -125,6 +127,16 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   const [upgradeNote, setUpgradeNote] = useState("");
   const [pullCommand, setPullCommand] = useState("");
 
+  // 是否由服务端自动完成升级（二进制替换或重建容器）；manual/download-only 只能给命令或只下载。
+  const canAutoUpgrade = !!upgradeStatus?.supported;
+  const isDockerRecreate = upgradeStatus?.mode === "docker-recreate";
+  const autoUpgradeLabel = (version: string) =>
+    isDockerRecreate
+      ? t("upgrade.upgrade_now_container", "立即升级（重建容器）到 {{version}}", {
+          version,
+        })
+      : t("upgrade.upgrade_now", "立即升级到 {{version}}", { version });
+
   const upgradePhaseLabel = (phase?: UpgradePhase) => {
     switch (phase) {
       case "downloading":
@@ -132,7 +144,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
       case "verifying":
         return t("upgrade.phase_verifying", "校验并自检中…");
       case "replacing":
-        return t("upgrade.phase_replacing", "替换二进制中…");
+        return isDockerRecreate
+          ? t("upgrade.phase_recreating", "正在重建容器…")
+          : t("upgrade.phase_replacing", "替换二进制中…");
       case "restarting":
         return t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…");
       case "failed":
@@ -558,7 +572,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                             {/* 能一键升级 → 升级按钮；不能（容器/无 systemd）→ 给可复制的命令入口。
                                 两者的区别只是服务端会不会真的替换二进制，前端入口都要有：
                                 0.0.9 的缺口就是"不支持"时把入口一起藏了，用户拿不到命令。 */}
-                            {upgradeStatus?.enabled !== false && (
+                            {upgradeStatus && upgradeStatus.enabled !== false && (
                               <div className="flex justify-end">
                                 <Button
                                   size="1"
@@ -568,7 +582,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                                     startUpgrade(r.tag_name || r.name)
                                   }
                                 >
-                                  {upgradeStatus?.supported
+                                  {canAutoUpgrade
                                     ? t("upgrade.install_version", "安装此版本")
                                     : t(
                                         "upgrade.copy_pull_command",
@@ -603,6 +617,14 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                             : ""}
                         </div>
                       )}
+                    {isDockerRecreate && (
+                      <div className="text-xs text-muted-foreground">
+                        {t(
+                          "upgrade.docker_socket_hint",
+                          "该模式通过挂载的 Docker socket 拉取镜像并重建容器——等于把宿主控制权交给本容器，请确认这是你想要的。",
+                        )}
+                      </div>
+                    )}
                     {upgradeNote && (
                       <div className="text-xs text-muted-foreground">
                         {upgradeNote}
@@ -623,9 +645,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                       </div>
                     )}
                     <div className="flex justify-end gap-2">
-                      {upgradeStatus?.enabled !== false && latestRelease && (
+                      {upgradeStatus && upgradeStatus.enabled !== false && latestRelease && (
                         <Button
-                          variant={upgradeStatus?.supported ? undefined : "soft"}
+                          variant={canAutoUpgrade ? undefined : "soft"}
                           disabled={!!upgradeStatus?.running}
                           onClick={() =>
                             startUpgrade(
@@ -633,16 +655,11 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                             )
                           }
                         >
-                          {upgradeStatus?.supported
-                            ? t(
-                                "upgrade.upgrade_now",
-                                "立即升级到 {{version}}",
-                                {
-                                  version:
-                                    latestRelease?.tag_name ||
-                                    latestRelease?.name ||
-                                    "",
-                                },
+                          {canAutoUpgrade
+                            ? autoUpgradeLabel(
+                                latestRelease?.tag_name ||
+                                  latestRelease?.name ||
+                                  "",
                               )
                             : t(
                                 "upgrade.copy_pull_command",

@@ -1326,6 +1326,7 @@
       "copy_command": "复制命令",
       "copy_pull_command": "复制升级命令",
       "disabled": "一键升级已在设置中关闭（可在系统设置里打开）",
+      "docker_socket_hint": "该模式通过挂载的 Docker socket 拉取镜像并重建容器——等于把宿主控制权交给本容器，请确认这是你想要的。",
       "done": "升级完成，页面即将刷新",
       "enable_description": "关闭后面板不再显示升级按钮，接口也会拒绝升级请求。容器与无 systemd 的部署本来就无法一键升级。",
       "enable_title": "启用手动一键升级",
@@ -1345,7 +1346,8 @@
       "timeout": "升级状态轮询超时，请刷新页面确认版本",
       "title": "服务器升级",
       "unsupported": "当前部署形态不支持一键升级（容器请拉镜像，前台运行请手工替换）",
-      "upgrade_now": "立即升级到 {{version}}"
+      "upgrade_now": "立即升级到 {{version}}",
+      "upgrade_now_container": "立即升级（重建容器）到 {{version}}"
   },
   "userAgent": {
     "android": "安卓",

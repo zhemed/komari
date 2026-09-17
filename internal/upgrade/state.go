@@ -24,11 +24,17 @@ const (
 // Status 是升级状态。进程重启后仍能读到（落盘在 data/upgrade-state.json），
 // 因此面板在重启完成后可以显示"上次升级的结果"。
 type Status struct {
-	Phase      Phase     `json:"phase"`
-	From       string    `json:"from,omitempty"`
-	To         string    `json:"to,omitempty"`
-	Error      string    `json:"error,omitempty"`
-	BackupPath string    `json:"backup_path,omitempty"`
+	Phase Phase  `json:"phase"`
+	From  string `json:"from,omitempty"`
+	To    string `json:"to,omitempty"`
+	Error string `json:"error,omitempty"`
+	// BackupPath：二进制模式 = 旧二进制的备份路径；docker 模式 = 旧容器的名字（保留为回滚点）。
+	BackupPath string `json:"backup_path,omitempty"`
+	// Image / Digest 仅 docker 模式使用：目标镜像与拉取到的 digest（审计）。
+	Image  string `json:"image,omitempty"`
+	Digest string `json:"digest,omitempty"`
+	// Detail 是给面板看的细节（如拉取进度、"recreating container"）。
+	Detail     string    `json:"detail,omitempty"`
 	UpdatesDir string    `json:"updates_dir,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at"`
 

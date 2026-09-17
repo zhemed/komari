@@ -1326,6 +1326,7 @@
       "copy_command": "Copy command",
       "copy_pull_command": "Copy upgrade command",
       "disabled": "One-click upgrade is disabled in settings",
+      "docker_socket_hint": "This mode pulls the image and recreates the container via the mounted Docker socket — that grants this container host-level control. Make sure you want this.",
       "done": "Upgrade complete, reloading the page",
       "enable_description": "When disabled the panel hides the upgrade buttons and the API rejects upgrade requests. Container and non-systemd deployments cannot self-upgrade regardless.",
       "enable_title": "Enable manual one-click upgrade",
@@ -1345,7 +1346,8 @@
       "timeout": "Timed out waiting for upgrade status; refresh to confirm the version",
       "title": "Server upgrade",
       "unsupported": "One-click upgrade is not supported in this deployment (pull the image in containers, replace manually when running in the foreground)",
-      "upgrade_now": "Upgrade to {{version}}"
+      "upgrade_now": "Upgrade to {{version}}",
+      "upgrade_now_container": "Upgrade (recreate container) to {{version}}"
   },
   "userAgent": {
     "android": "Android",

@@ -20,7 +20,9 @@
 | `internal/upgrade/install.go` | 部署形态探测（容器/ systemd / 目录可写）、`--help` 自检、备份 + 原子替换 |
 | `internal/upgrade/state.go` | 阶段状态与 `upgrade-state.json`（原子写）；`Reconcile` 把 restarting 收敛成 completed |
 | `internal/upgrade/upgrade.go` | `Prepare`（解析目标 + 前置检查 + 取校验和）与 `Execute`（下载→校验→自检→替换） |
-| `web/rpc/jsonrpc/admin.upgrade.go` | 5 个 admin RPC + 设置读取 + 审计日志 + 退出口 |
+| `internal/dockerapi/*` | Docker Engine API 最小客户端（unix socket）：拉镜像、inspect、改名、建/起/停/删容器、日志；`Recreate` 含回滚 |
+| `cmd/dockerSelfRecreate.go` | helper 子命令 `komari docker-self-recreate`：由旧容器启动、跑在独立容器里执行重建 |
+| `web/rpc/jsonrpc/admin.upgrade.go` | 4 个 admin RPC + 设置读取 + 审计日志 + 退出口（helper 接管时不退出） |
 
 RPC：`admin:getServerUpgradeSettings`、`admin:listServerReleases`、`admin:upgradeServer`、
 `admin:upgradeStatus`（`admin:setServerUpgradeSettings` 已删除：设置走通用设置接口）。
@@ -46,7 +48,8 @@ DB 路径在 `cmd` 包里，导入会成环；升级本来就要写二进制目�
 | 形态 | 结果 |
 |---|---|
 | linux + systemd + 可写 | 完整替换 |
-| 容器（`/.dockerenv`） | `Plan.Manual=true` + `PullHint()`，`Execute` 不做任何替换 |
+| 容器 + **有可用 docker socket** | `Mode=docker-recreate`：拉镜像（进度）→ 起 helper 容器重建自身（`internal/dockerapi`） |
+| 容器 + **无 socket** | `Mode=manual`：`PullHint()`，`Execute` 不做任何替换 |
 | 无 `/run/systemd/system` | `Plan.DownloadOnly=true`，落 `<二进制目录>/upgrades/` 或 `$TMPDIR/komari-upgrades` |
 | darwin/windows/其它架构 | `ServerAssetName` 返回 false → 报错 |
 
@@ -60,6 +63,12 @@ DB 路径在 `cmd` 包里，导入会成环；升级本来就要写二进制目�
 3. 替换 = `os.Rename(旧→backup)` + `os.Rename(新→正式)`；第二步失败要尝试把 backup 换回来。
 4. 不做自动回滚（0.0.8 决策）：兜底为 systemd 启动限流 + "安装指定版本" + 备份文件。
 5. 并发保护：`upgrade.IsRunning()` + `upgradeStartMu`，重复触发返回"已有升级任务在进行中"。
+6. **容器重建模式的顺序不可改**：预检（新镜像 `--help` 含版本行）→ 旧容器改名 →
+   建同名新容器（沿用旧 Config/HostConfig/网络）→ **停旧** → 起新；失败则删半成品 + 改名回滚 + 启动旧容器。
+   helper 必须跑在**独立容器**里（自己不能重建自己）；helper 用**目标镜像**启动（它必然带该子命令）。
+7. 重建时若旧 `Config.Hostname` 等于旧容器短 ID，必须删掉该字段（否则新容器被钉上旧 ID，
+   而"自身容器识别"依赖 hostname==短 ID）。
+8. 容器模式仍受 `server_upgrade_enabled` 约束；socket 存在本身就意味着用户显式选择了这个能力。
 
 ---
 

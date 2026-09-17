@@ -36,6 +36,8 @@ const defaultUpgradeRepo = "zhemed/komari"
 type serverUpgradeSettings struct {
 	Repo    string `json:"repo"`
 	Enabled bool   `json:"enabled"`
+	// Socket：docker socket 路径（容器一键升级用）。
+	Socket string `json:"socket"`
 }
 
 // loadServerUpgradeSettings 读取设置并补齐缺省值（配置缺失时不应让功能不可用）。
@@ -48,7 +50,11 @@ func loadServerUpgradeSettings() serverUpgradeSettings {
 	if err != nil {
 		enabled = true
 	}
-	return serverUpgradeSettings{Repo: repo, Enabled: enabled}
+	socket, err := config.GetAs[string](config.ServerUpgradeDockerSocketKey, upgrade.DefaultDockerSocket)
+	if err != nil || strings.TrimSpace(socket) == "" {
+		socket = upgrade.DefaultDockerSocket
+	}
+	return serverUpgradeSettings{Repo: repo, Enabled: enabled, Socket: socket}
 }
 
 // validateUpgradeSettingChanges 供通用设置接口（admin:editSettings）在落库前调用，
@@ -84,12 +90,16 @@ func init() {
 
 func adminGetServerUpgradeSettings(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
 	s := loadServerUpgradeSettings()
+	mode := upgrade.CurrentMode(context.Background(), s.Socket)
 	return map[string]any{
 		"repo":    s.Repo,
 		"enabled": s.Enabled,
-		// 当前形态是否真能一键升级：容器/无 systemd/非 linux 都会在这里体现，供前端决定按钮文案。
-		"supported": upgradeSupported(),
+		// mode 决定前端文案：binary=二进制替换；docker-recreate=重建容器；
+		// manual=容器没挂 socket，只能给命令；download-only=无 systemd，只下载。
+		"mode":      string(mode),
+		"supported": mode == upgrade.ModeBinary || mode == upgrade.ModeDockerRecreate,
 		"platform":  upgradePlatform(),
+		"socket":    s.Socket,
 	}, nil
 }
 
@@ -124,7 +134,7 @@ func adminListServerReleases(ctx context.Context, req *rpc.JsonRpcRequest) (any,
 		"current_version":  utils.CurrentVersion,
 		"repo":             settings.Repo,
 		"checksum_asset":   upgrade.ChecksumAssetName,
-		"upgrade_supports": upgradeSupported(),
+		"upgrade_supports": upgradeSupports(context.Background(), settings.Socket),
 	}, nil
 }
 
@@ -201,6 +211,12 @@ func runServerUpgrade(opts upgrade.Options, plan upgrade.Plan) {
 		logger.Infof("upgrade", "已下载 %s 到 %s（当前进程没有 systemd 接管，未替换二进制）", res.To, res.DownloadPath)
 		return
 	}
+	if res.HandledByHelper {
+		// 容器重建模式：helper 会负责停掉本容器并用新镜像重建，这里**不能**自己退出
+		// （我们一退出，docker 会按 restart 策略把我们拉起来，和 helper 抢改名/端口）。
+		logger.Infof("upgrade", "已启动 helper 容器 %s 执行容器重建（%s → %s）", res.HelperContainerID, res.From, res.To)
+		return
+	}
 	logger.Infof("upgrade", "已替换为 %s（备份 %s），退出等待 systemd 拉起", res.To, res.BackupPath)
 	upgradeExit(42)
 }
@@ -212,7 +228,12 @@ func adminUpgradeStatus(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.Jso
 		// 内存态为空（例如刚重启）：读落盘状态，并把 restarting→completed 收敛。
 		st = upgrade.Reconcile(upgradeStateDir(), utils.CurrentVersion)
 	}
+	mode := upgrade.CurrentMode(context.Background(), settings.Socket)
 	return map[string]any{
+		"mode":            string(mode),
+		"detail":          st.Detail,
+		"image":           st.Image,
+		"digest":          st.Digest,
 		"phase":           st.Phase,
 		"from":            st.From,
 		"to":              st.To,
@@ -224,7 +245,7 @@ func adminUpgradeStatus(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.Jso
 		"current_version": utils.CurrentVersion,
 		"enabled":         settings.Enabled,
 		"repo":            settings.Repo,
-		"supported":       upgradeSupported(),
+		"supported":       mode == upgrade.ModeBinary || mode == upgrade.ModeDockerRecreate,
 		"platform":        upgradePlatform(),
 	}, nil
 }
@@ -252,6 +273,7 @@ func buildUpgradeOptions(settings serverUpgradeSettings) (upgrade.Options, error
 		CurrentTag: utils.CurrentVersion,
 		BinaryPath: exe,
 		StateDir:   filepath.Dir(exe),
+		SocketPath: settings.Socket,
 	}, nil
 }
 
@@ -263,17 +285,15 @@ func upgradeStateDir() string {
 	return filepath.Dir(exe)
 }
 
-// upgradeSupported 返回当前形态能否做一键替换（容器/无 systemd 都不行）。
-func upgradeSupported() bool {
-	env, err := upgrade.DetectEnvironment("")
-	if err != nil {
+// upgradeSupports 返回当前形态能否**自动**完成升级：
+// 二进制 + systemd，或容器 + 可用的 docker socket（重建容器）。
+func upgradeSupports(ctx context.Context, socket string) bool {
+	switch upgrade.CurrentMode(ctx, socket) {
+	case upgrade.ModeBinary, upgrade.ModeDockerRecreate:
+		return true
+	default:
 		return false
 	}
-	if env.Container || !env.Systemd || !env.DirWritable {
-		return false
-	}
-	_, ok := upgrade.ServerAssetName(upgradePlatformPair())
-	return ok
 }
 
 func upgradePlatformPair() (string, string) { return runtime.GOOS, runtime.GOARCH }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/komari-monitor/komari/internal/dockerapi"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -192,6 +193,8 @@ func TestPrepareContainerReturnsPullCommandOnly(t *testing.T) {
 		Repo: "owner/repo", CurrentTag: "0.0.7", BinaryPath: filepath.Join(dir, "komari"), StateDir: dir,
 		VersionLister: fake.client(), Probe: probeFor("0.0.8"),
 		Env: &Environment{Container: true, Systemd: true, DirWritable: true},
+		// 不存在的 socket：确保走"没挂 socket"的手工分支，不受测试机环境（是否装了 docker）影响
+		SocketPath: filepath.Join(dir, "no-such-docker.sock"),
 	}
 	plan, err := Prepare(ctx, o, "")
 	if err != nil {
@@ -279,5 +282,76 @@ func TestFetchChecksumsMissingAssetGivesActionableError(t *testing.T) {
 	_, err = c.FetchChecksums(ctx, r)
 	if err == nil || !strings.Contains(err.Error(), "install-komari.sh") {
 		t.Fatalf("缺校验和资产时要给出可操作的提示，实际 %v", err)
+	}
+}
+
+// 容器里没挂可用的 docker socket 时必须回落到手工模式（不能试图重建容器）。
+func TestPrepareContainerWithoutUsableSocketStaysManual(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	fake := newFakeReleaseServer(t, "0.0.8", []byte("payload"), false)
+	o := Options{
+		Repo: "owner/repo", CurrentTag: "0.0.7", BinaryPath: filepath.Join(dir, "komari"), StateDir: dir,
+		VersionLister: fake.client(), Probe: probeFor("0.0.8"),
+		Env:        &Environment{Container: true, Systemd: true, DirWritable: true},
+		SocketPath: filepath.Join(dir, "missing.sock"),
+	}
+	plan, err := Prepare(ctx, o, "0.0.8")
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if plan.Mode != ModeManual || !plan.Manual {
+		t.Fatalf("无 socket 时应为手工模式，实际 mode=%s manual=%v", plan.Mode, plan.Manual)
+	}
+	if !strings.Contains(plan.PullCommand, "docker pull ") {
+		t.Fatalf("手工模式要给出可复制命令：%q", plan.PullCommand)
+	}
+}
+
+// helper 容器的参数与挂载必须正确：用目标镜像、带重建参数、只挂 socket 与数据目录。
+func TestHelperPayloadAndBinds(t *testing.T) {
+	self := dockerapi.Container{
+		ID:   "abcdefabcdefabcdef",
+		Name: "/komari",
+		Mounts: []dockerapi.Mount{
+			{Type: "bind", Source: "/srv/komari/data", Destination: "/app/data"},
+			{Type: "bind", Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"},
+		},
+	}
+	binds := helperBinds(self, DefaultDockerSocket, "/app/data")
+	if len(binds) != 2 {
+		t.Fatalf("应挂 socket 与数据目录，实际 %v", binds)
+	}
+	joined := strings.Join(binds, ",")
+	if !strings.Contains(joined, "/var/run/docker.sock:/var/run/docker.sock") {
+		t.Fatalf("socket 挂载缺失：%v", binds)
+	}
+	if !strings.Contains(joined, "/srv/komari/data:/app/data") {
+		t.Fatalf("数据目录应用宿主路径挂载：%v", binds)
+	}
+
+	payload := helperPayload("ghcr.io/zhemed/komari:0.0.11", self.ID, "ghcr.io/zhemed/komari:0.0.11",
+		"0.0.11", "/app/data", DefaultDockerSocket, "", binds)
+	cmd, _ := payload["Cmd"].([]string)
+	joinedCmd := strings.Join(cmd, " ")
+	for _, want := range []string{"docker-self-recreate", "--container abcdefabcdefabcdef", "--image ghcr.io/zhemed/komari:0.0.11", "--sanity-tag 0.0.11", "--state-dir /app/data"} {
+		if !strings.Contains(joinedCmd, want) {
+			t.Errorf("helper 命令缺少 %q：%s", want, joinedCmd)
+		}
+	}
+	hc, _ := payload["HostConfig"].(map[string]any)
+	if hc["AutoRemove"] != true || hc["NetworkMode"] != "none" {
+		t.Fatalf("helper 的 HostConfig 不符合预期：%+v", hc)
+	}
+}
+
+// 数据目录没挂出来时不应硬塞一个错误的卷映射。
+func TestHelperBindsSkipsUnmountedStateDir(t *testing.T) {
+	self := dockerapi.Container{
+		Mounts: []dockerapi.Mount{{Type: "bind", Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"}},
+	}
+	binds := helperBinds(self, DefaultDockerSocket, "/app/data")
+	if len(binds) != 1 {
+		t.Fatalf("只应挂 socket，实际 %v", binds)
 	}
 }

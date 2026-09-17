@@ -1326,6 +1326,7 @@
       "copy_command": "複製指令",
       "copy_pull_command": "複製升級指令",
       "disabled": "一鍵升級已在設定中關閉（可在系統設定裡開啟）",
+      "docker_socket_hint": "此模式會透過掛載的 Docker socket 拉取映像並重建容器——等於把宿主控制權交給本容器，請確認這是你要的。",
       "done": "升級完成，頁面即將重新整理",
       "enable_description": "關閉後面板不再顯示升級按鈕，介面也會拒絕升級請求。容器與無 systemd 的部署本來就無法一鍵升級。",
       "enable_title": "啟用手動一鍵升級",
@@ -1345,7 +1346,8 @@
       "timeout": "升級狀態輪詢逾時，請重新整理頁面確認版本",
       "title": "伺服器升級",
       "unsupported": "目前部署形態不支援一鍵升級（容器請拉映像檔，前景執行請手動替換）",
-      "upgrade_now": "立即升級到 {{version}}"
+      "upgrade_now": "立即升級到 {{version}}",
+      "upgrade_now_container": "立即升級（重建容器）到 {{version}}"
   },
   "userAgent": {
     "android": "安卓",

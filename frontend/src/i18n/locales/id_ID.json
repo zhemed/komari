@@ -1326,6 +1326,7 @@
       "copy_command": "Salin perintah",
       "copy_pull_command": "Salin perintah pembaruan",
       "disabled": "Pembaruan sekali klik dinonaktifkan di pengaturan",
+      "docker_socket_hint": "Mode ini menarik image dan membuat ulang container melalui Docker socket yang di-mount — itu memberi container ini kendali setara host.",
       "done": "Pembaruan selesai, memuat ulang halaman",
       "enable_description": "Jika dinonaktifkan, panel tidak menampilkan tombol pembaruan dan API menolak permintaan pembaruan. Deployment container dan tanpa systemd memang tidak bisa memperbarui sendiri.",
       "enable_title": "Aktifkan pembaruan manual sekali klik",
@@ -1345,7 +1346,8 @@
       "timeout": "Waktu tunggu status pembaruan habis; muat ulang halaman untuk memastikan versi",
       "title": "Pembaruan server",
       "unsupported": "Pembaruan sekali klik tidak didukung pada mode ini (container: tarik image, foreground: ganti manual)",
-      "upgrade_now": "Perbarui ke {{version}}"
+      "upgrade_now": "Perbarui ke {{version}}",
+      "upgrade_now_container": "Perbarui (buat ulang container) ke {{version}}"
   },
   "userAgent": {
     "android": "Android",

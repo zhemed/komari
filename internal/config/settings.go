@@ -66,4 +66,6 @@ const (
 	// 与设置页其它项一致（通用设置接口直接写这两个键，写入前有格式校验）。
 	ServerUpgradeEnabledKey = "server_upgrade_enabled"
 	ServerUpdateRepoKey     = "server_update_repo"
+	// ServerUpgradeDockerSocketKey：容器一键升级用的 docker socket 路径（默认 /var/run/docker.sock）。
+	ServerUpgradeDockerSocketKey = "server_upgrade_docker_socket"
 )

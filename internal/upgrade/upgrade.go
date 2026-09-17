@@ -28,13 +28,19 @@ type Options struct {
 	// 偏离设计说明（2026-09-17）：原设计写"data 目录"，但仓库里没有能从 web 层安全使用的
 	// 数据目录 helper（DB 路径在 cmd 包里，web→cmd 会形成导入环）。改用二进制同目录：
 	// 升级本就要写这个目录（临时文件 + 原子替换），前置检查也已确认它可写。
-	StateDir      string
-	Image         string // 容器提示用镜像名，空则 DefaultImage
-	HTTP          *http.Client
-	APIBase       string
-	Probe         VersionProbe // 自检探针，测试可注入
-	Env           *Environment // 部署形态，测试可注入；nil 时自动探测
-	VersionLister *Client      // 测试可注入；nil 时按 Repo/HTTP/APIBase 构造
+	StateDir string
+	// SocketPath 是 docker socket 路径（仅容器形态用），空则 DefaultDockerSocket。
+	SocketPath string
+	// SelfContainerID 是可选的自身容器 ID（测试注入用）；空则运行时探测。
+	SelfContainerID string
+	// ImageBinaryPath 是镜像内 komari 二进制路径，空则 DefaultImageBinaryPath。
+	ImageBinaryPath string
+	Image           string // 容器提示用镜像名，空则 DefaultImage
+	HTTP            *http.Client
+	APIBase         string
+	Probe           VersionProbe // 自检探针，测试可注入
+	Env             *Environment // 部署形态，测试可注入；nil 时自动探测
+	VersionLister   *Client      // 测试可注入；nil 时按 Repo/HTTP/APIBase 构造
 }
 
 func (o Options) client() *Client {
@@ -64,6 +70,14 @@ func (o Options) updatesDir(env Environment) string {
 	return filepath.Join(os.TempDir(), "komari-upgrades")
 }
 
+// socketPath 返回 docker socket 路径。
+func (o Options) socketPath() string {
+	if strings.TrimSpace(o.SocketPath) != "" {
+		return strings.TrimSpace(o.SocketPath)
+	}
+	return DefaultDockerSocket
+}
+
 func (o Options) image() string {
 	if strings.TrimSpace(o.Image) != "" {
 		return strings.TrimSpace(o.Image)
@@ -71,17 +85,35 @@ func (o Options) image() string {
 	return DefaultImage
 }
 
+// Mode 说明这次升级"用什么方式做"，前端据此决定按钮文案与提示。
+type Mode string
+
+const (
+	// ModeBinary：二进制 + systemd —— 下载 → 校验 → 自检 → 原子替换 → 退出交 systemd 拉起。
+	ModeBinary Mode = "binary"
+	// ModeDockerRecreate：容器 + 挂了 docker socket —— 拉镜像 → helper 容器重建自身容器。
+	ModeDockerRecreate Mode = "docker-recreate"
+	// ModeManual：容器但没挂 socket —— 只给可复制的 pull 命令，不替换任何东西。
+	ModeManual Mode = "manual"
+	// ModeDownloadOnly：无 systemd 的前台运行 —— 只下载，不替换不退出。
+	ModeDownloadOnly Mode = "download-only"
+)
+
 // Plan 是"要做什么"的描述：由 Prepare 产出，可被 RPC 直接回给前端。
 type Plan struct {
-	From         string `json:"from"`
-	To           string `json:"to"`
-	AssetName    string `json:"asset_name,omitempty"`
-	Manual       bool   `json:"manual"` // 容器：必须手工拉镜像，服务端不做任何替换
-	PullCommand  string `json:"pull_command,omitempty"`
-	DownloadOnly bool   `json:"download_only"` // 无服务管理器：只下载，不替换不退出
-	DownloadPath string `json:"download_path,omitempty"`
-	assetURL     string
-	checksum     string
+	From            string `json:"from"`
+	To              string `json:"to"`
+	Mode            Mode   `json:"mode"`
+	TargetImage     string `json:"target_image,omitempty"`
+	SocketPath      string `json:"socket_path,omitempty"`
+	SelfContainerID string `json:"-"`
+	AssetName       string `json:"asset_name,omitempty"`
+	Manual          bool   `json:"manual"` // 容器：必须手工拉镜像，服务端不做任何替换
+	PullCommand     string `json:"pull_command,omitempty"`
+	DownloadOnly    bool   `json:"download_only"` // 无服务管理器：只下载，不替换不退出
+	DownloadPath    string `json:"download_path,omitempty"`
+	assetURL        string
+	checksum        string
 }
 
 // Result 是执行结果。
@@ -91,6 +123,10 @@ type Result struct {
 	BackupPath   string `json:"backup_path,omitempty"`
 	DownloadOnly bool   `json:"download_only,omitempty"`
 	DownloadPath string `json:"download_path,omitempty"`
+	// HelperContainerID：容器重建模式下的 helper 容器（审计与排障用）。
+	HelperContainerID string `json:"helper_container_id,omitempty"`
+	// HandledByHelper：true 表示后续动作由 helper 完成，调用方**不要**自己退出进程。
+	HandledByHelper bool `json:"handled_by_helper,omitempty"`
 }
 
 // Prepare 解析目标版本、做前置检查、取校验和，产出可执行计划。
@@ -129,9 +165,21 @@ func Prepare(ctx context.Context, o Options, tag string) (Plan, error) {
 		return Plan{}, err
 	}
 	if env.Container {
-		// 容器里替换二进制会随容器重建丢失：只给可复制的拉取命令。
-		plan.Manual = true
-		plan.PullCommand = PullHint(o.image(), target.Tag)
+		// 容器形态分两种：
+		//  - 挂了 docker socket → 通过 Docker API 重建自身容器（真正的一键升级，2026-09-17 起支持）；
+		//  - 没挂 socket → 只给可复制的拉取命令（原行为，不回归）。
+		selfID, sockErr := dockerSocketReady(ctx, o.socketPath())
+		if sockErr != nil {
+			plan.Mode = ModeManual
+			plan.Manual = true
+			plan.PullCommand = PullHint(o.image(), target.Tag)
+			return plan, nil
+		}
+		o.SelfContainerID = selfID
+		plan.Mode = ModeDockerRecreate
+		plan.TargetImage = o.resolveTargetImage(ctx, target.Tag)
+		plan.SocketPath = o.socketPath()
+		plan.SelfContainerID = selfID
 		return plan, nil
 	}
 	assetName, ok := ServerAssetName(runtime.GOOS, runtime.GOARCH)
@@ -155,6 +203,7 @@ func Prepare(ctx context.Context, o Options, tag string) (Plan, error) {
 		return Plan{}, fmt.Errorf("%s 里 %s 的校验和为空", ChecksumAssetName, assetName)
 	}
 
+	plan.Mode = ModeBinary
 	plan.AssetName = assetName
 	plan.assetURL = asset.URL
 	plan.checksum = sum
@@ -162,6 +211,7 @@ func Prepare(ctx context.Context, o Options, tag string) (Plan, error) {
 	if !env.Systemd {
 		// 没有服务管理器接手：只下载 + 给命令，绝不自杀式退出。
 		plan.DownloadOnly = true
+		plan.Mode = ModeDownloadOnly
 		plan.DownloadPath = filepath.Join(o.updatesDir(env), assetName)
 		return plan, nil
 	}
@@ -176,6 +226,9 @@ func Prepare(ctx context.Context, o Options, tag string) (Plan, error) {
 func Execute(ctx context.Context, o Options, p Plan) (Result, error) {
 	if p.Manual {
 		return Result{From: p.From, To: p.To, DownloadOnly: true}, nil
+	}
+	if p.Mode == ModeDockerRecreate {
+		return o.executeDockerRecreate(ctx, p)
 	}
 	if p.assetURL == "" {
 		return Result{}, fmt.Errorf("计划缺少下载地址（Prepare 未成功执行）")

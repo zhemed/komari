@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.10）
+# 维护本仓库（komari 自维护版 · 当前 0.0.11）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.10**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.11**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.10`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.11`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -592,7 +592,8 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 | 部署形态 | 行为 |
 |---|---|
 | linux/amd64、linux/arm64 + systemd + 目录可写 | ✅ 下载 → 校验 → 自检 → 备份 + 原子替换 → 退出交 systemd 拉起 |
-| 容器 | ⚠️ 不替换二进制（会随容器重建丢失）：仅返回 `docker pull ghcr.io/zhemed/komari:<tag>` 供复制 |
+| 容器 **挂了 docker socket** | ✅ 通过 Docker Engine API 拉镜像 + helper 容器重建自身容器（见 §14.6） |
+| 容器 **没挂 socket** | ⚠️ 不替换任何东西：仅返回 `docker pull ghcr.io/zhemed/komari:<tag>` 供复制 |
 | 无 systemd（前台裸跑） | ⚠️ 仅下载到 `<二进制目录>/upgrades/`（不可写则退到 `$TMPDIR/komari-upgrades`），不退出不替换 |
 | darwin / windows / 其它架构 | ❌ 没有发布资产，接口直接拒绝 |
 
@@ -631,6 +632,32 @@ KOMARI_TAG=<旧版本> bash install-komari.sh
 但面板上"一键升级"在那个版本上等于不可用。0.0.9 修复（下载后先补执行位再自检），
 并加了回归测试断言"被自检的文件必须可执行"（去掉修复即 FAIL，验证过测试不是永真）。
 要避开这段窗口：0.0.8 用 `install-komari.sh` 升一次，之后面板升级即可正常工作。
+
+### 14.6 容器一键升级（挂 docker socket 时，0.0.11 起）
+
+**更正旧说法**：§14.4.2 曾把"容器不能自升级"写成架构限制 —— 那是**取舍**，不是事实：
+容器里替换二进制能生效（只是重建容器会退回镜像版本）。0.0.11 起提供真正的容器一键升级：
+把 socket 挂进来即可，服务端用 Docker Engine API 拉取目标镜像，再由一个 **helper 容器**
+（用目标镜像启动、只挂 socket 与数据目录）把本容器按原配置 + 新镜像重建。
+
+```bash
+docker run -d --name komari --restart always --network host \
+  -v ./data:/app/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \   # ← 这一行让它能一键升级
+  ghcr.io/zhemed/komari:0.0.11
+```
+
+- 重建时**逐字段沿用**旧容器的 `Config`/`HostConfig`/网络配置（卷、端口、restart 策略、env、别名…），
+  只换镜像；容器名保持不变，旧容器改名为 `<名字>-old-<时间戳>` 并保留为**停止状态**（回滚点）；
+- 任何一步失败都会把旧容器改名回去并启动（helper 里完成回滚）；
+- 没挂 socket 时行为不变（只给可复制的命令），systemd 二进制形态也完全不受影响；
+- **安全边界**：docker socket ≈ 宿主 root。因此该模式只在 socket 存在时启用、仍受
+  `server_upgrade_enabled` 开关约束、每次升级写审计日志，界面也会明确提示这一点；
+- 回滚：`docker start komari-old-<时间戳>`（旧容器仍在），或按 §14.4.2 用镜像 tag 重建；
+- socket 路径可用设置 `server_upgrade_docker_socket` 改（默认 `/var/run/docker.sock`）；
+- helper 也可以手工跑（故障恢复用）：
+  `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v <数据目录>:<数据目录> \
+     <镜像> /app/komari docker-self-recreate --container komari --image ghcr.io/zhemed/komari:<tag> --sanity-tag <tag>`
 
 ### 14.4.2 容器部署怎么升级（实测于 2026-09-17）
 

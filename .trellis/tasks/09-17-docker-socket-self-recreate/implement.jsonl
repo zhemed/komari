@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/server-upgrade.md", "reason": "现有升级契约与不变量（本任务在其上扩展 docker 分支）"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "新增 RPC 与 helper 的错误返回约定"}
