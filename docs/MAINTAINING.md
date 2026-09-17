@@ -89,6 +89,16 @@ feat: 一句话说明 [task:container-inplace-self-upgrade]
 > **诚实边界**：机器能强制的是"提交前必须有任务"。"只读调查也先建任务"没有可审计的产物，
 > 靠 `AGENTS.md`「强制规则」+ journal 留痕，**不是自动的**，别把它说成自动。
 
+查看远程闸门结果（**`gh` 的默认仓库会被 `upstream` remote 抢走，必须带 `-R`**）：
+
+```bash
+gh run list -R zhemed/komari --workflow=trellis-gate.yml --limit 5
+```
+
+实测证据（2026-09-17，两个方向都验过）：干净提交 → 工作流 `success`（run 35231550788，10s）；
+刻意用 `--no-verify` 推一个无锚点提交到临时分支并 `workflow_dispatch` → 同一工作流 `failure`
+（run 35231788694，9s），日志里逐条列出 `未带任务锚点：<sha> <subject>`。
+
 ## 3. 日常操作
 
 ### 3.1 构建（只需 Go，不需要网络与 Node）
