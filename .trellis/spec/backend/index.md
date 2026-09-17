@@ -11,6 +11,7 @@
 | [Build & Pinning](./build-and-pinning.md) | 构建/vendor/pin 契约与验证命令 | **Filled** |
 | [Directory Structure](./directory-structure.md) | 目录分层、放置与命名约定 | **Filled** |
 | [Database Guidelines](./database-guidelines.md) | GORM 模型、AutoMigrate、配置存储、SQLite 调优 | **Filled** |
+| [Metric Query & Aggregation](./metric-query-aggregation.md) | 指标的聚合语义、queryMetrics 优先级、分辨率与桶值约定 | **Filled** |
 | [Error Handling](./error-handling.md) | RPC/REST 错误返回、panic/recover 边界 | **Filled** |
 | [Logging Guidelines](./logging-guidelines.md) | `utils/log` API、模块名约定、级别使用 | **Filled** |
 | [Quality Guidelines](./quality-guidelines.md) | 测试写法、提交前必跑命令、已知遗留缺陷 | **Filled** |

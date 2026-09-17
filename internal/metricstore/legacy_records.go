@@ -138,15 +138,31 @@ func getRecordMetricMaxByClientAndTimeFromSeries(ctx context.Context, s *metric.
 	return records, nil
 }
 
-func recordMetricAggregation(metricName string) metric.Aggregation {
+// SemanticAggregation 返回指标"语义上正确"的聚合方式，第二个返回值表示该指标是否有语义默认。
+//
+// 这几个指标的正确聚合不由客户端的全局图表偏好决定：
+//   - traffic.up/down 的每个采样点是"两次上报之间的字节数"，只有求和才等于该时间桶的真实流量；
+//     取平均会得到"每次上报的平均字节数"，即被除以桶内采样条数（实测面板默认 avg 下点值 = 真实值 ÷ 20，
+//     桶内条数不齐时缩放比还会变，表现为个别分钟"偏低/偏高"）。
+//   - net.total.up/down 是累计计数器，取桶内最后一个值才代表该时刻的累计量。
+//
+// 调用方要覆盖语义默认，需按指标显式指定聚合（如 queryMetrics 的 aggregation_by_metric）。
+func SemanticAggregation(metricName string) (metric.Aggregation, bool) {
 	switch metricName {
 	case MetricTrafficUp, MetricTrafficDown:
-		return metric.AggSum
+		return metric.AggSum, true
 	case MetricNetTotalUp, MetricNetTotalDown:
-		return metric.AggLast
+		return metric.AggLast, true
 	default:
-		return metric.AggAvg
+		return "", false
 	}
+}
+
+func recordMetricAggregation(metricName string) metric.Aggregation {
+	if agg, ok := SemanticAggregation(metricName); ok {
+		return agg
+	}
+	return metric.AggAvg
 }
 
 func recordSeriesInterval(s *metric.Store, start, end, now time.Time) time.Duration {

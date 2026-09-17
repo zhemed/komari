@@ -730,14 +730,27 @@ func resolveMetricMaxPoints(metricKey string, params publicMetricQueryParams) (i
 	return maxPoints, nil
 }
 
+// resolveMetricAggregation 决定某个指标在这次查询里使用的聚合方式。
+//
+// 优先级：按指标显式指定（aggregation_by_metric / algorithm_by_metric）
+//
+//	> 指标语义默认（metricstore.SemanticAggregation）
+//	> 全局指定（aggregation / algorithm）> avg。
+//
+// 语义默认排在全局之前是有意的：全局那个是图表偏好（面板默认 avg），不是针对这个指标的意图，
+// 而 traffic.up/down 这类"字节量"指标取平均会得到与桶内采样条数相关的错误值（见 SemanticAggregation）。
+// 需要覆盖语义默认时，用 aggregation_by_metric 显式指定该指标。
 func resolveMetricAggregation(metricKey string, params publicMetricQueryParams) metric.Aggregation {
-	raw := firstNonEmpty(params.Aggregation, params.Algorithm)
 	if v := firstNonEmpty(
 		params.AggregationByMetric[metricKey],
 		params.AlgorithmByMetric[metricKey],
 	); v != "" {
-		raw = v
+		return metric.Aggregation(normalizeMetricAggregation(v))
 	}
+	if agg, ok := metricstore.SemanticAggregation(metricKey); ok {
+		return agg
+	}
+	raw := firstNonEmpty(params.Aggregation, params.Algorithm)
 	if raw == "" {
 		raw = string(metric.AggAvg)
 	}

@@ -486,3 +486,70 @@ func TestLoadPublicMetricPointsReturnsOnlyRawAfterRestart(t *testing.T) {
 		t.Fatalf("post-restart exact point changed: %#v", got.points[0])
 	}
 }
+
+// queryMetrics 的聚合优先级：按指标显式指定 > 指标语义默认 > 全局指定 > avg。
+// 这条优先级是修"面板流量图个别分钟偏低/偏高"的关键：面板会显式发全局 avg，
+// 但对 traffic.up/down 必须仍然求和，否则点值被除以桶内采样条数。
+func TestResolveMetricAggregationPrecedence(t *testing.T) {
+	tests := []struct {
+		name      string
+		metricKey string
+		params    publicMetricQueryParams
+		want      metric.Aggregation
+	}{
+		{
+			name:      "面板默认发全局 avg，traffic 仍按语义求和",
+			metricKey: metricstore.MetricTrafficUp,
+			params:    publicMetricQueryParams{Aggregation: "avg"},
+			want:      metric.AggSum,
+		},
+		{
+			name:      "面板默认发全局 avg，累计计数器仍取最后一个值",
+			metricKey: metricstore.MetricNetTotalUp,
+			params:    publicMetricQueryParams{Aggregation: "avg"},
+			want:      metric.AggLast,
+		},
+		{
+			name:      "普通指标沿用全局偏好",
+			metricKey: metricstore.MetricCPU,
+			params:    publicMetricQueryParams{Aggregation: "max"},
+			want:      metric.AggMax,
+		},
+		{
+			name:      "未指定时回退 avg",
+			metricKey: metricstore.MetricCPU,
+			params:    publicMetricQueryParams{},
+			want:      metric.AggAvg,
+		},
+		{
+			name:      "按指标显式指定可以覆盖语义默认",
+			metricKey: metricstore.MetricTrafficUp,
+			params: publicMetricQueryParams{
+				Aggregation:         "avg",
+				AggregationByMetric: map[string]string{metricstore.MetricTrafficUp: "max"},
+			},
+			want: metric.AggMax,
+		},
+		{
+			name:      "algorithm 字段等价于 aggregation",
+			metricKey: metricstore.MetricRAM,
+			params:    publicMetricQueryParams{Algorithm: "min"},
+			want:      metric.AggMin,
+		},
+		{
+			name:      "algorithm_by_metric 同样能覆盖语义默认",
+			metricKey: metricstore.MetricTrafficDown,
+			params: publicMetricQueryParams{
+				AlgorithmByMetric: map[string]string{metricstore.MetricTrafficDown: "average"},
+			},
+			want: metric.AggAvg,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveMetricAggregation(tt.metricKey, tt.params); got != tt.want {
+				t.Errorf("resolveMetricAggregation(%q) = %q, 期望 %q", tt.metricKey, got, tt.want)
+			}
+		})
+	}
+}
