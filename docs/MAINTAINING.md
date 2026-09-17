@@ -312,6 +312,11 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   `markPresence=true`，`report_v2.go:53`）。本机 agent 从未进过回退/降级（日志里只有
   "WebSocket connected using v2 protocol"）。
 
+- **升级弹窗在未登录时会显示按钮**（2026-09-17 实测发现，观感问题）：`upgradeStatus` 为 null
+  （未登录或状态接口失败）时，按钮条件 `upgradeStatus?.enabled !== false` 求值为真，访客点击会得到
+  `RPC Error -32041: Permission denied`。管理员路径与功能本身正常；下次发版把条件收紧为
+  `upgradeStatus && upgradeStatus.enabled !== false` 即可。
+
 - **两个 Dockerfile 的基础镜像用 tag 而非 digest**：`alpine:3.21` 会随上游更新而变，
   同一份源码在不同时间构建的镜像不完全可复现；二进制产物本身可复现。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
