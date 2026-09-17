@@ -32,13 +32,13 @@
 
 ## Acceptance Criteria
 
-- [ ] `grep -rn "确因\|实测表现为\|双通道上报导致" --include="*.md" --include="*.go" .`（排除 node_modules/dist/bin）
+- [x] `grep -rn "确因\|实测表现为\|双通道上报导致" --include="*.md" --include="*.go" .`（排除 node_modules/dist/bin）
       在更正后**只剩**带日期更正说明的条目或白名单条目
-- [ ] `gh release view 0.0.6 -R zhemed/komari --json body` 含更正段（日期 + 指向 §7）
-- [ ] 归档 PRD 与 journal Session 12 均有指向更正的说明；journal 新增一条整改 Session
-- [ ] `./scripts/check-repo.sh --full` 全绿
-- [ ] `internal/metricstore` 与 `web/rpc/jsonrpc` 的 `go test` 通过（注释改动不得打破构建）
-- [ ] 本任务 `task.py validate` 通过，最终 `archive` 到 `.trellis/tasks/archive/2026-09/`
+- [x] `gh release view 0.0.6 -R zhemed/komari --json body` 含更正段（日期 + 指向 §7）
+- [x] 归档 PRD 与 journal Session 12 均有指向更正的说明；journal 新增一条整改 Session
+- [x] `./scripts/check-repo.sh --full` 全绿
+- [x] `internal/metricstore` 与 `web/rpc/jsonrpc` 的 `go test` 通过（注释改动不得打破构建）
+- [x] 本任务 `task.py validate` 通过，最终 `archive` 到 `.trellis/tasks/archive/2026-09/`
 
 ## Notes
 

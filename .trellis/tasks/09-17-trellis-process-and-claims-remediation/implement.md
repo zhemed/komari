@@ -36,7 +36,7 @@
 - [x] `.build/rel-notes-0.0.6.md`：追加与线上一致的更正段（原文备份到 `rel-notes-0.0.6.published-backup.md`）
 - [x] **公开的 GitHub release `0.0.6` 说明**：`gh release edit 0.0.6 -R zhemed/komari --notes-file ...`
       （已确认线上正文含 1 段「更正（2026-09-17」；原文完整保留在上方）
-- [ ] `git commit` 全部更正（一个提交，说明里写清"整改"性质）
+- [x] `git commit` 全部更正（`245bb91`，已推送）（一个提交，说明里写清"整改"性质）
 
 ## Step 3 · 验证（Phase 2 收尾）
 
@@ -49,8 +49,8 @@
 
 ## Step 4 · 检查与收尾（Phase 3）
 
-- [ ] 运行 `trellis-check`（规范符合性、跨层数据流、复用、一致性）
-- [ ] `trellis-finish-work`：写 journal（本次整改 Session）、`task.py finish`、`task.py archive <name>`
+- [x] 运行 `trellis-check`（gofmt/vet/test/check-repo --full 全绿；仅注释与文档改动，跨层项不适用）（规范符合性、跨层数据流、复用、一致性）
+- [x] `trellis-finish-work`：写 journal（本次整改 Session）、`task.py finish`、`task.py archive <name>`
 - [ ] 汇报：把 break-loop 五维分析贴给用户（含 E1 根因与 M1~M4 机制状态）
 
 ## 回滚点
