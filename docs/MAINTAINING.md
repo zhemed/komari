@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.11）
+# 维护本仓库（komari 自维护版 · 当前 0.0.12）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.11**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.12**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.11`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.12`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -633,7 +633,7 @@ KOMARI_TAG=<旧版本> bash install-komari.sh
 并加了回归测试断言"被自检的文件必须可执行"（去掉修复即 FAIL，验证过测试不是永真）。
 要避开这段窗口：0.0.8 用 `install-komari.sh` 升一次，之后面板升级即可正常工作。
 
-### 14.6 容器一键升级（挂 docker socket 时，0.0.11 起）
+### 14.6 容器一键升级（挂 docker socket 时，0.0.11 起；0.0.12 修 helper 缺陷）
 
 **更正旧说法**：§14.4.2 曾把"容器不能自升级"写成架构限制 —— 那是**取舍**，不是事实：
 容器里替换二进制能生效（只是重建容器会退回镜像版本）。0.0.11 起提供真正的容器一键升级：
@@ -658,6 +658,22 @@ docker run -d --name komari --restart always --network host \
 - helper 也可以手工跑（故障恢复用）：
   `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v <数据目录>:<数据目录> \
      <镜像> /app/komari docker-self-recreate --container komari --image ghcr.io/zhemed/komari:<tag> --sanity-tag <tag>`
+
+### 14.6.1 0.0.11 的容器升级缺陷（已修，记以免重犯）
+
+0.0.11 的容器一键升级在**降级到没有 helper 子命令的版本**时必然静默失败：helper 用**目标镜像**
+启动，而 `docker-self-recreate` 是 0.0.11 才引入的 —— 目标镜像（例如 0.0.10）里没有它，
+helper 一启动就退出；当时 helper 还配了 `AutoRemove`，现场被一并抹掉，用户只看到"点了没反应"。
+
+实测证据（docker events）：`create practical_boyd → start → die → destroy`（1 秒内），
+父容器停在 `phase=restarting` 直到 6 分钟超时。
+
+0.0.12 的修法：
+1. helper 改用**当前镜像**（本进程所在的镜像必然含该子命令）；
+2. helper **不自动删除**，命名为 `komari-upgrade-helper-<时间戳>` 并打标签
+   `komari.upgrade.helper=1`（下次升级前统一清理），失败时可用 `docker logs` 查因；
+3. 父进程**监视 helper**：helper 先退出即视为失败，把它的日志尾部写进状态并回报面板，
+   不再让用户干等超时。
 
 ### 14.4.2 容器部署怎么升级（实测于 2026-09-17）
 

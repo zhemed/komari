@@ -237,6 +237,39 @@ func (c *Client) RunOnce(ctx context.Context, image string, cmd []string, bindSo
 	return code, logs, nil
 }
 
+// ListHelpers 返回带 komari.upgrade.helper=1 标签、且已退出的 helper 容器 ID。
+func (c *Client) ListHelpers(ctx context.Context) ([]string, error) {
+	filters := `{"label":["komari.upgrade.helper=1"],"status":["exited"]}`
+	q := url.Values{}
+	q.Set("all", "1")
+	q.Set("filters", filters)
+	req, err := c.newRequest(ctx, "GET", "/containers/json", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.URL.RawQuery = q.Encode()
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
+		return nil, statusError(resp.StatusCode, msg)
+	}
+	var list []struct {
+		ID string `json:"Id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		out = append(out, item.ID)
+	}
+	return out, nil
+}
+
 // Ready 判断 socket 是否可用（Ping + 版本协商）。
 func (c *Client) Ready(ctx context.Context) error {
 	if err := c.Ping(ctx); err != nil {

@@ -40,7 +40,7 @@ func dockerSocketReady(ctx context.Context, socketPath string) (selfID string, e
 //
 // helper 用**目标镜像**启动（它必然带 docker-self-recreate 子命令），只挂 docker socket
 // 与数据目录（写状态文件用），不挂业务需要的其它卷；跑完由 daemon 自动删除。
-func helperPayload(helperImage, selfID, targetImage, sanityTag, stateDir, socketPath, binaryPath string, binds []string) map[string]any {
+func helperPayload(helperImage, helperName, selfID, targetImage, sanityTag, stateDir, socketPath, binaryPath string, binds []string) map[string]any {
 	if binaryPath == "" {
 		binaryPath = DefaultImageBinaryPath
 	}
@@ -58,10 +58,12 @@ func helperPayload(helperImage, selfID, targetImage, sanityTag, stateDir, socket
 		cmd = append(cmd, "--state-dir", stateDir)
 	}
 	return map[string]any{
-		"Image": helperImage,
-		"Cmd":   cmd,
+		"Image":  helperImage,
+		"Cmd":    cmd,
+		"Labels": map[string]string{"komari.upgrade.helper": "1", "komari.upgrade.helper.name": helperName},
 		"HostConfig": map[string]any{
-			"AutoRemove":    true,
+			// 不自动删除：helper 失败时现场（容器 + 日志）必须留得住，否则用户只看到"没反应"。
+			"AutoRemove":    false,
 			"NetworkMode":   "none",
 			"RestartPolicy": map[string]any{"Name": "no"},
 			"Binds":         binds,
@@ -154,12 +156,20 @@ func (o Options) executeDockerRecreate(ctx context.Context, p Plan) (Result, err
 	if err != nil {
 		return Result{}, fmt.Errorf("读取自身容器信息失败：%w", err)
 	}
+	// 上一次升级留下的 helper（成功/失败都会留着现场）在这里顺手清掉，避免堆积。
+	CleanupHelpers(ctx, socketPath)
+
+	selfImage, _ := self.Config["Image"].(string)
+	if strings.TrimSpace(selfImage) == "" {
+		selfImage = p.TargetImage
+	}
 	binds := helperBinds(self, socketPath, o.StateDir)
-	payload := helperPayload(p.TargetImage, selfID, p.TargetImage, p.To, o.StateDir, socketPath,
+	helperName := helperContainerName()
+	payload := helperPayload(selfImage, helperName, selfID, p.TargetImage, p.To, o.StateDir, socketPath,
 		o.ImageBinaryPath, binds)
 
 	SetStatus(Status{Phase: PhaseReplacing, From: p.From, To: p.To, Detail: "recreating container", Running: true})
-	helperID, err := client.CreateContainer(ctx, "", payload)
+	helperID, err := client.CreateContainer(ctx, helperName, payload)
 	if err != nil {
 		SetStatus(Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: err.Error()})
 		_ = SaveState(o.StateDir, Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: err.Error()})
@@ -179,15 +189,31 @@ func (o Options) executeDockerRecreate(ctx context.Context, p Plan) (Result, err
 		Phase: PhaseRestarting, From: p.From, To: p.To, Image: p.TargetImage, BackupPath: helperID,
 	})
 
+	// 监视 helper：它正常工作时会停掉本容器（本进程随之结束）；
+	// 若它先退出（失败），必须把原因回报给面板，而不是让用户干等。
 	deadline := time.Now().Add(6 * time.Minute)
 	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
+		time.Sleep(2 * time.Second)
+		state, err := client.InspectContainer(ctx, helperID)
+		if err != nil {
+			continue // 查询失败（例如 daemon 忙）不致命
+		}
+		if !state.State.Running {
+			logs, _ := client.ContainerLogs(context.WithoutCancel(ctx), helperID, 60)
+			msg := strings.TrimSpace(logs)
+			if msg == "" {
+				msg = "helper 容器已退出且没有日志"
+			}
+			failMsg := fmt.Sprintf("helper 未完成重建（容器 %s）：%s", helperName, lastLines(msg, 6))
+			SetStatus(Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: failMsg})
+			_ = SaveState(o.StateDir, Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: failMsg})
+			return res, fmt.Errorf("%s", failMsg)
+		}
+		if ctx.Err() != nil {
 			return res, ctx.Err()
-		case <-time.After(2 * time.Second):
 		}
 	}
-	return res, fmt.Errorf("等待 helper 重建容器超时（helper 容器 %s）", helperID)
+	return res, fmt.Errorf("等待 helper 重建容器超时（helper 容器 %s）", helperName)
 }
 
 // stateDirFor 返回状态文件目录（与 Options.StateDir 一致；空则退回二进制所在目录）。
@@ -196,6 +222,38 @@ func stateDirFor(binaryPath string) string {
 		return ""
 	}
 	return filepath.Dir(binaryPath)
+}
+
+// helperContainerName 生成 helper 容器名（便于事后 docker logs / 清理）。
+func helperContainerName() string {
+	return "komari-upgrade-helper-" + time.Now().UTC().Format("20060102-150405")
+}
+
+// lastLines 取文本末尾 n 行（日志回报不必刷屏）。
+func lastLines(s string, n int) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	if len(lines) <= n {
+		return strings.Join(lines, " | ")
+	}
+	return strings.Join(lines[len(lines)-n:], " | ")
+}
+
+// CleanupHelpers 删除已退出的 helper 容器（新容器启动时调用一次即可）：
+// helper 故意不 AutoRemove，所以成功/失败后都会留下现场。
+func CleanupHelpers(ctx context.Context, socketPath string) {
+	client := dockerapi.NewClient(socketPath)
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx); err != nil {
+		return
+	}
+	ids, err := client.ListHelpers(context.WithoutCancel(ctx))
+	if err != nil {
+		return
+	}
+	for _, id := range ids {
+		_ = client.RemoveContainer(context.WithoutCancel(ctx), id, false)
+	}
 }
 
 // CurrentMode 返回当前进程实际可用的升级方式（不访问网络，只做本地判定）：

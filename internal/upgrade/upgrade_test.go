@@ -330,8 +330,8 @@ func TestHelperPayloadAndBinds(t *testing.T) {
 		t.Fatalf("数据目录应用宿主路径挂载：%v", binds)
 	}
 
-	payload := helperPayload("ghcr.io/zhemed/komari:0.0.11", self.ID, "ghcr.io/zhemed/komari:0.0.11",
-		"0.0.11", "/app/data", DefaultDockerSocket, "", binds)
+	payload := helperPayload("ghcr.io/zhemed/komari:0.0.11", "komari-upgrade-helper-test", self.ID,
+		"ghcr.io/zhemed/komari:0.0.11", "0.0.11", "/app/data", DefaultDockerSocket, "", binds)
 	cmd, _ := payload["Cmd"].([]string)
 	joinedCmd := strings.Join(cmd, " ")
 	for _, want := range []string{"docker-self-recreate", "--container abcdefabcdefabcdef", "--image ghcr.io/zhemed/komari:0.0.11", "--sanity-tag 0.0.11", "--state-dir /app/data"} {
@@ -340,8 +340,12 @@ func TestHelperPayloadAndBinds(t *testing.T) {
 		}
 	}
 	hc, _ := payload["HostConfig"].(map[string]any)
-	if hc["AutoRemove"] != true || hc["NetworkMode"] != "none" {
+	// AutoRemove 故意是 false：helper 失败时要留下容器与日志供排障（由下次升级前清理）
+	if hc["AutoRemove"] != false || hc["NetworkMode"] != "none" {
 		t.Fatalf("helper 的 HostConfig 不符合预期：%+v", hc)
+	}
+	if labels, _ := payload["Labels"].(map[string]string); labels["komari.upgrade.helper"] != "1" {
+		t.Fatalf("helper 缺少标识标签：%+v", payload["Labels"])
 	}
 }
 
