@@ -207,6 +207,15 @@ func Execute(ctx context.Context, o Options, p Plan) (Result, error) {
 	}
 
 	SetStatus(Status{Phase: PhaseVerifying, From: p.From, To: p.To, Running: true})
+	// 自检要**执行**这个文件：先补上执行位。
+	// 2026-09-17 实测踩到：下载出来是 0644，直接 fork/exec 会 "permission denied"，
+	// 表现为"升级失败但服务不受影响"（替换发生在自检之后，所以不会伤到线上）。
+	if err := os.Chmod(dst, 0o755); err != nil {
+		_ = os.Remove(dst)
+		SetStatus(Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: err.Error()})
+		_ = SaveState(o.StateDir, Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: err.Error()})
+		return Result{}, err
+	}
 	if err := VerifyBinary(ctx, o.Probe, dst, p.To); err != nil {
 		_ = os.Remove(dst)
 		SetStatus(Status{Phase: PhaseFailed, From: p.From, To: p.To, Error: err.Error()})

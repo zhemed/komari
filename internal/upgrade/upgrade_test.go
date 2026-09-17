@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -62,7 +63,16 @@ func (f *fakeReleaseServer) client() *Client {
 
 // 用固定探针替代真实执行：返回目标版本的版本行。
 func probeFor(tag string) VersionProbe {
-	return func(_ context.Context, _ string) (string, error) {
+	return func(_ context.Context, path string) (string, error) {
+		// 自检要真的执行这个文件：锁住"下载后先补执行位"这条不变量。
+		// （2026-09-17 实测踩到：0644 直接 fork/exec → permission denied，升级失败。）
+		info, err := os.Stat(path)
+		if err != nil {
+			return "", err
+		}
+		if info.Mode().Perm()&0o111 == 0 {
+			return "", fmt.Errorf("被自检的文件没有执行位: %v", info.Mode().Perm())
+		}
 		return "[INFO/SERVER] Komari Monitor " + tag + " (hash: deadbeef)", nil
 	}
 }

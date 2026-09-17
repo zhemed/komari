@@ -41,7 +41,7 @@ LISTEN_PORT=""
 # 本仓库只维护自有的 0.0.x 版本线：安装/升级一律走本仓库，避免落到上游 latest（已是 1.5.x）。
 REPO="${KOMARI_REPO:-zhemed/komari}"
 # 自有发布 tag：本仓库只维护自有版本线，故锁定 tag 而非使用 latest。
-REPO_TAG="${KOMARI_TAG:-0.0.8}"
+REPO_TAG="${KOMARI_TAG:-0.0.9}"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
 # TUI 工具: whiptail / dialog / 空（回退纯文本）
