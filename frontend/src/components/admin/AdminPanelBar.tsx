@@ -173,49 +173,93 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   };
 
   // 轮询升级状态；服务重启会让请求失败，此时按“重启中”继续等版本号变化。
-  const pollUpgrade = (targetTag?: string) => {
+  // 升级后的跟随逻辑。
+  //
+  // 关键教训（2026-09-17 实测）：容器内替换会 **execve 替换进程**，那条 RPC2 连接会被直接切断，
+  // 原来"await 状态调用"的写法会永久挂住 —— 界面卡在"下载新版本中…"、按钮灰着，必须手动刷新。
+  // 因此这里改成：① 每次调用都带超时；② 独立轮询 /api/version（普通 HTTP，不依赖被切断的连接）；
+  // ③ 版本变成目标值就自动刷新页面。
+  const followUpgrade = (targetTag?: string) => {
     const startedAt = Date.now();
-    const tick = async () => {
-      if (Date.now() - startedAt > 5 * 60 * 1000) {
-        setUpgradeNote(
-          t("upgrade.timeout", "升级状态轮询超时，请刷新页面确认版本"),
-        );
-        return;
-      }
-      try {
-        const st = await call<any, UpgradeStatusInfo>("admin:upgradeStatus", {});
-        setUpgradeStatus(st);
-        if (st.phase === "failed") {
-          setUpgradeNote(st.error || t("upgrade.phase_failed", "升级失败"));
-          return;
+    const DEADLINE_MS = 6 * 60 * 1000;
+    let finished = false;
+
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), ms),
+        ),
+      ]);
+
+    const finish = (msg: string, reload: boolean) => {
+      if (finished) return;
+      finished = true;
+      setUpgradeNote(msg);
+      setUpgradeStatus((prev) => (prev ? { ...prev, running: false } : prev));
+      if (reload) setTimeout(() => window.location.reload(), 1200);
+    };
+
+    // ① 版本观察：只要 /api/version 变成目标版本就算成功（与服务重启/进程替换无关）
+    const watchVersion = async () => {
+      while (!finished && Date.now() - startedAt < DEADLINE_MS) {
+        try {
+          const resp = await withTimeout(
+            fetch("/api/version", { cache: "no-store" }).then((r) => r.json()),
+            3000,
+          );
+          if (targetTag && resp?.data?.version === targetTag) {
+            finish(t("upgrade.done", "升级完成，页面即将刷新"), true);
+            return;
+          }
+        } catch {
+          // 服务正在重启/进程正在替换：正常现象，继续等
         }
-        const current = (publicInfo as any)?.version || versionInfo?.version;
-        if (targetTag && st.current_version === targetTag && current !== targetTag) {
-          setUpgradeNote(t("upgrade.done", "升级完成，页面即将刷新"));
-          setTimeout(() => window.location.reload(), 1500);
-          return;
-        }
-        setUpgradeNote(upgradePhaseLabel(st.phase));
-        setTimeout(tick, 1000);
-      } catch {
-        setUpgradeNote(
-          t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…"),
-        );
-        fetch("/api/version", { cache: "no-store" })
-          .then((r) => r.json())
-          .then((d) => {
-            const v = d?.data?.version;
-            if (targetTag && v === targetTag) {
-              setUpgradeNote(t("upgrade.done", "升级完成，页面即将刷新"));
-              setTimeout(() => window.location.reload(), 1000);
-              return;
-            }
-          })
-          .catch(() => undefined);
-        setTimeout(tick, 2000);
+        await new Promise((r) => setTimeout(r, 1500));
       }
     };
-    tick();
+
+    // ② 状态观察：拿阶段文案与失败原因（拿不到就按"正在重启"显示，绝不挂死）
+    const watchStatus = async () => {
+      while (!finished && Date.now() - startedAt < DEADLINE_MS) {
+        try {
+          const st = await withTimeout(
+            call<any, UpgradeStatusInfo>("admin:upgradeStatus", {}),
+            4000,
+          );
+          setUpgradeStatus(st);
+          if (st.phase === "failed") {
+            finish(st.error || t("upgrade.phase_failed", "升级失败"), false);
+            return;
+          }
+          if (targetTag && st.current_version === targetTag) {
+            finish(t("upgrade.done", "升级完成，页面即将刷新"), true);
+            return;
+          }
+          setUpgradeNote(
+            upgradePhaseLabel(st.phase) ||
+              t("upgrade.started", "升级已开始：下载并校验新版本…"),
+          );
+        } catch {
+          setUpgradeNote(
+            t("upgrade.phase_restarting", "正在重启服务，等待新版本上线…"),
+          );
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    };
+
+    void watchVersion();
+    void watchStatus();
+
+    setTimeout(() => {
+      if (!finished) {
+        finish(
+          t("upgrade.timeout", "升级状态轮询超时，请刷新页面确认版本"),
+          false,
+        );
+      }
+    }, DEADLINE_MS + 1000);
   };
 
   const startUpgrade = async (tag?: string) => {
@@ -241,7 +285,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
         return;
       }
       setUpgradeNote(t("upgrade.started", "升级已开始：下载并校验新版本…"));
-      pollUpgrade(res?.to || tag);
+      followUpgrade(res?.to || tag);
     } catch (e: any) {
       setUpgradeNote(e?.message || String(e));
     }
