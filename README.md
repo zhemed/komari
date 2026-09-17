@@ -56,11 +56,16 @@ sudo bash install-komari.sh
 docker run -d --name komari --restart always \
   --network host \
   -v ./data:/app/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
   ghcr.io/zhemed/komari:latest
 ```
 
 - 多架构镜像（amd64/arm64），数据保存在宿主机的 `./data`
 - 启动后访问 `http://localhost:25774` 完成初始化
+- **最后那行 socket 挂载是"网页一键升级"的必需条件**：容器部署想让面板自己拉镜像、重建容器，
+  就必须把 `/var/run/docker.sock` 挂进来（只有这一条路，代码只认挂进来的 socket）。
+  挂上等于把**宿主机 root 等价权限**交给这个容器——请自行确认；不挂也能跑，
+  只是面板会退化成"给出可复制的 `docker pull` 命令"，需要你手工重建容器。
 - 不想用 host 网络时，把 `--network host` 换成 `-p 25774:25774`
 
 ### 方式二：源码构建

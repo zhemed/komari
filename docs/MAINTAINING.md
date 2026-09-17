@@ -677,13 +677,18 @@ helper 一启动就退出；当时 helper 还配了 `AutoRemove`，现场被一�
 
 ### 14.4.2 容器部署怎么升级（实测于 2026-09-17）
 
-容器里**不能**自替换二进制，正确做法是"拉新镜像 + 用同一个数据卷重建容器"：
+容器有两种升级方式：
+
+1. **面板一键升级（推荐，0.0.11 起）**：`docker run` 时挂上 `/var/run/docker.sock`，
+   之后在面板里点升级即可 —— 这是容器形态唯一的"网页升级"实现方式，**要这个功能就必须挂 socket**
+   （见 §14.6）；
+2. **手工升级（没挂 socket 时的唯一方式）**：拉新镜像 + 用同一个数据卷重建容器：
 
 ```bash
-docker pull ghcr.io/zhemed/komari:0.0.9        # 或 :latest（每次发版都会移动）
+docker pull ghcr.io/zhemed/komari:latest       # 或固定版本号（每次发版都会移动 :latest）
 docker stop komari && docker rm komari
 docker run -d --name komari --restart always --network host \
-  -v ./data:/app/data ghcr.io/zhemed/komari:0.0.9
+  -v ./data:/app/data ghcr.io/zhemed/komari:latest
 ```
 
 - `docker restart` / `docker compose restart` **不会**升级（还是旧镜像），必须是 pull + 重建；
