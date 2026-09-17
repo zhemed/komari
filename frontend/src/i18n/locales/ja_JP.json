@@ -1324,6 +1324,7 @@
   "traffic_overview": "トラフィック概要",
   "upgrade": {
       "copy_command": "コマンドをコピー",
+      "copy_pull_command": "更新コマンドをコピー",
       "disabled": "ワンクリック更新は設定で無効になっています",
       "done": "更新が完了しました。ページを再読み込みします",
       "enable_description": "無効にするとパネルに更新ボタンが表示されず、API も更新要求を拒否します。コンテナや systemd なしの構成は元々ワンクリック更新できません。",

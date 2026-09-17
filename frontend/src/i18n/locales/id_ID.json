@@ -1324,6 +1324,7 @@
   "traffic_overview": "Ringkasan Lalu Lintas",
   "upgrade": {
       "copy_command": "Salin perintah",
+      "copy_pull_command": "Salin perintah pembaruan",
       "disabled": "Pembaruan sekali klik dinonaktifkan di pengaturan",
       "done": "Pembaruan selesai, memuat ulang halaman",
       "enable_description": "Jika dinonaktifkan, panel tidak menampilkan tombol pembaruan dan API menolak permintaan pembaruan. Deployment container dan tanpa systemd memang tidak bisa memperbarui sendiri.",

@@ -1324,6 +1324,7 @@
   "traffic_overview": "流量概覽",
   "upgrade": {
       "copy_command": "複製指令",
+      "copy_pull_command": "複製升級指令",
       "disabled": "一鍵升級已在設定中關閉（可在系統設定裡開啟）",
       "done": "升級完成，頁面即將重新整理",
       "enable_description": "關閉後面板不再顯示升級按鈕，介面也會拒絕升級請求。容器與無 systemd 的部署本來就無法一鍵升級。",

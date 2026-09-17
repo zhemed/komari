@@ -1324,6 +1324,7 @@
   "traffic_overview": "流量概览",
   "upgrade": {
       "copy_command": "复制命令",
+      "copy_pull_command": "复制升级命令",
       "disabled": "一键升级已在设置中关闭（可在系统设置里打开）",
       "done": "升级完成，页面即将刷新",
       "enable_description": "关闭后面板不再显示升级按钮，接口也会拒绝升级请求。容器与无 systemd 的部署本来就无法一键升级。",

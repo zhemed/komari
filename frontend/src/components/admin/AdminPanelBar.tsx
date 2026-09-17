@@ -555,21 +555,28 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                                 opacity: 0.5,
                               }}
                             />
-                            {upgradeStatus?.supported &&
-                              upgradeStatus?.enabled !== false && (
-                                <div className="flex justify-end">
-                                  <Button
-                                    size="1"
-                                    variant="soft"
-                                    disabled={!!upgradeStatus?.running}
-                                    onClick={() =>
-                                      startUpgrade(r.tag_name || r.name)
-                                    }
-                                  >
-                                    {t("upgrade.install_version", "安装此版本")}
-                                  </Button>
-                                </div>
-                              )}
+                            {/* 能一键升级 → 升级按钮；不能（容器/无 systemd）→ 给可复制的命令入口。
+                                两者的区别只是服务端会不会真的替换二进制，前端入口都要有：
+                                0.0.9 的缺口就是"不支持"时把入口一起藏了，用户拿不到命令。 */}
+                            {upgradeStatus?.enabled !== false && (
+                              <div className="flex justify-end">
+                                <Button
+                                  size="1"
+                                  variant="soft"
+                                  disabled={!!upgradeStatus?.running}
+                                  onClick={() =>
+                                    startUpgrade(r.tag_name || r.name)
+                                  }
+                                >
+                                  {upgradeStatus?.supported
+                                    ? t("upgrade.install_version", "安装此版本")
+                                    : t(
+                                        "upgrade.copy_pull_command",
+                                        "复制升级命令",
+                                      )}
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -616,25 +623,33 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                       </div>
                     )}
                     <div className="flex justify-end gap-2">
-                      {upgradeStatus?.supported &&
-                        upgradeStatus?.enabled !== false &&
-                        latestRelease && (
-                          <Button
-                            disabled={!!upgradeStatus?.running}
-                            onClick={() =>
-                              startUpgrade(
-                                latestRelease?.tag_name || latestRelease?.name,
+                      {upgradeStatus?.enabled !== false && latestRelease && (
+                        <Button
+                          variant={upgradeStatus?.supported ? undefined : "soft"}
+                          disabled={!!upgradeStatus?.running}
+                          onClick={() =>
+                            startUpgrade(
+                              latestRelease?.tag_name || latestRelease?.name,
+                            )
+                          }
+                        >
+                          {upgradeStatus?.supported
+                            ? t(
+                                "upgrade.upgrade_now",
+                                "立即升级到 {{version}}",
+                                {
+                                  version:
+                                    latestRelease?.tag_name ||
+                                    latestRelease?.name ||
+                                    "",
+                                },
                               )
-                            }
-                          >
-                            {t("upgrade.upgrade_now", "立即升级到 {{version}}", {
-                              version:
-                                latestRelease?.tag_name ||
-                                latestRelease?.name ||
-                                "",
-                            })}
-                          </Button>
-                        )}
+                            : t(
+                                "upgrade.copy_pull_command",
+                                "复制升级命令",
+                              )}
+                        </Button>
+                      )}
                       <a
                         href={latestRelease?.html_url}
                         target="_blank"

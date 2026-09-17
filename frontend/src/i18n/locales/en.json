@@ -1324,6 +1324,7 @@
   "traffic_overview": "Traffic Overview",
   "upgrade": {
       "copy_command": "Copy command",
+      "copy_pull_command": "Copy upgrade command",
       "disabled": "One-click upgrade is disabled in settings",
       "done": "Upgrade complete, reloading the page",
       "enable_description": "When disabled the panel hides the upgrade buttons and the API rejects upgrade requests. Container and non-systemd deployments cannot self-upgrade regardless.",
