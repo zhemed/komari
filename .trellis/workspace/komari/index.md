@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~761 | Active |
+| `journal-1.md` | ~799 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-09-17 | 仓库体检：清残留 + 瘦身本地产物 + 钉死镜像基线与测试门控 + 前端死代码 | `fc1b597`, `dc61273` | `main` |
 | 24 | 2026-09-17 | 强制规则推广到全局（~/.dsh/AGENTS.md）：有 .trellis/ 的项目全部适用 | `30e5c2c` | `main` |
 | 23 | 2026-09-17 | Trellis 强制闸门：提交时拦截 + 事后审计 + GitHub CI 兜底 | `922e1a9`, `afa8fb9` | `main` |
 | 22 | 2026-09-17 | 文档一致性：容器部署命令去掉 socket 挂载，统一零配置升级口径 | `a5c53fa` | `main` |

@@ -759,3 +759,41 @@
 ### Next Steps
 
 - 其它启用 Trellis 的项目如需机械拦截，照 komari 的 .githooks + 审计脚本 + CI 复制
+
+
+## Session 25: 仓库体检：清残留 + 瘦身本地产物 + 钉死镜像基线与测试门控 + 前端死代码
+<!-- trellis-session: v=2 fp=67cb36c1d8dd45d9 -->
+
+**Date**: 2026-09-17
+**Task**: 仓库体检：清残留 + 瘦身本地产物 + 钉死镜像基线与测试门控 + 前端死代码
+**Branch**: `main`
+
+### Summary
+
+先只读体检分级（A/B），再清 8 处文档/注释残留、.build 3.7G→451M、dist 236M→12K、删遗留分支、Dockerfile 钉 digest、agent 外网测试门控、前端死代码清理并重建产物（哈希重固定）
+
+### Main Changes
+
+- 文档/注释对齐：RPC README 去插件遗留、pkg/rpc 注释、§7 已修项、§2.1 检查项、README 自检入口
+- 本地瘦身：.build 删一次性实验与缓存、dist 只留校验和、删 backup/pre-rewrite 分支（记录 SHA 与恢复法）
+- 可复现性：两个 Dockerfile 钉 alpine manifest digest；agent 外网测试默认跳过（离线 go test 全绿）
+- 前端：删 2 个无引用 Context + 5 语言 plugin 死键，重建产物、哈希 b860e30d→cc8f1c10（两次构建一致）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fc1b597` | docs(cleanup): 清掉已移除功能的文档/注释残留，对齐自检与遗留清单 [task:repo-audit-cleanup] |
+| `dc61273` | chore(cleanup): 仓库体检——清残留、瘦身本地产物、钉死镜像基线与测试门控 [task:repo-audit-cleanup] |
+
+### Testing
+
+- [OK] check-repo --full 11 项全绿；CI success；产物零 plugin 键；gofmt 干净
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 下次发版自然带上前端清理；可选跟进：E2E 升级脚本正式化、Go deadcode 扫描、面板文档链接改指本仓库
