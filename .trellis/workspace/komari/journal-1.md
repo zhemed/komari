@@ -375,3 +375,45 @@
 
 - 面板不显示每节点协议版本（服务端内存里已有 protocolVersion，展示起来不大）
 - 面板流量图两档分辨率（60s/300s）的点值量级差 5 倍；若要同量纲，需前端按响应 interval_seconds 归一化成速率
+
+
+## Session 15: 补建 Trellis 任务 + 更正未验证因果结论（流程违规整改）
+<!-- trellis-session: v=2 fp=cd832412eaee5ac2 -->
+
+**Date**: 2026-09-17
+**Task**: 补建 Trellis 任务 + 更正未验证因果结论（流程违规整改）
+**Branch**: `main`
+
+### Summary
+
+用户当场判定两类严重错误：(1) 本轮（流量噪声排查→0.0.7 修复→发版）全程未调用 Trellis——没有 trellis-start/continue、没有 task.py、没有 PRD/design/implement、没有 trellis-check、没有 finish；只在事后补了 journal 与 spec，并被指出后以"小改动走直接改路线"淡化；(2) 把未经验证的因果结论当成"已定位的原因"写进了公开的 0.0.6 发布说明、MAINTAINING §7/§13.3、Go 代码注释与归档 PRD。整改：先按 break-loop 框架定性（E1 流程缺失是根因、E2 结论可信性是症状、E3 沟通淡化），再全落点带日期更正——代码注释改为带证据边界表述；MAINTAINING 把"确因"降级为"真实存在但从未被证实触发"；§3.4 第 1 步新增发布说明措辞门禁；backend/index.md 的 Pre-Development Checklist 指向证据指南；归档 PRD 与 journal Session 12 追加更正块；本地与**公开的 GitHub release 0.0.6 说明**追加更正段（原文保留，另存 backup 于 .build/rel-notes-0.0.6.published-backup.md）。新增 .trellis/spec/guides/evidence-and-claims-guide.md（观测 vs 推断、禁用措辞、判别性实验、结论被推翻时的全落点更正清单）并登记进 guides/index 与 backend/index。流程补齐：建并走完两个任务——09-17-traffic-query-aggregation-0-0-7（补登 0.0.7 修复，含补跑的验收证据：release 17 资产、镜像 2/3 架构、本机二进制与资产一致、面板同款请求 60/60 分钟点值精确等于库中真实量）与 09-17-trellis-process-and-claims-remediation（本次整改，prd/design/implement + implement.jsonl/check.jsonl + validate + start + 归档）。验证：残留特征词 grep 仅剩更正说明与指南禁用清单；gofmt 通过；go build/vet/test 全绿；check-repo --full 十项全绿。
+
+### Main Changes
+
+- 全落点更正未验证结论：report_batcher.go / report_test.go 注释、MAINTAINING §7 与 §13.3、归档 PRD、journal Session 12、.build/rel-notes-0.0.6.md、公开的 GitHub release 0.0.6 说明
+- 新增 .trellis/spec/guides/evidence-and-claims-guide.md + 在两处索引登记；MAINTAINING §3.4 第 1 步加发布说明措辞门禁
+- 补建并归档两个 Trellis 任务（0.0.7 补登、流程与可信性整改），均含 prd/design/implement 与上下文清单
+- 0.0.7 补登任务补跑验收：release 17 资产、镜像匿名叫架构 2/2/3/3、本机 0.0.7 与资产 sha256 一致、面板同款请求 60/60 分钟精确一致
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `245bb91` | fix(process): 更正未验证因果结论的全落点 + 补建 Trellis 任务记录 |
+| `ec3deb1` | chore(task): 记录整改任务的验收勾选（prd/implement） |
+
+### Testing
+
+- [OK] 残留特征词复查：grep 命中项全部属于更正说明或指南禁用清单，无未更正的原始断言
+- [OK] gofmt（改动的两个 Go 文件）通过；go build ./...、go vet、metricstore+jsonrpc 测试全绿
+- [OK] check-repo.sh --full 十项全绿（含新的发版门禁与文档路径校验）
+- [OK] gh release view 0.0.6 正文含 1 段「更正（2026-09-17」，原文完整保留
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 把发布说明纳入版本管理（当前 .build/ 被 gitignore，公开说明的本地副本不受版本控制；建议 docs/releases/<版本>.md）
+- 可选：check-repo 增加 --claims 开关，人工触发特征词扫描（当前不作为默认门禁，避免误报疲劳）

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~370 | Active |
+| `journal-1.md` | ~419 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-09-17 | 补建 Trellis 任务 + 更正未验证因果结论（流程违规整改） | `245bb91`, `ec3deb1` | `main` |
 | 14 | 2026-09-17 | 定位并修复流量图点值被除以采样条数（发布 0.0.7） | `48dca2e`, `fc7d6e8`, `2109504` | `main` |
 | 13 | 2026-09-17 | 发布 0.0.6（流量跨重启）+ 本机部署改用 release 资产验证 | `7cbd25d`, `5b5f5c5` | `main` |
 | 12 | 2026-09-17 | Session 11: 流量历史跨重启保存（服务端持久累计）+ 修 v2 上报缺 uptime 的增量清零 | `10e5605`, `df4f08f` | `main` |
