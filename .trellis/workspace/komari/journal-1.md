@@ -502,3 +502,46 @@
 ### Next Steps
 
 - 收紧按钮条件为 upgradeStatus && upgradeStatus.enabled !== false（未登录时不该渲染按钮），下次发版带上
+
+
+## Session 18: 容器一键升级：docker socket + helper 重建容器（0.0.11 引入，0.0.12 修缺陷）
+<!-- trellis-session: v=2 fp=2a984fa4bd243aba -->
+
+**Date**: 2026-09-17
+**Task**: 容器一键升级：docker socket + helper 重建容器（0.0.11 引入，0.0.12 修缺陷）
+**Branch**: `main`
+
+### Summary
+
+用户明确要求容器部署也能在网页里一键升级，并选定"挂 docker.sock + 面板拉镜像重建自身容器"（方案 B），同时指出我此前把"容器不能自升级"说成架构限制是错的——那只是取舍，已在文档更正。实现：新增 internal/dockerapi（标准库 + unix socket 直连 Engine API：Ping/版本协商、拉镜像含 200 里的 error 与流式进度、inspect、改名、建/起/停/删/等容器、日志解复用、ListHelpers），Recreate 实现"预检 → 旧容器改名 → 建同名新容器（逐字段沿用旧 Config/HostConfig/网络，仅换镜像）→ 停旧 → 起新"与全路径回滚；新增 helper 子命令 komari docker-self-recreate（跑在独立容器里，也可手工用于恢复）；internal/upgrade 增加 Mode（binary/docker-recreate/manual/download-only）与 CurrentMode；设置键 server_upgrade_docker_socket；RPC 暴露 mode/detail/image/digest 且 helper 接管时不自行退出；前端按 mode 切换文案（立即升级（重建容器））并加 socket 权限提示、顺带修掉"未登录也渲染按钮"的观感问题、5 语言补 2 键。E2E 抓到 0.0.11 的必然缺陷：helper 用目标镜像启动，而 helper 子命令是 0.0.11 才有的——降级到更早版本时 helper 秒退（docker events: create→start→die→destroy），又因 AutoRemove=true 现场被抹掉，父容器卡在 restarting 直到超时；0.0.12 修为：helper 用当前镜像、不自动删除并命名+打标签保留现场（下次升级前统一清理）、父进程监视 helper 退出并把日志尾部写状态回报面板。实测（真实容器 + 真实 socket）：0.0.12 → 0.0.11 重建约 4 秒完成；重建前后容器名/卷/端口/restart/网络/env/WorkingDir/Cmd 逐项一致，Hostname 正确重新分配；数据完整（节点、累计流量、rollups）；审计有记录；再升回 0.0.12 成功；失败注入（不存在的 tag）被拒且容器未动、服务 200；未挂 socket 回落 manual 返回可复制命令（无回归）。发布 0.0.11 与 0.0.12（各 18 资产 + 两个镜像），本机生产升到 0.0.12 且二进制与 release 资产一致；0.0.11 的公开发布说明已追加更正段。
+
+### Main Changes
+
+- internal/dockerapi：Engine API 最小客户端 + Recreate（含回滚）+ 单测（unix socket 上的假 daemon，含 create/start 失败两条回滚路径、预检失败不动容器、no-op）
+- cmd/docker-self-recreate：helper 子命令；internal/upgrade：Mode/CurrentMode、docker-recreate 分支、helper 监视与清理
+- 设置键 server_upgrade_docker_socket；RPC 暴露 mode/detail/image/digest；helper 接管时不退出进程
+- 前端 mode 感知文案 + socket 权限提示 + 状态未知不渲染按钮；5 语言 25 键；产物重建与哈希更新
+- 文档：MAINTAINING §14.6（容器一键升级与安全边界）与 §14.6.1（0.0.11 缺陷记录）、§14.2 支持矩阵更正、README、spec/backend/server-upgrade.md
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c663d96` | feat(upgrade): 容器部署也能一键升级（docker socket + helper 重建容器） |
+| `c434af7` | fix(upgrade): 容器升级 helper 改用当前镜像 + 保留现场 + 监视退出（0.0.12） |
+
+### Testing
+
+- [OK] 真实容器 E2E：0.0.12→0.0.11 与 0.0.11→0.0.12 各约 4 秒完成；配置逐项一致；数据完整；审计有记录
+- [OK] 失败注入：不存在的 tag 被拒、容器 ID 未变、服务仍 200
+- [OK] 无 socket 容器：mode=manual、supported=false、返回 docker pull 命令（无回归）
+- [OK] dockerapi 单测 73.6% 覆盖 + upgrade 侧 helper 参数/挂载测试；check-repo --full 十项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 真实容器里的自动回滚注入（需要占端口/容器名，测试不具结论性，单测已覆盖两条路径）
+- 可选：容器模式下把 helper 的执行摘要也写进审计日志（当前只有请求记录）
