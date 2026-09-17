@@ -417,9 +417,11 @@ func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, er
 			report.UpdatedAt = values.timestamp.Add(time.Millisecond)
 		}
 		// 仅当两次上报都带有效的开机时长时才把"回退"当成 agent 重启：
-		// v2 协议的报告没有 uptime 字段（服务端读到 0），而同一节点可能同时走 v1 POST
-		// 与 v2 WS 两条通道上报，零值会让每次 v1→v2 切换都被误判成重启，
-		// 那条上报的流量增量就被强制置 0（实测表现为整分钟丢流量）。
+		// v2 协议的报告没有 uptime 字段（服务端读到 0），拿这个 0 与 v1 报告的有效值比较，
+		// 会在通道切换时（v2 整体失败降级到 v1、之后重连回 v2，见 agent/server/websocket.go
+		// 的 runPostFallback/runV2PullLoop）被误判成 agent 重启，那条上报的流量增量被置 0。
+		// 注意：agent 同一时刻只走一条通道，本地部署也从未观测到降级，因此**没有证据**表明
+		// 这个缺陷曾在实测中触发；保留判据是防御性的正确性修复，不要据此声称它解释过任何实测现象。
 		agentRestart := values.hasUptime && report.Uptime > 0 && values.uptime > 0 && report.Uptime < values.uptime
 		counterResetUp := values.hasUp && report.Network.TotalUp < values.totalUp
 		counterResetDown := values.hasDown && report.Network.TotalDown < values.totalDown

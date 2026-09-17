@@ -534,8 +534,9 @@ func TestWriteReportFeedsTrafficAccumulator(t *testing.T) {
 	}
 }
 
-// v2 协议的报告不带 uptime（服务端读到 0），而同一节点可能同时用 v1（带 uptime）
-// 与 v2（不带）两条通道上报。零值不能被判成 agent 重启，否则交错上报会把流量增量清零。
+// v2 协议的报告不带 uptime（服务端读到 0）。零值不能被判成 agent 重启，否则节点在
+// v2↔v1 之间切换（降级/重连是 agent 里真实存在的路径）时，那条上报的流量增量会被清零。
+// 说明：这个缺陷是否曾在实测中触发没有证据，本测试锁的是"零值不得当作重启"这条语义。
 func TestWriteReportKeepsTrafficWhenUptimeMissing(t *testing.T) {
 	ctx := context.Background()
 	s := useReportTestStore(t, nil)

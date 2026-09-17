@@ -23,6 +23,7 @@ These guides help you **ask the right questions before coding**.
 |-------|---------|-------------|
 | [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
 | [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
+| [Evidence & Claims Guide](./evidence-and-claims-guide.md) | 结论的证据标准：区分观测与推断、判别性实验、结论被推翻时的全落点更正 | 写下任何"原因/已定位/已知问题"结论时；修改文档或发布说明时 |
 
 ---
 

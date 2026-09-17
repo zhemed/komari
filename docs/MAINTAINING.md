@@ -115,6 +115,9 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 
 1. 同步版本字面量（`scripts/version.env` 的 `KOMARI_VERSION`、`install-komari.sh` 的 `REPO_TAG`、
    `install-agent.sh` 的 `default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`）。
+   **发布说明的措辞门禁**（2026-09-17 事故后加，见 `.trellis/spec/guides/evidence-and-claims-guide.md`）：
+   说明里每写一条"修复/原因/已知问题"，都必须能指向一条判别性验证（命令或测试）写进正文；
+   是推断就要标置信度，是"已知问题"就要给下一步实验，不许把推断写成"已定位"。
 2. 服务器静态产物（需 zig）：
    ```bash
    KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
@@ -285,10 +288,15 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
     线上每分钟点值恰为真实值的 1/20，修复版**逐分钟精确等于**真实值；`hours=24` 的 300s 桶值
     等于该 5 分钟内各分钟之和（如 11:25 桶 1,653,537 B = 294+300+2,661+942+1,649,340）。
 
-  **已经修掉的一条确因**：v2 协议的报告没有 `uptime` 字段，服务端读到 0，而"agent 是否重启"的
-  判据是 `report.Uptime < values.uptime`；节点从 v2 **降级**到 v1（v1 报告带真实开机时长）时会
-  互相误判成重启、把该条上报的增量清零。判据已改为"两次上报都必须带有效 uptime"
+  **一个已修掉、但从未被证实触发过的缺陷（0.0.6 写成"确因"，是过度断言，在此更正）**：
+  v2 协议的报告没有 `uptime` 字段，服务端读到 0，而"agent 是否重启"的判据是
+  `report.Uptime < values.uptime`；**若**节点在 v2 与 v1 之间切换（v2 整体失败降级到 v1，
+  之后重连回 v2——这是 agent 里真实存在的代码路径），两侧的 uptime 会互相误判成重启、
+  把该条上报的增量清零。判据已改为"两次上报都必须带有效 uptime"
   （`report_batcher.go`），回归测试 `TestWriteReportKeepsTrafficWhenUptimeMissing`。
+  **证据边界**：本机 agent 的表报日志里只有 v2 WebSocket（从未降级），所以这个缺陷
+  有没有在真实环境触发过，我们**没有证据**；当初把它写成"已定位的原因"是把
+  "代码路径上必然发生"当成了"实测观测到"，这是本次错误的第二个来源。
 
   **关于"两条通道"的更正**：agent 的设计是**同一时刻只走一条上报通道**——
   v2 WebSocket（首选）→ 连不上时进 v2 HTTP POST 回退（报告 POST + 事件 pull 两条 POST 循环，
@@ -552,4 +560,4 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 - 改协议层时要同时看两条入口；v1 属**冻结兼容**（服务老 agent 与降级路径），
   不要在没有理由的情况下删它——删掉会让只懂 v1 的节点失联，也让 agent 的兜底失去意义。
 - 与协议版本唯一相关的一次修复：v2 报告没有 `uptime` 字段，而"agent 是否重启"的判据依赖它，
-  于是 v1↔v2 切换时会误判并把增量清零（详见 §7）。
+  **若**发生 v1↔v2 切换就会误判并把增量清零（详见 §7；该缺陷存在但从未被证实触发过）。
