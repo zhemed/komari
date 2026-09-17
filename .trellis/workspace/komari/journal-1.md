@@ -324,3 +324,47 @@
 
 - 残留个分钟级流量增量噪声（60s 桶压成 300s）需要临时逐条上报日志才能定性，属独立小课题
 - 面板未显示每节点协议版本（v1/v2），可选加一个字段方便判断节点走的哪条通道
+
+
+## Session 14: 定位并修复流量图点值被除以采样条数（发布 0.0.7）
+<!-- trellis-session: v=2 fp=ba1591e9ebd80471 -->
+
+**Date**: 2026-09-17
+**Task**: 定位并修复流量图点值被除以采样条数（发布 0.0.7）
+**Branch**: `main`
+
+### Summary
+
+用户报面板流量图个别分钟偏低/偶发 2×。按先取证据再改语义的顺序查：用 60s 桶端点对齐逐分钟核对（本桶 Σ增量 vs 相邻桶计数器差值），636 个分钟逐分钟零误差、10.5 小时全窗口只差 336 B、计数器零回退——记录侧没有丢数；同时更正了 MAINTAINING §7 里先前那条错误观测（05:38 只记到 5.5 KB 而计数器涨 190 KB，实为混着 60s/300s 两种分辨率比出来的假象，实测两边都是 5,554 B）。真正根因在查询端：queryMetrics 对 traffic.up/down 采用客户端全局聚合偏好（面板默认 avg），而这两个指标每个采样点是两次上报之间的字节数，取平均等于再除以桶内采样条数——实测 60/60 分钟的 真实值÷点值 精确等于采样条数（20），条数不齐时缩放比变化即表现为噪声。修法：把 records 路径早就存在的按指标语义聚合约定抽成唯一来源 metricstore.SemanticAggregation，queryMetrics 优先级改为 按指标显式指定 > 语义默认 > 全局指定 > avg（traffic→sum、net.total→last）。验证不改线上：复制 data/ 到备用端口跑修复版，与线上 0.0.6 对拍面板同款参数——线上点值恰为真实值 1/20，修复版逐分钟精确相等。随后发布 0.0.7：版本线四处字面量+文档标题，提交 fc7d6e8 后构建（服务端 2 平台静态 + agent 14 平台 + SHA256SUMS 共 17 资产）→ 打 tag → gh release → 两个镜像四标签推 ghcr 并匿名校验（2/2/3/3 架构）；本机部署随即从 release 资产升级，服务器二进制与资产 sha256 逐字节一致（2cd36d38…，版本行 0.0.7 hash fc7d6e8），agent 0.0.7 复用原 UUID，实测修复生效：面板同款请求 5/5 分钟点值与库中真实量完全一致（含 count=19 的分钟），累计表跨升级继续增长到 2731.3MB/909.8MB。顺带修掉发版流程里的一个坑：check-repo --full 的 agent 门禁默认调用 build-agent.sh（该脚本会 rm -rf dist/agent），按 §3.4 的顺序跑会把刚建好的 14 个 agent 资产冲成 1 个——已改为构建到 .build/check-agent，并把 §3.4 第 6 步漏掉的 komari-agent-SHA256SUMS 补进清单。
+
+### Main Changes
+
+- metricstore.SemanticAggregation 成为指标语义聚合的唯一来源；queryMetrics 优先级改为 按指标显式 > 语义默认 > 全局 > avg
+- 新增测试：internal/metricstore/semantic_aggregation_test.go、public_metric_test.go 的 TestResolveMetricAggregationPrecedence
+- 文档：MAINTAINING §7 换成实测定位过程并更正旧错误观测；新增 spec/backend/metric-query-aggregation.md
+- check-repo 的 agent 门禁改用 .build/check-agent，不再冲掉 dist/ 发版资产；§3.4 资产清单补全
+- 发布 0.0.7：17 个资产 + ghcr 两个镜像四标签（匿名可拉取）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `48dca2e` | fix(metrics): traffic.up/down 查询按语义求和，修面板流量图点值被除以采样条数 |
+| `fc7d6e8` | chore(release): 版本线 0.0.6 → 0.0.7（流量查询聚合修复） |
+| `2109504` | fix(scripts): check-repo 的 agent 门禁改用 .build/check-agent，避免冲掉 dist/ 发版资产 |
+
+### Testing
+
+- [OK] 逐分钟对拍 636/636 分钟零误差；全窗口差额 +336 B；累计表与记录增量差 -0.33%（端点对齐精度内）
+- [OK] 备用端口对拍：线上点值=真实值÷20，修复版逐分钟精确等于真实值；300s 桶=五分钟之和
+- [OK] 升级后实测：版本 0.0.7/fc7d6e8、二进制与资产 sha256 一致、面板同款请求 5/5 分钟精确一致、节点在线（时延 2.3s）、累计表继续增长
+- [OK] check-repo.sh --full 十项全绿，且 dist/agent 14 个产物完好（验证修好的门禁不再冲产物）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 面板不显示每节点协议版本（服务端内存里已有 protocolVersion，展示起来不大）
+- 面板流量图两档分辨率（60s/300s）的点值量级差 5 倍；若要同量纲，需前端按响应 interval_seconds 归一化成速率
