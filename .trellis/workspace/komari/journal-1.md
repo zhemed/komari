@@ -724,3 +724,38 @@
 ### Next Steps
 
 - 可选：把同一条规则写进全局 ~/.dsh/AGENTS.md，让本机所有项目都受约束（需用户确认）
+
+
+## Session 24: 强制规则推广到全局（~/.dsh/AGENTS.md）：有 .trellis/ 的项目全部适用
+<!-- trellis-session: v=2 fp=7cbb060a1c640e7e -->
+
+**Date**: 2026-09-17
+**Task**: 强制规则推广到全局（~/.dsh/AGENTS.md）：有 .trellis/ 的项目全部适用
+**Branch**: `main`
+
+### Summary
+
+在全局 AGENTS.md 增加 TRELLIS-MANDATORY 段（托管块之外）：先建任务（含只读调查）、提交带 [task:slug]、收尾留痕、项目闸门优先、诚实边界；komari 指南同步记录
+
+### Main Changes
+
+- ~/.dsh/AGENTS.md 新增 TRELLIS-MANDATORY 块（31-59 行），原两个托管块未改动
+- .trellis/spec/guides/trellis-gate-guide.md 增加全局推广一节
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `30e5c2c` | docs(gate): 强制规则推广到全局 ~/.dsh/AGENTS.md（有 .trellis/ 的项目全部适用） [task:global-trellis-rule] |
+
+### Testing
+
+- [OK] 结构核对通过；check-trellis-gate + check-repo 通过；CI success
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 其它启用 Trellis 的项目如需机械拦截，照 komari 的 .githooks + 审计脚本 + CI 复制
