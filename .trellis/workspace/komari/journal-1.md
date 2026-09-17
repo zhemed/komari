@@ -651,3 +651,39 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 22: 文档一致性：容器部署命令去掉 socket 挂载，统一零配置升级口径
+<!-- trellis-session: v=2 fp=8c395085e913726d -->
+
+**Date**: 2026-09-17
+**Task**: 文档一致性：容器部署命令去掉 socket 挂载，统一零配置升级口径
+**Branch**: `main`
+
+### Summary
+
+8 处'必须挂 socket/没挂只给命令'的残留一次性清掉：README 命令块、README 升级功能点、MAINTAINING §14.2/§14.6/§14.4.2、3 处代码注释；纯文档不改行为，check-repo --full 全绿，无需发版
+
+### Main Changes
+
+- README Docker 命令块删掉 socket 挂载行，改为默认零配置（一键升级开箱可用）
+- MAINTAINING §14.2 矩阵/§14.6 标题/示例注释/§14.4.2 末条统一为三条口径（默认替换 / socket 可选重建 / 不挂则重建会回退）
+- 代码注释同步（ModeManual 条件、upgradeSupports 含 container-replace、helper 当前镜像+不自动删除）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a5c53fa` | docs: 统一容器升级口径——命令不再挂 socket，零配置即可网页升级 |
+
+### Testing
+
+- [OK] grep 复核旧说法仅剩历史更正段；gofmt/build 干净；check-repo --full 10/10；raw README 已更新
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户侧：现有容器升到 ≥0.0.14 后即可只用面板按钮（历史版本仍需手工重建一次）
