@@ -586,3 +586,35 @@
 ### Next Steps
 
 - 用户侧只需用 0.0.14 镜像重建一次容器（他的 0.0.5 容器本身没有升级功能），之后即可一键升级
+
+
+## Session 20: 去掉升级弹窗里的 Github 按钮（0.0.15）
+<!-- trellis-session: v=2 fp=fc0d91a52f333f83 -->
+
+**Date**: 2026-09-17
+**Task**: 去掉升级弹窗里的 Github 按钮（0.0.15）
+**Branch**: `main`
+
+### Summary
+
+用户要求：升级弹窗里的 Github 按钮去掉（升级弹窗只保留真正要做的操作）。改动只在 AdminPanelBar 的"有新版本"弹窗底部——移除指向 latestRelease.html_url 的 Github 按钮；关于页里的仓库链接保持不变（那是仓库信息不是操作入口）。前端产物重建并更新 FRONTEND_TREE_SHA256（c92ceb77→6c158ec6）；版本线 0.0.14→0.0.15 并发布 0.0.15（18 资产 + 两个镜像）。验证：真实容器（不挂 socket）里用浏览器打开弹窗，底部按钮只剩「安装此版本」与「立即升级（容器内替换）到 0.0.15」，截图 .build/shots/no-github-button.png；弹窗正文里仍出现 Github 字样属发布说明文本，不是按钮。用户侧无需任何手工操作——直接在面板点按钮升到 0.0.15 即可。
+
+### Main Changes
+
+- frontend/src/components/admin/AdminPanelBar.tsx：移除升级弹窗底部的 Github 按钮
+- 前端产物重建 + FRONTEND_TREE_SHA256 更新；版本线 0.0.15 与发布（含镜像）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b6bc4d7` | feat(ui): 去掉升级弹窗里的 Github 按钮（0.0.15） |
+
+### Testing
+
+- [OK] 浏览器实测：弹窗按钮集合 = [安装此版本, 立即升级（容器内替换）到 0.0.15]，无 Github 按钮（截图留证）
+- [OK] check-repo.sh 全部通过；容器形态 supported=true 仍可一键升级
+
+### Status
+
+[OK] **Completed**
