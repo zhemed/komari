@@ -545,3 +545,44 @@
 
 - 真实容器里的自动回滚注入（需要占端口/容器名，测试不具结论性，单测已覆盖两条路径）
 - 可选：容器模式下把 helper 的执行摘要也写进审计日志（当前只有请求记录）
+
+
+## Session 19: 容器零配置网页升级（0.0.13 引入，0.0.14 修两个缺陷）
+<!-- trellis-session: v=2 fp=27c99acc4bb68ccf -->
+
+**Date**: 2026-09-17
+**Task**: 容器零配置网页升级（0.0.13 引入，0.0.14 修两个缺陷）
+**Branch**: `main`
+
+### Summary
+
+用户明确表态：他给的任务只有"网页端升级"，而我此前把容器形态做成了"要么挂 docker.sock、要么只给命令"，都不满足需求。本任务补齐真正的零配置路径：容器 + 无 socket + 目录可写 → ModeContainerReplace（下载 release 资产 → 校验 komari-SHA256SUMS → 自检版本行 → 备份 + 原子替换 → syscall.Exec 原地重执行），re-exec 失败回落 exit(42)，只读 rootfs 回落 manual。E2E 发现两个缺陷并在 0.0.14 修复：(1) supported 判定有两处内联表达式漏掉新模式 → 面板不显示按钮（接口层可用，所以命令行实测是通的）；(2) SelfExec 的等值校验写错——二进制替换后 /proc/self/exe 跟随 inode 指向备份文件，导致 exec 永不执行、实际靠 docker restart 策略兜住（没有 restart 策略就升不动）；改为只校验目标文件存在且可执行。最终实测（真实容器、不挂 socket、用户原命令形态）：mode=container-replace、supported=true、0.0.14→0.0.13 约 6 秒、容器 ID 不变、重启次数 0→0、容器内二进制与发布资产 md5 一致、备份生成、数据单调不减、升回 0.0.14 成功。文档更正"必须挂 socket"的过头说法（README + MAINTAINING §14.4.2/§14.6 三条路径对照表）；0.0.13 的公开发布说明追加更正段。发布 0.0.13 与 0.0.14（各 18 资产 + 两个镜像），本机生产升到 0.0.14，check-repo --full 全绿。
+
+### Main Changes
+
+- internal/upgrade：ModeContainerReplace + Plan/Result.InContainer + selfexec.go（syscall.Exec）
+- Prepare 容器分支改为三条：挂 socket→重建容器 / 无 socket 且可写→容器内替换 / 不可写→manual
+- RPC：InContainer 时先 SelfExec 失败回落 exit；supported 统一走 upgradeSupports()
+- 前端：立即升级（容器内替换）文案、原地重启阶段、"重建容器会回退"提示；5 语言各 3 键；产物重建与哈希更新
+- 文档：README 与 MAINTAINING §14.4.2/§14.6 更正"必须挂 socket"的说法，给出三条路径对照表
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `247aa9f` | feat(upgrade): 容器零配置网页升级（容器内替换二进制 + 原地重执行） |
+| `5b478ee` | fix(upgrade): 修 0.0.13 容器零配置升级的两个缺陷（0.0.14） |
+
+### Testing
+
+- [OK] 真实容器（不挂 socket）：0.0.14→0.0.13→0.0.14 往返，容器 ID 不变、RestartCount 0→0、二进制与资产一致、数据完好
+- [OK] supported=true / mode=container-replace（面板会显示按钮）；只读回落 manual 有单测
+- [OK] check-repo.sh --full 十项全绿；0.0.13 公开说明已更正
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户侧只需用 0.0.14 镜像重建一次容器（他的 0.0.5 容器本身没有升级功能），之后即可一键升级

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 18
+- **Total Sessions**: 19
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~547 | Active |
+| `journal-1.md` | ~588 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 19 | 2026-09-17 | 容器零配置网页升级（0.0.13 引入，0.0.14 修两个缺陷） | `247aa9f`, `5b478ee` | `main` |
 | 18 | 2026-09-17 | 容器一键升级：docker socket + helper 重建容器（0.0.11 引入，0.0.12 修缺陷） | `c663d96`, `c434af7` | `main` |
 | 17 | 2026-09-17 | 容器形态暴露可复制的升级命令（发布 0.0.10） | `f24b743`, `b976210` | `main` |
 | 16 | 2026-09-17 | 面板一键升级服务器（0.0.8 功能 + 0.0.9 修 E2E 抓到的缺陷） | `c671364`, `6421ec9`, `8dea6a6` | `main` |
