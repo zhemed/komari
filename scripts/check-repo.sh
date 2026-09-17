@@ -143,7 +143,10 @@ if [ "${FULL}" = "1" ]; then
   fi
 
   head_ "10. agent 构建门禁"
-  if ./scripts/build-agent.sh --only linux/amd64 >/tmp/check-repo-agent.log 2>&1; then
+  # 必须换输出目录：build-agent.sh 默认写 dist/agent 且开头就 rm -rf 该目录，
+  # 直接跑会把刚构建好的发版资产清成单平台产物（2026-09-17 实际踩到——按
+  # docs/MAINTAINING.md §3.4 的顺序“先建资产、再跑 --full”，自检把 14 个 agent 产物冲掉）。
+  if KOMARI_AGENT_OUTPUT="${REPO_ROOT}/.build/check-agent" ./scripts/build-agent.sh --only linux/amd64 >/tmp/check-repo-agent.log 2>&1; then
     ok "agent 单平台构建 + 三道门禁通过"
   else
     bad "agent 构建门禁失败（详见 /tmp/check-repo-agent.log）"; tail -3 /tmp/check-repo-agent.log | sed 's/^/      /'

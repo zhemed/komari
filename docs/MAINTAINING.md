@@ -123,10 +123,14 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 3. agent 全平台（14 个，纯 Go）：`./scripts/build-agent.sh`
 4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含版本字面量一致性、文档锚点、
    `go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希）。
+   自检里的 agent 门禁构建到 `.build/check-agent`，**不会动 `dist/`**；反过来说，
+   `scripts/build-agent.sh` 默认写的就是 `dist/agent` 并会先清空该目录，别拿它当临时构建用。
 5. `git tag <版本> && git push origin <版本>`
-6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes "..." \
-      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/agent/komari-agent-*`
-7. 推送镜像：`./scripts/build-agent-image.sh --push`
+6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes-file <说明.md> \
+      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/komari-agent-SHA256SUMS \
+      dist/agent/komari-agent-*`
+   （共 17 个资产：服务端 2 + agent 14 + `komari-agent-SHA256SUMS`；agent 安装脚本按清单校验）
+7. 推送镜像：`./scripts/build-server-image.sh --push && ./scripts/build-agent-image.sh --push`
 
 > **顺序很重要**：服务器二进制的版本 hash 来自构建时的 `git rev-parse HEAD`，
 > 且 Go 会把 VCS 信息也编进去。所以**先提交、后构建**，否则 release 里的二进制
