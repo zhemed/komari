@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.5）
+# 维护本仓库（komari 自维护版 · 当前 0.0.6）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.5**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.6**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.5`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.6`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
