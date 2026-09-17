@@ -687,3 +687,40 @@
 ### Next Steps
 
 - 用户侧：现有容器升到 ≥0.0.14 后即可只用面板按钮（历史版本仍需手工重建一次）
+
+
+## Session 23: Trellis 强制闸门：提交时拦截 + 事后审计 + GitHub CI 兜底
+<!-- trellis-session: v=2 fp=4e9d868969032aed -->
+
+**Date**: 2026-09-17
+**Task**: Trellis 强制闸门：提交时拦截 + 事后审计 + GitHub CI 兜底
+**Branch**: `main`
+
+### Summary
+
+用户定调 Trellis 是强制规则；落地三层闸门（git hook 拦截 / check-repo 第 8 项审计 / GitHub Actions 兜底），8 个本地场景 + CI 成功与失败两个方向全部实测
+
+### Main Changes
+
+- .githooks/pre-commit + commit-msg：无进行中任务或消息缺 [task:<slug>] 直接拒绝提交
+- scripts/check-trellis-gate.sh 逐提交审计（抓 --no-verify 绕过），接入 check-repo 第 8 项
+- .github/workflows/trellis-gate.yml + 一键安装脚本 + AGENTS.md 强制规则段 + MAINTAINING §2.2 + spec 指南
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `922e1a9` | feat(gate): Trellis 强制闸门：提交时拦截 + 事后审计 + GitHub CI 兜底 [task:trellis-mandatory-gate] |
+| `afa8fb9` | docs(gate): 记录远程闸门用法与两个方向的实测证据 [task:trellis-mandatory-gate] |
+
+### Testing
+
+- [OK] 临时克隆 8 场景全符合预期；CI run 35231550788 success / 35231788694 failure；check-repo --full 11 项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：把同一条规则写进全局 ~/.dsh/AGENTS.md，让本机所有项目都受约束（需用户确认）

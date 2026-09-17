@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 22
+- **Total Sessions**: 23
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~689 | Active |
+| `journal-1.md` | ~726 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 23 | 2026-09-17 | Trellis 强制闸门：提交时拦截 + 事后审计 + GitHub CI 兜底 | `922e1a9`, `afa8fb9` | `main` |
 | 22 | 2026-09-17 | 文档一致性：容器部署命令去掉 socket 挂载，统一零配置升级口径 | `a5c53fa` | `main` |
 | 21 | 2026-09-17 | 修"点升级后卡住、必须手动刷新"（0.0.16） | `585f02d` | `main` |
 | 20 | 2026-09-17 | 去掉升级弹窗里的 Github 按钮（0.0.15） | `b6bc4d7` | `main` |
