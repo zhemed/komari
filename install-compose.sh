@@ -41,6 +41,26 @@ ok()   { printf '\033[32m%s\033[0m\n' "$*"; }
 warn() { printf '\033[33m[警告] %s\033[0m\n' "$*"; }
 die()  { printf '\033[31m[错误] %s\033[0m\n' "$*" >&2; exit 1; }
 
+# 生成唯一的备份名：时间戳 + 纳秒；不支持 %N 的平台回退 PID+RANDOM。
+# 只到秒会让**同一秒内**的多次 --force 互相覆盖——实测 4 次连跑后只剩 1 份备份，
+# "只保留最近 3 份"因此形同虚设（脚本/CI 高频调用时）。2026-09-18 用户实测报告。
+unique_backup_name() {
+  local base="$1" ts ns candidate
+  ts="$(date -u +%Y%m%d-%H%M%S)"
+  ns="$(date -u +%N 2>/dev/null || true)"
+  case "$ns" in
+    '' | *[!0-9]*) ns="$$-$RANDOM" ;;   # BSD/极小 busybox：没有 %N
+    *) ns="${ns:0:6}" ;;                # 微秒精度足够唯一，名字也不至于太长
+  esac
+  candidate="$PROJECT_DIR/$base.bak-$ts-$ns"
+  # 兜底：万一名字仍被占用（PID 复用等），继续抖到不冲突为止，绝不覆盖既有备份。
+  while [ -e "$candidate" ]; do
+    candidate="$PROJECT_DIR/$base.bak-$ts-$ns-$RANDOM"
+  done
+  printf '%s' "$candidate"
+}
+
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir) PROJECT_DIR="${2:?--dir 需要路径}"; shift 2 ;;
@@ -98,11 +118,11 @@ if [ "$EXISTS" = 1 ] && [ "$FORCE" != 1 ]; then
   fi
 fi
 if [ "$EXISTS" = 1 ] && [ "$FORCE" = 1 ]; then
-  BACKUP_TS="$(date -u +%Y%m%d-%H%M%S)"
   for f in ${COMPOSE_FILE:+compose.yaml} "${LEGACY_NAMES[@]}"; do
     [ -f "$PROJECT_DIR/$f" ] || continue
-    mv "$PROJECT_DIR/$f" "$PROJECT_DIR/$f.bak-$BACKUP_TS"
-    warn "已把 $f 备份为 $f.bak-$BACKUP_TS（保证只有一个 compose 文件生效）"
+    backup_path="$(unique_backup_name "$f")"
+    mv "$PROJECT_DIR/$f" "$backup_path"
+    warn "已把 $f 备份为 $(basename "$backup_path")（保证只有一个 compose 文件生效）"
   done
   # 反复 --force 会让 compose.yaml.bak-* 累积；只保留最近 $BACKUP_KEEP 份。
   # 历史名备份（<历史名>.bak-*）是**用户原来的文件**，永远不自动删。
