@@ -969,3 +969,39 @@
 ### Next Steps
 
 - 用户侧：面板里确认数据与图表正常；后续升级=面板点一下 + 同步 compose 里的 tag
+
+
+## Session 31: compose tag 自动同步 + host 网络下识别自身容器（0.0.18 待发）
+<!-- trellis-session: v=2 fp=7bdbcaee7c47f463 -->
+
+**Date**: 2026-09-18
+**Task**: compose tag 自动同步 + host 网络下识别自身容器（0.0.18 待发）
+**Branch**: `main`
+
+### Summary
+
+实现方案 A（helper 升级后自动把 compose 文件 image tag 改成新版本）；E2E 过程中抓到并修复两个真 bug：host 网络下识别不了自身容器（静默退回容器内替换）与 ListContainers 路径拼错 404
+
+### Main Changes
+
+- internal/upgrade/compose.go：标签解析 + 只换 tag 的行级改写（保留仓库名/注释/权限，.bak + 原子替换）
+- helperBinds 挂 compose 目录、helperPayload 传参、docker-self-recreate 成功后同步
+- internal/dockerapi/selfid.go：bind 挂载比对识别自身容器（host 网络唯一可靠线索）+ ListContainers 路径修正
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dd0486a` | feat(upgrade): compose tag 自动同步 + host 网络下识别自身容器（0.0.18） [task:compose-tag-autosync] |
+
+### Testing
+
+- [OK] compose 同步 7 类单测 + 自识别整链 + 路径回归；判别性验证；真实 E2E 全绿（含改文件不再回退）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户点头发 0.0.18，然后把生产 compose 从 0.0.17 升到 0.0.18（B 策略才真正生效）
