@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 26
+- **Total Sessions**: 27
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~836 | Active |
+| `journal-1.md` | ~869 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 27 | 2026-09-18 | Docker Compose 部署方案审查（真实镜像逐条验证） | - | `main` |
 | 26 | 2026-09-18 | 去掉安装/改密口令的强度与长度校验（发布 0.0.17） | `3698480` | `main` |
 | 25 | 2026-09-17 | 仓库体检：清残留 + 瘦身本地产物 + 钉死镜像基线与测试门控 + 前端死代码 | `fc1b597`, `dc61273` | `main` |
 | 24 | 2026-09-17 | 强制规则推广到全局（~/.dsh/AGENTS.md）：有 .trellis/ 的项目全部适用 | `30e5c2c` | `main` |

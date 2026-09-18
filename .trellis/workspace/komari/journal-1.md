@@ -834,3 +834,36 @@
 ### Next Steps
 
 - 可选：把口令哈希从 sha256+常量盐 换成 bcrypt/argon2（含老口令迁移），需另开任务
+
+
+## Session 27: Docker Compose 部署方案审查（真实镜像逐条验证）
+<!-- trellis-session: v=2 fp=f2355fc6c8d38611 -->
+
+**Date**: 2026-09-18
+**Task**: Docker Compose 部署方案审查（真实镜像逐条验证）
+**Branch**: `main`
+
+### Summary
+
+对用户未定稿的 compose 做实测审查：确认 host 网络/env/卷/TZ/healthcheck 机制正确，指出 5 处必改（版本钉错、healthcheck 噪音、日志无上限、冗余 env、升级交互取舍）并给出定稿
+
+### Main Changes
+
+- 验证方式：用 0.0.17 镜像起临时 compose（host 网络 + 备用端口），实测 healthy、TZ、curl/wget 探针、日志驱动默认值
+- 关键证据：0.0.7 的 docker-self-recreate 子命令不存在（unknown command）→ 钉旧版会失去面板升级能力
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] compose config 校验通过；health status=healthy；容器与临时目录已清理
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 待用户定：是否把 compose 形态写进 README/MAINTAINING；是否授权在 /opt/docker/komari 实际部署
