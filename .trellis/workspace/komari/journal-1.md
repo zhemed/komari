@@ -867,3 +867,35 @@
 ### Next Steps
 
 - 待用户定：是否把 compose 形态写进 README/MAINTAINING；是否授权在 /opt/docker/komari 实际部署
+
+
+## Session 28: 日志上限取值：实测日志速率并给出 max-size/max-file 建议
+<!-- trellis-session: v=2 fp=1eb42a86cc2325d3 -->
+
+**Date**: 2026-09-18
+**Task**: 日志上限取值：实测日志速率并给出 max-size/max-file 建议
+**Branch**: `main`
+
+### Summary
+
+实测容器日志来源与速率（空载/仪表盘常开均 0 行、每请求 74 B、每页 4.6 KB），结合面板日志走 DB(30 天保留) 的事实，给出 10m×3=30MB 的建议与大规模场景的 20m×5
+
+### Main Changes
+
+- 确认面板日志页读 DB 不影响 docker 轮转；agent v2(WS) 不产生 HTTP 日志行、v1(POST) 每报一行
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 300 次请求/5 次页面浏览实测；空载 120s 与仪表盘 180s 零输出；环境清理无残留
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 若定版后要固化：可把 compose 定稿与日志建议写进 README/MAINTAINING
