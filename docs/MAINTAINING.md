@@ -779,8 +779,17 @@ docker run -d --name komari --restart always --network host \
 ### 15.1 目录约定
 
 - 伞目录 `/opt/docker/`（750，root:root），**一项目一子目录**；komari 落在 `/opt/docker/komari/`；
-- 里面只有两样东西：`docker-compose.yml` 与 `data/`——**`data/` 是唯一有状态的东西**（备份它即可）；
-- 容器以 root 运行（镜像未设 `USER`），bind mount 由 docker 创建为 root:root，与伞目录 750 不冲突。
+- 里面只有两样东西：`compose.yaml` 与 `data/`——**`data/` 是唯一有状态的东西**（备份它即可）；
+- 容器以 root 运行（镜像未设 `USER`），bind mount 由 docker 创建为 root:root，与伞目录 750 不冲突；
+- **文件名用 `compose.yaml`**：compose v2 的**首选名**。实测（本机 compose 5.4.0，成对比较）
+  优先级为 `compose.yaml` > `compose.yml` > `docker-compose.yml` > `docker-compose.yaml`；
+  同时存在多个会告警并选优先级最高者。`docker-compose.yml` 是 v1 时代的历史名，v2 仍然认，
+  但保留它容易让人误以为要用老的 `docker-compose` 二进制，新部署不再使用。
+- **改名后要 `--force-recreate` 一次**（2026-09-18 实测）：`mv docker-compose.yml compose.yaml` 之后
+  直接 `docker compose up -d` **不会**重建容器（配置哈希没变），容器上的
+  `com.docker.compose.project.config_files` 标签仍指向旧路径——而 §15.4 的 tag 自动同步正是读这个标签，
+  会因此静默失效（日志里是"compose 文件不可读"）。跑一次
+  `docker compose up -d --force-recreate` 让标签更新即可。
 
 ### 15.2 定稿 compose 的取值与依据
 
@@ -846,7 +855,8 @@ curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/insta
 它做的事：建目录（默认 `/opt/docker/komari`，750）→ 写 compose（内容与 §15.2 定稿一致）→
 `docker compose up -d` → 等 healthy → 打印访问地址、数据目录、升级与回滚方式。要点：
 
-- **幂等**：已存在 `docker-compose.yml` 时**拒绝覆盖**（保护现有部署），要覆盖得显式 `--force`；
+- **幂等**：已存在 compose 文件（`compose.yaml` 或任一历史名）时**拒绝覆盖**（保护现有部署），
+  要覆盖得显式 `--force`；发现历史命名会打印迁移命令（`mv … compose.yaml && docker compose up -d`）；
   `./data` 永远不会被脚本删除或覆盖；
 - 参数：`--dir` 换目录、`--name` 换容器名、`--tag` 换版本、`--port` 用端口映射替代 host 网络、
   `--no-socket` 做不挂 socket 的最小权限部署、`--no-start` 只写文件不启动；

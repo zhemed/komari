@@ -4,7 +4,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
 #
-# 它做的事：建项目目录（默认 /opt/docker/komari，750）→ 写 docker-compose.yml
+# 它做的事：建项目目录（默认 /opt/docker/komari，750）→ 写 compose.yaml
 # （钉版本 / host 网络 / 日志上限 / healthcheck / 可选挂 docker.sock）→ docker compose up -d
 # → 等健康检查通过 → 打印访问地址与后续操作。
 #
@@ -16,7 +16,7 @@
 #   --port <端口>    改用端口映射（去掉 host 网络，映射 <端口>:25774）
 #   --tz <时区>      容器时区（默认取宿主机 /etc/timezone，取不到用 Asia/Shanghai）
 #   --no-socket      不挂 /var/run/docker.sock（放弃面板内一键升级，最小权限部署）
-#   --force          项目目录已有 docker-compose.yml 时覆盖（默认拒绝，保护现有部署）
+#   --force          项目目录已有 compose 文件时覆盖（默认拒绝，保护现有部署）
 #   --no-start       只写文件，不启动
 #
 # 幂等：默认不会覆盖已存在的 compose 文件；加 --force 才会重写并重建容器。
@@ -63,7 +63,19 @@ done
 command -v docker >/dev/null 2>&1 || die "未找到 docker：请先安装 Docker Engine（https://docs.docker.com/engine/install/）"
 docker compose version >/dev/null 2>&1 || die "未找到 docker compose（v2）：请安装 docker-compose-plugin"
 
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
+# 文件名用 compose.yaml：compose v2 的**首选名**（实测优先级 compose.yaml > compose.yml >
+# docker-compose.yml > docker-compose.yaml）。后两个是 v1 时代的历史名，v2 仍认，但不建议新部署使用。
+COMPOSE_FILE="$PROJECT_DIR/compose.yaml"
+LEGACY_NAMES=()
+for f in compose.yml docker-compose.yml docker-compose.yaml; do
+  [ -f "$PROJECT_DIR/$f" ] && LEGACY_NAMES+=("$f")
+done
+if [ "${#LEGACY_NAMES[@]}" -gt 0 ]; then
+  die "项目目录里已有历史命名的 compose 文件：${LEGACY_NAMES[*]}
+      建议迁移到 compose.yaml（compose v2 的首选名）后重跑，例如：
+        mv $PROJECT_DIR/${LEGACY_NAMES[0]} $COMPOSE_FILE && cd $PROJECT_DIR && docker compose up -d
+      确实要覆盖：加 --force（会写入 compose.yaml，历史文件保留）"
+fi
 if [ -f "$COMPOSE_FILE" ] && [ "$FORCE" != 1 ]; then
   die "$COMPOSE_FILE 已存在（可能是现有部署）。要覆盖请加 --force；只想启停请直接在该目录跑 docker compose up -d / down"
 fi

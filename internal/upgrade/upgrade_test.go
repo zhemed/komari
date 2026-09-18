@@ -364,7 +364,7 @@ func TestHelperPayloadAndBindsForCompose(t *testing.T) {
 		Config: map[string]any{
 			"Labels": map[string]any{
 				composeServiceLabel: "komari",
-				composeFilesLabel:   "/opt/docker/komari/docker-compose.yml",
+				composeFilesLabel:   "/opt/docker/komari/compose.yaml",
 			},
 		},
 		Mounts: []dockerapi.Mount{
@@ -383,7 +383,7 @@ func TestHelperPayloadAndBindsForCompose(t *testing.T) {
 		composeInfoFromContainer(self))
 	cmd, _ := payload["Cmd"].([]string)
 	joinedCmd := strings.Join(cmd, " ")
-	for _, want := range []string{"--compose-files /opt/docker/komari/docker-compose.yml", "--compose-service komari"} {
+	for _, want := range []string{"--compose-files /opt/docker/komari/compose.yaml", "--compose-service komari"} {
 		if !strings.Contains(joinedCmd, want) {
 			t.Errorf("helper 命令缺少 %q：%s", want, joinedCmd)
 		}
