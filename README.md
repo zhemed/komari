@@ -52,7 +52,20 @@ sudo bash install-komari.sh
 
 ### 方式一：Docker（无需源码）
 
-推荐用 docker compose（钉版本、日志有上限、healthcheck 就绪）：
+**一条命令部署**（写入 `/opt/docker/komari/docker-compose.yml` 并启动；幂等，不会覆盖已有部署）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
+```
+
+需要换目录/版本/容器名，或要做**不挂 socket 的最小权限部署**时加参数（`| sudo bash -s -- --help` 看全部）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | \
+  sudo bash -s -- --dir /opt/docker/komari --tag 0.0.18 --no-socket
+```
+
+也可以自己写这份 compose（脚本生成的就是它）：
 
 ```yaml
 # /opt/docker/komari/docker-compose.yml
@@ -93,7 +106,7 @@ docker compose up -d
   升级成功后 helper 会**自动把上面 ① 的 tag 改成新版本**（0.0.18 起），所以之后改这个文件不会把版本拉回去
 - 想用端口映射而不是 host 网络：删掉 `network_mode: host`，改成 `ports: ["25774:25774"]`
 - 不用 compose 的最小形态：
-  `docker run -d --name komari --restart always --network host -v ./data:/app/data ghcr.io/zhemed/komari:0.0.17`
+  `docker run -d --name komari --restart unless-stopped --network host -v ./data:/app/data ghcr.io/zhemed/komari:0.0.18`
 
 ### 方式二：源码构建
 

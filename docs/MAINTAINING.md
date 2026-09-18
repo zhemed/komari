@@ -153,7 +153,8 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 一次发布 = **整套栈**：服务器静态产物 + 14 个 agent 资产 + agent 镜像。
 
 1. 同步版本字面量（`scripts/version.env` 的 `KOMARI_VERSION`、`install-komari.sh` 的 `REPO_TAG`、
-   `install-agent.sh` 的 `default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`）。
+   `install-compose.sh` 的 `DEFAULT_TAG`、`install-agent.sh` 的 `default_agent_version`、
+   `install-agent.ps1` 的 `$DefaultAgentVersion`；`check-repo` 第 1 项逐个校验）。
    **发布说明的措辞门禁**（2026-09-17 事故后加，见 `.trellis/spec/guides/evidence-and-claims-guide.md`）：
    说明里每写一条"修复/原因/已知问题"，都必须能指向一条判别性验证（命令或测试）写进正文；
    是推断就要标置信度，是"已知问题"就要给下一步实验，不许把推断写成"已定位"。
@@ -304,8 +305,8 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   决定采纳时有意识地 `git fetch upstream <ref>` 后 cherry-pick——`upstream` 的 fetch refspec
   目前被锁在 tag 1.4.3，这是防止误引入 1.5.x 的**安全默认**，不要随手改掉。
 - **关于页/GitHub 按钮已指向我们**（补丁 0006）：`src/pages/admin/about.tsx` 读的是本仓库 README。
-- **`install-komari.sh` 的 tag 是字面量**：它是给 `curl | bash` 用的独立脚本，没法在运行时读
-  `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步）。
+- **`install-komari.sh` / `install-compose.sh` 的 tag 是字面量**：它们是给 `curl | bash` 用的独立脚本，
+  没法在运行时读 `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步；漏改会被 `check-repo` 第 1 项拦下）。
 - **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
   `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本仓库（无插件/无通知）
   有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
@@ -833,3 +834,34 @@ helper 容器按原 `Config`/`HostConfig` 重建自身容器 → **版本与镜�
 不挂 socket 时走**容器内替换**（0.0.13 起的零配置路径），那种形态下**重建容器会退回镜像版本**；
 两种形态的完整对照见 §14.2 与 §14.4.2。生产约定选 B，是为了"版本与镜像一致、避免回退困惑"，
 代价是接受 socket 的权限面。
+
+### 15.6 一条命令部署（install-compose.sh）与重启策略
+
+**一条命令**（仓库根的 `install-compose.sh`，`curl | bash` 形态）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
+```
+
+它做的事：建目录（默认 `/opt/docker/komari`，750）→ 写 compose（内容与 §15.2 定稿一致）→
+`docker compose up -d` → 等 healthy → 打印访问地址、数据目录、升级与回滚方式。要点：
+
+- **幂等**：已存在 `docker-compose.yml` 时**拒绝覆盖**（保护现有部署），要覆盖得显式 `--force`；
+  `./data` 永远不会被脚本删除或覆盖；
+- 参数：`--dir` 换目录、`--name` 换容器名、`--tag` 换版本、`--port` 用端口映射替代 host 网络、
+  `--no-socket` 做不挂 socket 的最小权限部署、`--no-start` 只写文件不启动；
+- **容器名冲突预检**（实测踩到）：同名容器若属于别的项目目录，脚本在启动前就报错并给出解法
+  （本机已有生产容器 `komari` 时，用默认名会撞车——不能等 `compose up` 起一半再报 Conflict）。
+
+**重启策略：定稿用 `unless-stopped`**，与 `always` 的差别：
+
+| 场景 | `unless-stopped` | `always` |
+|---|---|---|
+| 进程崩溃 / 升级兜底 `exit(42)`（`web/rpc/jsonrpc/admin.upgrade.go:229`） | 重启（**实测**：杀掉 PID 1 → `RestartCount=1`，服务 2 秒后恢复 307） | 重启 |
+| 宿主 / dockerd 重启 | 重启；**但之前被 `docker stop` 过就保持停止** | 重启，**包括你手工 `docker stop` 过的**（Docker 既定语义，本机未重启 dockerd 验证） |
+| 面板升级重建容器（B 策略） | 策略随 `HostConfig` 复制保留（**实测**：`unless-stopped` → `unless-stopped`） | 同 |
+| healthcheck 失败 | 不触发重启（需要外部 autoheal，两者一样） | 同 |
+
+结论：用 `unless-stopped`——它覆盖了"崩了要拉起来"的全部现实场景（含升级失败兜底），
+同时尊重运维的一次 `docker stop`；`always` 会在下一次 dockerd/宿主重启时把被刻意停掉的容器
+又拉起来，属于惊吓而不是健壮。
