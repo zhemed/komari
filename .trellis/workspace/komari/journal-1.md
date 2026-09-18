@@ -1084,3 +1084,38 @@
 ### Next Steps
 
 - 随 0.0.18 发布一起推送；发布后把生产 compose 升到 0.0.18
+
+
+## Session 34: 发布 0.0.18 + 生产升级（B 策略真正生效）
+<!-- trellis-session: v=2 fp=664a2a54ce8399af -->
+
+**Date**: 2026-09-18
+**Task**: 发布 0.0.18 + 生产升级（B 策略真正生效）
+**Branch**: `main`
+
+### Summary
+
+推送 10 个提交、发 0.0.18（18 资产 + 两镜像）、生产 compose 从 0.0.17 升到 0.0.18；在生产容器内实测自识别返回正确 ID，确认重建容器模式生效
+
+### Main Changes
+
+- release 0.0.18（含 compose tag 自动同步、host 网络自识别修复、一条命令部署、README 删减）
+- 生产：compose tag 0.0.17→0.0.18，pull + up -d，数据与流量完好、agent 自动重连
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4479580` | chore(task): archive 09-18-readme-trim |
+
+### Testing
+
+- [OK] 生产容器内 SelfContainerID == docker inspect ID（实测）；check-repo --full 11 项全绿；CI success；面板 200
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 后续升级直接用面板按钮（helper 会自动同步 compose 里的 tag）；可选改进项见 MAINTAINING §7

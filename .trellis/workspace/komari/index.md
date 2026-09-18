@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 33
+- **Total Sessions**: 34
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1086 | Active |
+| `journal-1.md` | ~1121 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 34 | 2026-09-18 | 发布 0.0.18 + 生产升级（B 策略真正生效） | `4479580` | `main` |
 | 33 | 2026-09-18 | README 大面积删减（175 → 53 行） | `5d3bf9b` | `main` |
 | 32 | 2026-09-18 | 重启策略评估 + 一条命令部署（install-compose.sh） | `d907c6e` | `main` |
 | 31 | 2026-09-18 | compose tag 自动同步 + host 网络下识别自身容器（0.0.18 待发） | `dd0486a` | `main` |
