@@ -50,23 +50,51 @@ sudo bash install-komari.sh
 交互式菜单提供安装 / 升级 / 卸载 / 查看状态 / 查看日志 / 重启 / 停止 / 清理升级备份；
 默认装到 `/opt/komari`，创建 `komari.service`（`Restart=always`）。
 
-### 方式一：Docker 镜像（无需源码）
+### 方式一：Docker（无需源码）
+
+推荐用 docker compose（钉版本、日志有上限、healthcheck 就绪）：
+
+```yaml
+# /opt/docker/komari/docker-compose.yml
+services:
+  komari:
+    image: ghcr.io/zhemed/komari:0.0.17   # ① 钉具体版本（≥0.0.13 才有面板一键升级）
+    container_name: komari
+    restart: unless-stopped
+    network_mode: host                     # ② 用 host 网络时不要写 ports
+    environment:
+      TZ: Asia/Shanghai
+      KOMARI_LISTEN: 0.0.0.0:25774
+    volumes:
+      - ./data:/app/data                            # ③ 唯一有状态的东西（备份它就够了）
+      - /var/run/docker.sock:/var/run/docker.sock   # ④ 升级走"拉镜像+重建容器"，见下方说明
+    logging:                               # ⑤ docker 默认 json-file 无上限
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:                           # ⑥ 用 curl：镜像自带，且不会把 HTML 灌进健康日志
+      test: ["CMD", "curl", "-fsSL", "-o", "/dev/null", "http://127.0.0.1:25774/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+```
 
 ```bash
-docker run -d --name komari --restart always \
-  --network host \
-  -v ./data:/app/data \
-  ghcr.io/zhemed/komari:latest
+mkdir -p /opt/docker/komari && cd /opt/docker/komari   # 目录约定：一项目一子目录
+docker compose up -d
 ```
 
 - 多架构镜像（amd64/arm64），数据保存在宿主机的 `./data`
 - 启动后访问 `http://localhost:25774` 完成初始化
-- **网页一键升级在容器里开箱可用**：面板会在容器内下载新版本、校验、替换二进制并原地重启
-  （不需要任何挂载或额外配置）。
-- 可选：把 `/var/run/docker.sock` 挂进来则改用"拉镜像 + 重建容器"模式——版本与镜像完全一致，
-  但等于把**宿主机 root 等价权限**交给该容器，请自行权衡；
-  不挂 socket 时，**重建容器**（`docker rm + run` / `compose up`）会把二进制退回镜像版本。
-- 不想用 host 网络时，把 `--network host` 换成 `-p 25774:25774`
+- **面板一键升级**：挂了 `/var/run/docker.sock`（上面 ④）时用"拉镜像 + helper 重建容器"，
+  **版本与镜像始终一致**；代价是该容器获得**宿主机 root 等价权限**，不需要就地升级就别挂。
+  升级后请把 compose 里的 tag 同步改成新版本——否则之后**改这个文件的任何一行**都会触发重建、
+  按文件里的旧 tag 把版本拉回去（行为实测见 [docs/MAINTAINING.md](./docs/MAINTAINING.md) §15）
+- 想用端口映射而不是 host 网络：删掉 `network_mode: host`，改成 `ports: ["25774:25774"]`
+- 不用 compose 的最小形态：
+  `docker run -d --name komari --restart always --network host -v ./data:/app/data ghcr.io/zhemed/komari:0.0.17`
 
 ### 方式二：源码构建
 

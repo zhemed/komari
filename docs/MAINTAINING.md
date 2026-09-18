@@ -756,7 +756,7 @@ docker run -d --name komari --restart always --network host \
 ```
 
 - `docker restart` / `docker compose restart` **不会**升级（还是旧镜像），必须是 pull + 重建；
-  compose 用户用 `docker compose pull && docker compose up -d`；
+  compose 用户见 §15（本仓库生产约定：挂 socket 用面板升级，并把 compose 里的 tag 同步改掉）；
 - 数据在数据卷里（`-v ./data:/app/data`），重建容器不影响；
 - 升级前后对比实测（0.0.5 → 0.0.9，用生产库副本）：节点数、累计流量、metric rollups 全部保留；
 - 服务端在版本变化前会自己备份：`./data/backup/upgrade-<时间>.zip`
@@ -772,3 +772,51 @@ docker run -d --name komari --restart always --network host \
   签名体系（minisign/GPG）留待后续；
 - 故意**没有**给 `admin:upgradeServer` 标记 `rpc.MarkSensitive`：那会让每次调用都必须带 2FA 码，
   而面板目前没有该提示流程。若后续接上提示，应把它加入敏感方法。
+
+## 15. 部署约定：Docker Compose（2026-09-18 与用户共同定版）
+
+### 15.1 目录约定
+
+- 伞目录 `/opt/docker/`（750，root:root），**一项目一子目录**；komari 落在 `/opt/docker/komari/`；
+- 里面只有两样东西：`docker-compose.yml` 与 `data/`——**`data/` 是唯一有状态的东西**（备份它即可）；
+- 容器以 root 运行（镜像未设 `USER`），bind mount 由 docker 创建为 root:root，与伞目录 750 不冲突。
+
+### 15.2 定稿 compose 的取值与依据
+
+| 项 | 取值 | 依据 |
+|---|---|---|
+| 镜像 tag | 钉明确版本（如 `:0.0.17`），不用 `:latest` | 回滚有落点；且**≥0.0.13** 才有面板一键升级（0.0.11 才引入 helper 子命令） |
+| `network_mode` | `host` → **不写 `ports`** | 容器与宿主同 netns，`127.0.0.1` 即宿主回环（实测） |
+| `KOMARI_LISTEN` | `0.0.0.0:25774` | 真实环境变量：`cmd/server.go:25` 读取，默认值即此 |
+| `TZ` | `Asia/Shanghai` | 镜像装了 tzdata；实测容器日志 21:40(CST) vs 探针 13:40(UTC) |
+| 数据卷 | `./data:/app/data` | 应用用相对路径 `./data`（`database/dbcore/dbcore.go:204`）+ `WORKDIR /app` |
+| `logging` | `max-size: "10m"` + `max-file: "3"`（上限 30 MB） | 实测：空载 120 s、仪表盘常开 180 s 均 **0 行**；每次请求 ~74 B；v2(WS) 上报不落日志，v1(POST) 每报一行（3 s 间隔 ≈ **4.5 MB/天**）。典型部署 30 MB ≈ 数周；跑 v1 老 agent 的用 `20m × 5` |
+| `healthcheck` | `curl -fsSL -o /dev/null http://127.0.0.1:25774/` | 镜像自带 curl（实测退出码 0）；`wget -qO-` 会把整个 HTML 灌进健康日志（实测单次 **3020 B**） |
+
+> 面板"日志"页读的是数据库 `models.Log`，有 **30 天**保留（`database/auditlog/log.go:30`），
+> 因此 docker 日志轮转**不会**丢掉面板里能看到的内容。
+
+### 15.3 升级策略（用户拍板：B）
+
+**B = 挂 `/var/run/docker.sock`，走"拉镜像 + helper 重建容器"**：面板拉取目标 tag 的镜像，
+helper 容器按原 `Config`/`HostConfig` 重建自身容器 → **版本与镜像始终一致**，容器名不变，
+旧容器改名为 `<名字>-old-<时间戳>` 留作回滚点（见 §14.6）。代价：docker socket ≈ 宿主 root。
+
+### 15.4 Compose 与面板升级的交互（2026-09-18 实测三条）
+
+实测方法：compose 项目（钉 `0.0.17` + 挂 socket）→ 用真 helper 重建到 `0.0.16`（等价于面板升级）→ 观察。
+
+| 场景 | 实测结果 | 含义 |
+|---|---|---|
+| 文件不动，直接 `docker compose up -d` | 容器仍是 **0.0.16**，没有重建回 0.0.17 | compose 用 `com.docker.compose.config-hash` 判断、**不比对镜像 tag**；helper 逐字段照抄 `Config`，所以 compose 标签保留、`docker compose ps` 照常识别 |
+| 改了文件**任一字段**（`max-size` 10m→11m）后再 `up -d` | 触发重建，版本**回到文件里的 0.0.17** | 面板升级后**必须把 compose 里的 tag 同步改成新版本**，否则任何一次文件改动都会把版本拉回去 |
+| 升级后再次 `up -d` / `down` | 回滚点 `komari-<name>-old-<ts>` 被当作孤儿容器 **Removed** | 想保住回滚点：在需要回滚之前别跑 compose 命令。`docker compose ps` 不受影响 |
+
+**操作规程**：面板升级成功后 → 把 compose 里的 `image:` 改成同一版本（这一行本身会触发一次
+"重建到同版本"，结果一致）→ 平时尽量少动该文件。
+
+### 15.5 与"不挂 socket"形态的关系
+
+不挂 socket 时走**容器内替换**（0.0.13 起的零配置路径），那种形态下**重建容器会退回镜像版本**；
+两种形态的完整对照见 §14.2 与 §14.4.2。生产约定选 B，是为了"版本与镜像一致、避免回退困惑"，
+代价是接受 socket 的权限面。
