@@ -28,6 +28,8 @@ type fakeDaemon struct {
 	failStart  bool
 	helpOutput string
 	newImageID string
+	// listItems 是 GET /containers/json 的返回（识别自身容器时用）。
+	listItems []ContainerSummary
 }
 
 func (f *fakeDaemon) record(msg string) {
@@ -80,6 +82,17 @@ func newTestClient(t *testing.T) (*Client, *fakeDaemon) {
 	handle("/_ping", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("OK")) })
 	handle("/version", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"ApiVersion": "1.41", "Version": "24.0.7"})
+	})
+	// 容器列表：识别自身容器（bind 挂载比对）要用。
+	handle("/containers/json", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		f.record("list:all=" + r.URL.Query().Get("all"))
+		items := f.listItems
+		f.mu.Unlock()
+		if items == nil {
+			items = []ContainerSummary{}
+		}
+		_ = json.NewEncoder(w).Encode(items)
 	})
 	handle("/images/create", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()

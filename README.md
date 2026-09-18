@@ -90,8 +90,7 @@ docker compose up -d
 - 启动后访问 `http://localhost:25774` 完成初始化
 - **面板一键升级**：挂了 `/var/run/docker.sock`（上面 ④）时用"拉镜像 + helper 重建容器"，
   **版本与镜像始终一致**；代价是该容器获得**宿主机 root 等价权限**，不需要就地升级就别挂。
-  升级后请把 compose 里的 tag 同步改成新版本——否则之后**改这个文件的任何一行**都会触发重建、
-  按文件里的旧 tag 把版本拉回去（行为实测见 [docs/MAINTAINING.md](./docs/MAINTAINING.md) §15）
+  升级成功后 helper 会**自动把上面 ① 的 tag 改成新版本**（0.0.18 起），所以之后改这个文件不会把版本拉回去
 - 想用端口映射而不是 host 网络：删掉 `network_mode: host`，改成 `ports: ["25774:25774"]`
 - 不用 compose 的最小形态：
   `docker run -d --name komari --restart always --network host -v ./data:/app/data ghcr.io/zhemed/komari:0.0.17`

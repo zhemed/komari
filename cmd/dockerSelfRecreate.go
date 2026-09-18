@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/komari-monitor/komari/cmd/flags"
@@ -28,7 +29,36 @@ var (
 	dockerSelfRecreateStateDir  string
 	dockerSelfRecreateSocket    string
 	dockerSelfRecreateTimeout   time.Duration
+	// compose 部署时由服务端传入：升级成功后把 compose 文件里的 image tag 同步成新版本。
+	dockerSelfRecreateComposeFiles   string
+	dockerSelfRecreateComposeService string
 )
+
+// syncComposeTag 把 compose 文件里本 service 的 image tag 同步成目标版本。
+//
+// 只在收到 --compose-files/--compose-service 时执行；任何失败都只记日志，
+// **不影响升级结果**（容器已经重建成功，这里只是消除"文件 tag 落后"的后续陷阱）。
+func syncComposeTag() {
+	if dockerSelfRecreateComposeService == "" || strings.TrimSpace(dockerSelfRecreateComposeFiles) == "" {
+		return
+	}
+	for _, file := range strings.Split(dockerSelfRecreateComposeFiles, ",") {
+		if file = strings.TrimSpace(file); file == "" {
+			continue
+		}
+		res, err := upgrade.SyncComposeImage(file, dockerSelfRecreateComposeService, dockerSelfRecreateImage)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "[docker-self-recreate] compose 同步失败（不影响升级）: %v\n", err)
+			continue
+		}
+		if res.Changed {
+			_, _ = fmt.Fprintf(os.Stdout, "[docker-self-recreate] compose synced: %s  %s -> %s（备份 %s）\n",
+				res.File, res.OldImage, res.NewImage, res.BackupPath)
+			return
+		}
+		_, _ = fmt.Fprintf(os.Stdout, "[docker-self-recreate] compose 跳过 %s：%s\n", res.File, res.Reason)
+	}
+}
 
 var DockerSelfRecreateCmd = &cobra.Command{
 	Use:   "docker-self-recreate",
@@ -87,6 +117,7 @@ var DockerSelfRecreateCmd = &cobra.Command{
 		}
 		_, _ = fmt.Fprintf(os.Stdout, "[docker-self-recreate] done: new=%s old=%s digest=%s\n",
 			res.NewContainerID, res.OldContainerName, digest)
+		syncComposeTag()
 		writeState(upgrade.PhaseCompleted, nil, res, digest)
 		return nil
 	},
@@ -99,6 +130,8 @@ func init() {
 	DockerSelfRecreateCmd.Flags().StringVar(&dockerSelfRecreateStateDir, "state-dir", "", "升级状态文件目录（容器内的数据目录）")
 	DockerSelfRecreateCmd.Flags().StringVar(&dockerSelfRecreateSocket, "socket", "", "docker socket 路径（默认 /var/run/docker.sock）")
 	DockerSelfRecreateCmd.Flags().DurationVar(&dockerSelfRecreateTimeout, "timeout", 10*time.Minute, "整体超时")
+	DockerSelfRecreateCmd.Flags().StringVar(&dockerSelfRecreateComposeFiles, "compose-files", "", "compose 部署：配置文件路径（逗号分隔，升级成功后同步 image tag）")
+	DockerSelfRecreateCmd.Flags().StringVar(&dockerSelfRecreateComposeService, "compose-service", "", "compose 部署：本容器所属 service 名")
 	_ = flags.DatabaseFile // 本子命令不碰数据库，保持与其它子命令一致的包依赖
 	RootCmd.AddCommand(DockerSelfRecreateCmd)
 }

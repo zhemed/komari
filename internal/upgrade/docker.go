@@ -17,8 +17,12 @@ const (
 	DefaultImageBinaryPath = "/app/komari"
 )
 
-// dockerSocketReady 判断 socket 是否真的可用（存在 + daemon 应答）。
-// 只有真的可用才启用"重建容器"模式；否则一律回落到手工模式。
+// dockerSocketReady 判断 socket 是否真的可用（存在 + daemon 应答 + 能认出自己所在的容器）。
+// 只有真的可用才启用"重建容器"模式；否则一律回落到容器内替换/手工模式。
+//
+// 识别自身容器用 dockerapi.Client.SelfContainerID：hostname → cgroup → bind 挂载比对。
+// 第三条是 2026-09-18 补的：`network_mode: host` 的容器 hostname 是宿主名、cgroup v2 是
+// `0::/`，只靠前两条会判不出自己，于是静默退回"容器内替换"（重建容器模式形同虚设）。
 func dockerSocketReady(ctx context.Context, socketPath string) (selfID string, err error) {
 	client := dockerapi.NewClient(socketPath)
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -29,9 +33,9 @@ func dockerSocketReady(ctx context.Context, socketPath string) (selfID string, e
 	if _, err := client.ServerVersion(pingCtx); err != nil {
 		return "", err
 	}
-	selfID = dockerapi.DetectSelfContainerID()
-	if selfID == "" {
-		return "", fmt.Errorf("无法识别自身容器（hostname 与 /proc/self/cgroup 都不含容器 ID）")
+	selfID, err = client.SelfContainerID(ctx)
+	if err != nil {
+		return "", err
 	}
 	return selfID, nil
 }
@@ -42,7 +46,10 @@ func dockerSocketReady(ctx context.Context, socketPath string) (selfID string, e
 // 用目标镜像时，降级到 0.0.10 及更早的镜像没有该子命令，helper 会秒退），只挂 docker socket
 // 与数据目录（写状态文件用），不挂业务需要的其它卷；**不自动删除**——命名并打标签保留现场，
 // 由下一次升级前的清理或人工 `docker logs` 查因。
-func helperPayload(helperImage, helperName, selfID, targetImage, sanityTag, stateDir, socketPath, binaryPath string, binds []string) map[string]any {
+//
+// compose 部署（compose.Usable()）时额外告诉 helper：升级成功后把 compose 文件里本 service
+// 的 image tag 同步成新版本（不然文件的 tag 落后，之后任何一次文件编辑都会按旧 tag 把版本拉回去）。
+func helperPayload(helperImage, helperName, selfID, targetImage, sanityTag, stateDir, socketPath, binaryPath string, binds []string, compose ComposeInfo) map[string]any {
 	if binaryPath == "" {
 		binaryPath = DefaultImageBinaryPath
 	}
@@ -59,6 +66,11 @@ func helperPayload(helperImage, helperName, selfID, targetImage, sanityTag, stat
 	if stateDir != "" {
 		cmd = append(cmd, "--state-dir", stateDir)
 	}
+	if compose.Usable() {
+		cmd = append(cmd,
+			"--compose-files", strings.Join(compose.Files, ","),
+			"--compose-service", compose.Service)
+	}
 	return map[string]any{
 		"Image":  helperImage,
 		"Cmd":    cmd,
@@ -73,7 +85,8 @@ func helperPayload(helperImage, helperName, selfID, targetImage, sanityTag, stat
 	}
 }
 
-// helperBinds 计算 helper 需要的卷：docker socket + 状态文件所在的数据目录。
+// helperBinds 计算 helper 需要的卷：docker socket + 状态文件所在的数据目录
+// +（compose 部署时）compose 文件所在目录，供升级成功后同步 image tag。
 // 用**被升级容器自己的 Mounts** 里的宿主路径，这样即使宿主路径与容器内路径不同也能挂对。
 func helperBinds(self dockerapi.Container, socketPath, stateDir string) []string {
 	var binds []string
@@ -98,6 +111,10 @@ func helperBinds(self dockerapi.Container, socketPath, stateDir string) []string
 			}
 		}
 	}
+
+	// compose 部署：把 compose 文件所在目录挂进 helper，升级成功后同步 image tag
+	//（挂目录而非文件：同步用"写临时文件 + rename"原子替换，rename 到挂载点会失败）。
+	binds = append(binds, composeInfoFromContainer(self).DirBinds()...)
 	return binds
 }
 
@@ -168,7 +185,7 @@ func (o Options) executeDockerRecreate(ctx context.Context, p Plan) (Result, err
 	binds := helperBinds(self, socketPath, o.StateDir)
 	helperName := helperContainerName()
 	payload := helperPayload(selfImage, helperName, selfID, p.TargetImage, p.To, o.StateDir, socketPath,
-		o.ImageBinaryPath, binds)
+		o.ImageBinaryPath, binds, composeInfoFromContainer(self))
 
 	SetStatus(Status{Phase: PhaseReplacing, From: p.From, To: p.To, Detail: "recreating container", Running: true})
 	helperID, err := client.CreateContainer(ctx, helperName, payload)

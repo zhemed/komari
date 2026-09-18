@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.17）
+# 维护本仓库（komari 自维护版 · 当前 0.0.18）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.17**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.18**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.17`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.18`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -802,18 +802,31 @@ docker run -d --name komari --restart always --network host \
 helper 容器按原 `Config`/`HostConfig` 重建自身容器 → **版本与镜像始终一致**，容器名不变，
 旧容器改名为 `<名字>-old-<时间戳>` 留作回滚点（见 §14.6）。代价：docker socket ≈ 宿主 root。
 
-### 15.4 Compose 与面板升级的交互（2026-09-18 实测三条）
+> **host 网络下的自身识别（0.0.18 修）**：`network_mode: host` 时容器 hostname 是**宿主名**、
+> cgroup v2 只有 `0::/`，上游那两条"认出自己是谁"的线索全失效 → 面板会**静默退回容器内替换**，
+> B 策略形同虚设（2026-09-18 实测：`mode=container-replace`，无 helper、旧容器也不留）。
+> 现在多了一条线索：读 `/proc/self/mountinfo` 里的 **bind 挂载宿主路径**，与 Docker 容器列表
+> 的 `Mounts` 比对（`internal/dockerapi/selfid.go`）。与网络模式、hostname、cgroup 版本都无关。
 
-实测方法：compose 项目（钉 `0.0.17` + 挂 socket）→ 用真 helper 重建到 `0.0.16`（等价于面板升级）→ 观察。
+### 15.4 Compose 与面板升级的交互（2026-09-18 实测）
+
+实测方法：compose 项目（钉 `0.0.18-test` + 挂 socket）→ 用真 helper 重建到 `0.0.16`（等价于面板升级）→ 观察。
 
 | 场景 | 实测结果 | 含义 |
 |---|---|---|
-| 文件不动，直接 `docker compose up -d` | 容器仍是 **0.0.16**，没有重建回 0.0.17 | compose 用 `com.docker.compose.config-hash` 判断、**不比对镜像 tag**；helper 逐字段照抄 `Config`，所以 compose 标签保留、`docker compose ps` 照常识别 |
-| 改了文件**任一字段**（`max-size` 10m→11m）后再 `up -d` | 触发重建，版本**回到文件里的 0.0.17** | 面板升级后**必须把 compose 里的 tag 同步改成新版本**，否则任何一次文件改动都会把版本拉回去 |
+| 文件不动，直接 `docker compose up -d` | 容器仍是面板升到的版本，没有重建回文件里的旧 tag | compose 用 `com.docker.compose.config-hash` 判断、**不比对镜像 tag**；helper 逐字段照抄 `Config`，所以 compose 标签保留、`docker compose ps` 照常识别 |
+| 改了文件**任一字段**（`max-size` 10m→11m）后再 `up -d` | **0.0.18 起：仍是新版本**（文件已被 helper 同步）；**0.0.17 及更早：会按文件里的旧 tag 回退** | 这就是"tag 落后"陷阱；0.0.18 起由 helper 自动改文件消除，不再需要手工同步 |
 | 升级后再次 `up -d` / `down` | 回滚点 `komari-<name>-old-<ts>` 被当作孤儿容器 **Removed** | 想保住回滚点：在需要回滚之前别跑 compose 命令。`docker compose ps` 不受影响 |
 
-**操作规程**：面板升级成功后 → 把 compose 里的 `image:` 改成同一版本（这一行本身会触发一次
-"重建到同版本"，结果一致）→ 平时尽量少动该文件。
+**0.0.18 起的自动同步**（helper 在**新容器启动成功之后**执行，失败不影响升级）：
+
+- 只改目标 service 块里的 `image:` 行，**保留仓库名**（私有 registry/镜像加速不会被改掉）、
+  保留缩进与行尾注释；值已一致则不动文件；
+- 改前留 `<file>.bak`，写临时文件 + `os.Rename` 原子替换，文件权限原样保留；
+- 认不出就跳过（`image:` 用了 `${变量}`、找不到 service、文件不可读）——日志里会写明原因，
+  查 `docker logs komari-upgrade-helper-*`；
+- 路径来源是容器自己的 compose 标签（`com.docker.compose.project.config_files` / `…service`），
+  非 compose 部署**完全不受影响**（helper 不多挂目录、不写文件）。
 
 ### 15.5 与"不挂 socket"形态的关系
 
