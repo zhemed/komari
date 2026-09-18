@@ -1227,3 +1227,38 @@
 ### Next Steps
 
 - 无
+
+
+## Session 38: install-compose 备份名唯一化（修同一秒连跑互相覆盖）
+<!-- trellis-session: v=2 fp=b9e33e575f59bef6 -->
+
+**Date**: 2026-09-18
+**Task**: install-compose 备份名唯一化（修同一秒连跑互相覆盖）
+**Branch**: `main`
+
+### Summary
+
+复现用户报告的同秒撞名（4 次连跑只剩 1 份）→ 备份名加微秒（无 %N 回退 PID-RANDOM）+ 占用兜底；无间隔连跑与 50 次唯一性压力全过
+
+### Main Changes
+
+- unique_backup_name()：亚秒级唯一后缀 + 占用兜底；函数挪到定义区修 command not found
+- 回归测试改无间隔连跑（原测试的 sleep 避开了待测路径，已写入文档教训）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f9e8520` | fix(install-compose): 备份名唯一到微秒（修同一秒连跑互相覆盖） [task:install-compose-backup-unique] |
+
+### Testing
+
+- [OK] 5/10 次无间隔连跑（3 份唯一）、50 次生成 0 重复、历史名备份保留、正常路径回归、check-repo --full 全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无
