@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 32
+- **Total Sessions**: 33
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1043 | Active |
+| `journal-1.md` | ~1086 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,7 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
-| 32 | 2026-09-18 | 重启策略评估 + 一条命令部署（install-compose.sh） | `dd0486a` | `main` |
+| 33 | 2026-09-18 | README 大面积删减（175 → 53 行） | `5d3bf9b` | `main` |
+| 32 | 2026-09-18 | 重启策略评估 + 一条命令部署（install-compose.sh） | `d907c6e` | `main` |
 | 31 | 2026-09-18 | compose tag 自动同步 + host 网络下识别自身容器（0.0.18 待发） | `dd0486a` | `main` |
 | 30 | 2026-09-18 | 生产切换到 compose（/opt/docker/komari，0.0.17，升级策略 B） | `6ed7fbd` | `main` |
 | 29 | 2026-09-18 | 定稿 Compose 部署形态并入仓（升级策略 B + 实测 compose 交互三条） | `644169c` | `main` |
