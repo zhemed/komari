@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 29
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~901 | Active |
+| `journal-1.md` | ~936 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-09-18 | 定稿 Compose 部署形态并入仓（升级策略 B + 实测 compose 交互三条） | `644169c` | `main` |
 | 28 | 2026-09-18 | 日志上限取值：实测日志速率并给出 max-size/max-file 建议 | - | `main` |
 | 27 | 2026-09-18 | Docker Compose 部署方案审查（真实镜像逐条验证） | - | `main` |
 | 26 | 2026-09-18 | 去掉安装/改密口令的强度与长度校验（发布 0.0.17） | `3698480` | `main` |

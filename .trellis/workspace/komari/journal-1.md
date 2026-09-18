@@ -899,3 +899,38 @@
 ### Next Steps
 
 - 若定版后要固化：可把 compose 定稿与日志建议写进 README/MAINTAINING
+
+
+## Session 29: 定稿 Compose 部署形态并入仓（升级策略 B + 实测 compose 交互三条）
+<!-- trellis-session: v=2 fp=968bef276b270683 -->
+
+**Date**: 2026-09-18
+**Task**: 定稿 Compose 部署形态并入仓（升级策略 B + 实测 compose 交互三条）
+**Branch**: `main`
+
+### Summary
+
+用户拍板 B 策略；实测 compose 与面板升级的交互（文件不动不回退、改文件才回退、回滚点会被 compose 清掉），把定稿 compose 与操作规程写进 README 与 MAINTAINING §15
+
+### Main Changes
+
+- README：Docker 段改 compose 优先（钉 tag/host 网络/卷/socket/日志上限/curl healthcheck）
+- MAINTAINING §15：目录约定、逐项取值依据、B 策略、三条交互实测、操作规程；§14.4.2 指向 §15
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `644169c` | docs(deploy): 定稿 Compose 部署形态（升级策略 B：挂 socket 重建容器） [task:compose-mode-b-docs] |
+
+### Testing
+
+- [OK] compose ps 全程识别容器；helper 重建 0.0.17→0.0.16 与改文件回退 0.0.16→0.0.17 均实测；check-repo 通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户点头：推送 5 个本地提交；是否授权在 /opt/docker/komari 实际部署并迁移 data/
