@@ -1191,3 +1191,39 @@
 ### Next Steps
 
 - 无（脚本已定稿）；后续升级用面板按钮即可
+
+
+## Session 37: install-compose 备份治理：摘要提示 + 保留最近 3 份（历史名备份不动）
+<!-- trellis-session: v=2 fp=8664ff998fdb04ec -->
+
+**Date**: 2026-09-18
+**Task**: install-compose 备份治理：摘要提示 + 保留最近 3 份（历史名备份不动）
+**Branch**: `main`
+
+### Summary
+
+按用户建议落地：摘要印出 .bak-* 份数并提示可删；compose.yaml.bak-* 自动保留最近 3 份；历史名备份属用户原文件、永不自动删。6 项断言全过
+
+### Main Changes
+
+- 成功摘要新增备份份数与提示行
+- 自动清理 compose.yaml.bak-*（保留 3 份，带日志）
+- 边界：历史名备份永不自动删；文档 §15.6 记录策略
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `86130f8` | feat(install-compose): 备份文件给提示 + 只保留最近 3 份（历史名备份永不自动删） [task:install-compose-backup-prune] |
+
+### Testing
+
+- [OK] 连续 5 次 --force 后仅剩 3 份 yaml 备份 + 1 份历史名备份；摘要/日志/无多文件告警/healthy 均验证
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无

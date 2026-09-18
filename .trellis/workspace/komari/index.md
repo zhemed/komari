@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 36
+- **Total Sessions**: 37
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1193 | Active |
+| `journal-1.md` | ~1229 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 37 | 2026-09-18 | install-compose 备份治理：摘要提示 + 保留最近 3 份（历史名备份不动） | `86130f8` | `main` |
 | 36 | 2026-09-18 | install-compose.sh 三处改进（干跑跳过预检 / --force 不并存 / 迁移提示补重建） | `7eae40e` | `main` |
 | 35 | 2026-09-18 | compose 文件名核实并切到首选名 compose.yaml | `f263484` | `main` |
 | 34 | 2026-09-18 | 发布 0.0.18 + 生产升级（B 策略真正生效） | `4479580` | `main` |
