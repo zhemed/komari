@@ -934,3 +934,38 @@
 ### Next Steps
 
 - 等用户点头：推送 5 个本地提交；是否授权在 /opt/docker/komari 实际部署并迁移 data/
+
+
+## Session 30: 生产切换到 compose（/opt/docker/komari，0.0.17，升级策略 B）
+<!-- trellis-session: v=2 fp=04fa9e704b2e6376 -->
+
+**Date**: 2026-09-18
+**Task**: 生产切换到 compose（/opt/docker/komari，0.0.17，升级策略 B）
+**Branch**: `main`
+
+### Summary
+
+停用 systemd 0.0.14 实例、备份并迁移数据到 /opt/docker/komari，起 compose（0.0.17 + 挂 socket）；数据/流量历史/节点全部保留，agent 自动重连，healthcheck healthy，含回滚路径
+
+### Main Changes
+
+- 新建 /opt/docker/komari（伞目录 750）+ 定稿 compose（钉 0.0.17/host 网络/socket/日志上限/curl 健康检查）
+- 备份 27M、停用并 disable komari.service（保留 /opt/komari 与 unit 作为回滚）、清理我们遗留的两个 agent 测试容器
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6ed7fbd` | chore(task): archive 09-18-compose-mode-b-docs |
+
+### Testing
+
+- [OK] healthy + restarts=0 + 版本 0.0.17；clients/users/logs/metrics 与基线一致；累计流量保留；升级备份 zip 生成
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户侧：面板里确认数据与图表正常；后续升级=面板点一下 + 同步 compose 里的 tag

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 29
+- **Total Sessions**: 30
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~936 | Active |
+| `journal-1.md` | ~971 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-09-18 | 生产切换到 compose（/opt/docker/komari，0.0.17，升级策略 B） | `6ed7fbd` | `main` |
 | 29 | 2026-09-18 | 定稿 Compose 部署形态并入仓（升级策略 B + 实测 compose 交互三条） | `644169c` | `main` |
 | 28 | 2026-09-18 | 日志上限取值：实测日志速率并给出 max-size/max-file 建议 | - | `main` |
 | 27 | 2026-09-18 | Docker Compose 部署方案审查（真实镜像逐条验证） | - | `main` |
