@@ -856,12 +856,17 @@ curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/insta
 `docker compose up -d` → 等 healthy → 打印访问地址、数据目录、升级与回滚方式。要点：
 
 - **幂等**：已存在 compose 文件（`compose.yaml` 或任一历史名）时**拒绝覆盖**（保护现有部署），
-  要覆盖得显式 `--force`；发现历史命名会打印迁移命令（`mv … compose.yaml && docker compose up -d`）；
-  `./data` 永远不会被脚本删除或覆盖；
+  要覆盖得显式 `--force`；`./data` 永远不会被脚本删除或覆盖；
+- **不会让两个 compose 文件名并存**（2026-09-18，用户点名）：发现历史命名时脚本拒绝执行并打印迁移命令
+  （`mv … compose.yaml && docker compose up -d --force-recreate`，并说明**这会触发一次重建**、
+  为什么要重建）；`--force` 覆盖时把已有的 `compose.yaml`/历史文件逐个改名成 `.bak-<时间戳>` 再写新文件，
+  所以覆盖完目录里只有一个可被 compose 识别的文件名（实测：两个文件都在的情况下也能清干净，且再跑
+  compose 不再出现 "Found multiple config files" 告警）；
 - 参数：`--dir` 换目录、`--name` 换容器名、`--tag` 换版本、`--port` 用端口映射替代 host 网络、
   `--no-socket` 做不挂 socket 的最小权限部署、`--no-start` 只写文件不启动；
 - **容器名冲突预检**（实测踩到）：同名容器若属于别的项目目录，脚本在启动前就报错并给出解法
-  （本机已有生产容器 `komari` 时，用默认名会撞车——不能等 `compose up` 起一半再报 Conflict）。
+  （本机已有生产容器 `komari` 时，用默认名会撞车——不能等 `compose up` 起一半再报 Conflict）；
+  预检只在**真要启动**时做：`--no-start` 是干跑（只写文件、不碰容器），此时跳过预检以便用它生成文件做对比。
 
 **重启策略：定稿用 `unless-stopped`**，与 `always` 的差别：
 

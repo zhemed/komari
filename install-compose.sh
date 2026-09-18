@@ -70,19 +70,46 @@ LEGACY_NAMES=()
 for f in compose.yml docker-compose.yml docker-compose.yaml; do
   [ -f "$PROJECT_DIR/$f" ] && LEGACY_NAMES+=("$f")
 done
-if [ "${#LEGACY_NAMES[@]}" -gt 0 ]; then
-  die "项目目录里已有历史命名的 compose 文件：${LEGACY_NAMES[*]}
-      建议迁移到 compose.yaml（compose v2 的首选名）后重跑，例如：
-        mv $PROJECT_DIR/${LEGACY_NAMES[0]} $COMPOSE_FILE && cd $PROJECT_DIR && docker compose up -d
-      确实要覆盖：加 --force（会写入 compose.yaml，历史文件保留）"
+if [ -f "$COMPOSE_FILE" ]; then
+  EXISTS=1
+else
+  EXISTS=0
 fi
-if [ -f "$COMPOSE_FILE" ] && [ "$FORCE" != 1 ]; then
-  die "$COMPOSE_FILE 已存在（可能是现有部署）。要覆盖请加 --force；只想启停请直接在该目录跑 docker compose up -d / down"
+[ "${#LEGACY_NAMES[@]}" -gt 0 ] && EXISTS=1
+
+if [ "$EXISTS" = 1 ] && [ "$FORCE" != 1 ]; then
+  if [ "${#LEGACY_NAMES[@]}" -gt 0 ]; then
+    NOTE=""
+    if [ -f "$COMPOSE_FILE" ]; then
+      NOTE="
+      （注意：$COMPOSE_FILE 也在，--force 会把它一并备份成 .bak-<时间戳>）"
+    fi
+    die "项目目录里已有 compose 文件：${LEGACY_NAMES[*]}
+      compose v2 的首选名是 compose.yaml，${LEGACY_NAMES[0]} 是 v1 时代的历史名；多个并存会让每次
+      compose 命令都告警。迁移方式（只留一个文件；改名后容器上的配置标签仍指向旧路径，
+      所以要 --force-recreate 触发**一次重建**——几秒空窗）：
+        mv $PROJECT_DIR/${LEGACY_NAMES[0]} $COMPOSE_FILE
+        cd $PROJECT_DIR && docker compose up -d --force-recreate
+      确实要覆盖：加 --force —— 会把历史文件改名为 <名字>.bak-<时间戳> 并写入 compose.yaml，
+      不会让两个 compose 文件名并存。$NOTE"
+  else
+    die "$COMPOSE_FILE 已存在（可能是现有部署）。要覆盖请加 --force（会先备份成 .bak-<时间戳>）；
+      只想启停请直接在该目录跑 docker compose up -d / down"
+  fi
+fi
+if [ "$EXISTS" = 1 ] && [ "$FORCE" = 1 ]; then
+  BACKUP_TS="$(date -u +%Y%m%d-%H%M%S)"
+  for f in ${COMPOSE_FILE:+compose.yaml} "${LEGACY_NAMES[@]}"; do
+    [ -f "$PROJECT_DIR/$f" ] || continue
+    mv "$PROJECT_DIR/$f" "$PROJECT_DIR/$f.bak-$BACKUP_TS"
+    warn "已把 $f 备份为 $f.bak-$BACKUP_TS（保证只有一个 compose 文件生效）"
+  done
 fi
 
 # 容器名冲突预检：同名容器若不属于本项目目录，直接拒绝并给出解法，
 # 而不是等 docker compose 起一半再报 Conflict（2026-09-18 实测踩到）。
-if docker inspect "$NAME" >/dev/null 2>&1; then
+# --no-start 是"干跑"（只写文件、不碰容器）：此时不做预检，否则没法用它生成文件来对比。
+if [ "$START" = 1 ] && docker inspect "$NAME" >/dev/null 2>&1; then
   existing_dir="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$NAME" 2>/dev/null || true)"
   if [ "$existing_dir" != "$PROJECT_DIR" ]; then
     die "已有同名容器 \"$NAME\"（项目目录：${existing_dir:-未知/非 compose}）。换名字加 --name，或换目录加 --dir；确认要替换请先自行处理该容器"
