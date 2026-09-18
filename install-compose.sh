@@ -104,6 +104,15 @@ if [ "$EXISTS" = 1 ] && [ "$FORCE" = 1 ]; then
     mv "$PROJECT_DIR/$f" "$PROJECT_DIR/$f.bak-$BACKUP_TS"
     warn "已把 $f 备份为 $f.bak-$BACKUP_TS（保证只有一个 compose 文件生效）"
   done
+  # 反复 --force 会让 compose.yaml.bak-* 累积；只保留最近 $BACKUP_KEEP 份。
+  # 历史名备份（<历史名>.bak-*）是**用户原来的文件**，永远不自动删。
+  BACKUP_KEEP=3
+  old_backups="$(ls -1t "$PROJECT_DIR"/compose.yaml.bak-* 2>/dev/null | tail -n +$((BACKUP_KEEP + 1)) || true)"
+  if [ -n "$old_backups" ]; then
+    while IFS= read -r f; do
+      rm -f "$f" && warn "清理较旧的备份 $(basename "$f")（只保留最近 $BACKUP_KEEP 份 compose.yaml 备份）"
+    done <<< "$old_backups"
+  fi
 fi
 
 # 容器名冲突预检：同名容器若不属于本项目目录，直接拒绝并给出解法，
@@ -195,6 +204,8 @@ else
   URL="http://localhost:25774"
 fi
 
+BACKUP_COUNT="$(ls -1 "$PROJECT_DIR"/*.bak-* 2>/dev/null | wc -l | tr -d ' ')"
+
 cat <<EOF
 
 ------------------------------------------------------------------------
@@ -202,6 +213,7 @@ cat <<EOF
   面板地址:  $URL   （首次访问会进安装向导）
   数据目录:  $PROJECT_DIR/data
   常用命令:  cd $PROJECT_DIR && docker compose logs -f / restart / down
+  compose 备份:  ${BACKUP_COUNT} 份 *.bak-<时间戳>（$([ "$BACKUP_COUNT" = 0 ] && echo '无' || echo '确认新文件无误后可自行删除')）
 
 升级方式:
   · 挂了 docker.sock：面板里点"立即升级"（拉镜像 + 重建容器，版本与镜像始终一致；

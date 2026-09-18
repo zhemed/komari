@@ -862,6 +862,10 @@ curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/insta
   为什么要重建）；`--force` 覆盖时把已有的 `compose.yaml`/历史文件逐个改名成 `.bak-<时间戳>` 再写新文件，
   所以覆盖完目录里只有一个可被 compose 识别的文件名（实测：两个文件都在的情况下也能清干净，且再跑
   compose 不再出现 "Found multiple config files" 告警）；
+- **备份不会无限累积**（2026-09-18，用户建议）：`compose.yaml.bak-*` 只保留最近 **3** 份，更旧的自动
+  清理并在输出里逐条写明；**历史名备份（`<历史名>.bak-*`）是用户原来的文件，永不自动删**。
+  成功摘要里会印出当前 `.bak-*` 份数，并提示"确认新文件无误后可自行删除"
+  （实测：连续 5 次 `--force` 后只剩 3 份 yaml 备份 + 1 份历史名备份）；
 - 参数：`--dir` 换目录、`--name` 换容器名、`--tag` 换版本、`--port` 用端口映射替代 host 网络、
   `--no-socket` 做不挂 socket 的最小权限部署、`--no-start` 只写文件不启动；
 - **容器名冲突预检**（实测踩到）：同名容器若属于别的项目目录，脚本在启动前就报错并给出解法
