@@ -1005,3 +1005,39 @@
 ### Next Steps
 
 - 等用户点头发 0.0.18，然后把生产 compose 从 0.0.17 升到 0.0.18（B 策略才真正生效）
+
+
+## Session 32: 重启策略评估 + 一条命令部署（install-compose.sh）
+<!-- trellis-session: v=2 fp=5a4835f969d6dc8b -->
+
+**Date**: 2026-09-18
+**Task**: 重启策略评估 + 一条命令部署（install-compose.sh）
+**Branch**: `main`
+
+### Summary
+
+实测评估 unless-stopped vs always（定稿 unless-stopped）；新增 install-compose.sh 一条命令部署（幂等、冲突预检、接入自检），README 与 MAINTAINING §15.6 同步
+
+### Main Changes
+
+- install-compose.sh：建目录/写 compose/up -d/等 healthy/打印用法，支持 --dir/--name/--tag/--port/--no-socket/--no-start
+- 重启策略证据：exit(42) 兜底会被拉起（实测 RestartCount=1）、重建后策略保留（实测）；差别在手工 stop 后重启
+- check-repo 增加 install-compose.sh 的版本字面量与语法校验（判别性验证过）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dd0486a` | feat(upgrade): compose tag 自动同步 + host 网络下识别自身容器（0.0.18） [task:compose-tag-autosync] |
+
+### Testing
+
+- [OK] 脚本 E2E 全流程通过；幂等与撞名防护实测；check-repo --full 11 项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户点头发 0.0.18；发布后把生产 compose 升上去
