@@ -1155,3 +1155,39 @@
 ### Next Steps
 
 - 无；后续升级直接用面板按钮即可（helper 会同步 compose.yaml 里的 tag）
+
+
+## Session 36: install-compose.sh 三处改进（干跑跳过预检 / --force 不并存 / 迁移提示补重建）
+<!-- trellis-session: v=2 fp=6fadb79489016746 -->
+
+**Date**: 2026-09-18
+**Task**: install-compose.sh 三处改进（干跑跳过预检 / --force 不并存 / 迁移提示补重建）
+**Branch**: `main`
+
+### Summary
+
+按用户点名的三处改进并再验一轮：7 项断言 + 双文件并存边界 + 全新目录回归全部通过，文档 §15.6 同步
+
+### Main Changes
+
+- --no-start 干跑跳过容器名预检（真启动仍保护）
+- --force 把已有 compose/历史文件备份成 .bak-<时间戳>，保证只有一个文件名生效
+- 迁移提示补'会触发一次重建'与 --force-recreate 命令
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7eae40e` | fix(install-compose): 三处改进（干跑跳过预检 / --force 不与历史文件并存 / 迁移提示补重建说明） [task:install-compose-fixes] |
+
+### Testing
+
+- [OK] 7 项断言 + 双文件并存 + 全新目录回归 + 生产未受影响 + check-repo --full 全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无（脚本已定稿）；后续升级用面板按钮即可
