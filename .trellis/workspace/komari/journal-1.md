@@ -797,3 +797,40 @@
 ### Next Steps
 
 - 下次发版自然带上前端清理；可选跟进：E2E 升级脚本正式化、Go deadcode 扫描、面板文档链接改指本仓库
+
+
+## Session 26: 去掉安装/改密口令的强度与长度校验（发布 0.0.17）
+<!-- trellis-session: v=2 fp=492f3b80162424dc -->
+
+**Date**: 2026-09-18
+**Task**: 去掉安装/改密口令的强度与长度校验（发布 0.0.17）
+**Branch**: `main`
+
+### Summary
+
+按用户要求删除口令复杂度与长度校验（后端两处 + 前端两处 + 5 语言死键），重写回归测试并做判别性验证，发 0.0.17（18 资产 + 两镜像），用真实镜像 E2E 验证 3 位口令可安装且可登录
+
+### Main Changes
+
+- 后端：install.go 删 hasStrongPassword 与长度校验；admin/update.go 删改密 ≥6 位校验
+- 前端：安装向导与改密页删校验；5 语言删 password_strength_error / password_too_short_error
+- 测试：新契约两条 + 判别性验证（加回规则即 FAIL）；前端产物重建哈希 93a2b61b
+- 发布 0.0.17（18 资产 + 服务器/agent 镜像）；MAINTAINING §4 记录分歧并更正 workflows 行
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3698480` | feat(install): 去掉安装/改密口令的强度与长度校验（0.0.17） [task:relax-install-password-rule] |
+
+### Testing
+
+- [OK] check-repo --full 11 项全绿；真实镜像 E2E：3 位口令安装 200 且登录成功；CI success
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：把口令哈希从 sha256+常量盐 换成 bcrypt/argon2（含老口令迁移），需另开任务
