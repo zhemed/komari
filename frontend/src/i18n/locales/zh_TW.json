@@ -24,8 +24,6 @@
     "otp_empty_error": "空驗證碼",
     "password_empty_error": "不允許空密碼",
     "password_mismatch_error": "兩次輸入的密碼不一致",
-    "password_strength_error": "密碼必須包含大寫，小寫字母和數字",
-    "password_too_short_error": "密碼長度必須至少8位",
     "qr_fetch_error": "無法載入二維碼",
     "title": "帳戶"
   },

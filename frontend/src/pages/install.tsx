@@ -82,10 +82,6 @@ export default function Install() {
     setError("");
     if (step === 1 && !username.trim())
       return setError(t("install.username_required"));
-    if (step === 1 && password.length < 8)
-      return setError(t("account.password_too_short_error"));
-    if (step === 1 && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password))
-      return setError(t("account.password_strength_error"));
     if (step === 1 && password !== passwordAgain)
       return setError(t("account.password_mismatch_error"));
     if (step === 2 && !sitename.trim())

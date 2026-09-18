@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.16）
+# 维护本仓库（komari 自维护版 · 当前 0.0.17）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.16**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.17**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.16`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.17`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -252,7 +252,8 @@ metricstore 不反向依赖 `database/*`。
 | `install-komari.sh` | 指向自有仓库并锁定 tag；`curl -f` + 先下临时文件再替换 | 不再安装上游 1.5.x；失败时不写入错误页、不截断运行中的二进制 |
 | `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游 `komari` 规则锚定为 `/komari` | 后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
 | `Dockerfile` | `ARG TARGETOS/TARGETARCH` 给出默认值 `linux/amd64` | 让普通 `docker build`（非 buildx）也能定位上下文里的二进制 |
-| `.github/workflows`、`.github/actions`、`.github/ISSUE_TEMPLATE` | 全部删除 | 上游流水线会从前端**默认分支**构建、并向 `ghcr.io/komari-monitor` 推镜像，对本仓库是错误产出 |
+| `.github/workflows`、`.github/actions`、`.github/ISSUE_TEMPLATE` | 上游流水线全部删除；**只补回我们自己的** `.github/workflows/trellis-gate.yml`（2026-09-17，审计"提交是否绑定 Trellis 任务"） | 上游流水线会从前端**默认分支**构建、并向 `ghcr.io/komari-monitor` 推镜像，对本仓库是错误产出；补回的这一个**不产出任何资产**，也不替代手动发布步骤（§3.4） |
+| `web/install/install.go`、`web/api/admin/update.go`、`frontend/src/pages/install.tsx`、`frontend/src/pages/admin/account.tsx` | **不再校验初始/改密口令的强度与长度**（2026-09-18，用户明确要求去掉全部限制）：删掉"大写+小写+数字"复杂度与 8/6 位长度下限，只保留"两次输入一致" | 自托管面板的口令强度由部署者自己承担；口令哈希是 sha256+常量盐（无 bcrypt 的 72 字节上限），所以去掉长度校验不会引入新的失败路径。回归测试断言"无大写"和"3 位"口令现在都安装成功 |
 | `README.md`、`README_zh-cn.md` | 删除上游版本，改为我们自己的单份 `README.md` | 上游 README 含上游徽章/部署按钮/截图与升级到 1.5.x 的指引 |
 
 更新检查的目标仓库可在构建期覆盖：

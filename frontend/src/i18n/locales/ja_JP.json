@@ -24,8 +24,6 @@
     "otp_empty_error": "空の確認コード",
     "password_empty_error": "空のパスワードは許可されていません",
     "password_mismatch_error": "2回入力したパスワードが一致しません",
-    "password_strength_error": "パスワードには大文字、小文字、数字を含める必要があります",
-    "password_too_short_error": "パスワードの長さは最低8文字でなければなりません",
     "qr_fetch_error": "QRコードを読み込めません",
     "title": "アカウント"
   },

@@ -10,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
@@ -197,13 +196,11 @@ func validateRequest(request *completeRequest) error {
 	if request.Username == "" || utf8.RuneCountInString(request.Username) > 64 {
 		return fmt.Errorf("username must be between 1 and 64 characters")
 	}
-	passwordLength := utf8.RuneCountInString(request.Password)
-	if passwordLength < 8 || passwordLength > 256 {
-		return fmt.Errorf("password must be between 8 and 256 characters")
-	}
-	if !hasStrongPassword(request.Password) {
-		return fmt.Errorf("password must contain uppercase, lowercase letters, and numbers")
-	}
+	// 刻意不做任何密码强度/长度校验（2026-09-18，用户明确要求去掉全部限制）：
+	// 自托管面板的初始管理员口令只由部署者自己承担风险。前端安装向导与改密页同步去掉了
+	// 长度与复杂度校验，只保留"两次输入一致"。口令哈希是 sha256+常量盐
+	// （database/accounts/accounts.go，上游实现，**没有** bcrypt 的 72 字节上限），
+	// 因此不再校验长度也不会引入新的失败路径。见 docs/MAINTAINING.md §4。
 	if request.Sitename == "" || utf8.RuneCountInString(request.Sitename) > 100 {
 		return fmt.Errorf("site name must be between 1 and 100 characters")
 	}
@@ -214,16 +211,6 @@ func validateRequest(request *completeRequest) error {
 		return fmt.Errorf("monitoring database DSN is required")
 	}
 	return nil
-}
-
-func hasStrongPassword(password string) bool {
-	var upper, lower, digit bool
-	for _, char := range password {
-		upper = upper || unicode.IsUpper(char)
-		lower = lower || unicode.IsLower(char)
-		digit = digit || unicode.IsDigit(char)
-	}
-	return upper && lower && digit
 }
 
 func metricConfig(request completeRequest) (*metricstore.MetricStoreConfig, error) {

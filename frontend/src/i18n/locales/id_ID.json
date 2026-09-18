@@ -24,8 +24,6 @@
     "otp_empty_error": "Kode OTP tidak boleh kosong",
     "password_empty_error": "Kata sandi tidak boleh kosong",
     "password_mismatch_error": "Kata sandi tidak cocok",
-    "password_strength_error": "Kata sandi harus mengandung huruf besar, huruf kecil, dan angka",
-    "password_too_short_error": "Kata sandi minimal 8 karakter",
     "qr_fetch_error": "Tidak dapat memuat kode QR",
     "title": "Akun"
   },

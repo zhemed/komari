@@ -77,14 +77,6 @@ const InnerLayout = () => {
       toast.error(t("account.password_mismatch_error"));
       return;
     }
-    if (password.length < 8) {
-      toast.error(t("account.password_too_short_error"));
-      return;
-    }
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      toast.error(t("account.password_strength_error"));
-      return;
-    }
     if (account?.["2fa_enabled"] && !passwordTwoFa) {
       toast.error(t("account.otp_empty_error"));
       return;

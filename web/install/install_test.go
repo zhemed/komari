@@ -48,7 +48,9 @@ func performJSON(r http.Handler, method, path string, body any) *httptest.Respon
 	return response
 }
 
-func TestInstallRejectsInvalidInputWithoutCreatingAccount(t *testing.T) {
+// 拒绝的依据是**缺少监控库 DSN**（不是口令）：2026-09-18 起口令不再做任何强度/长度校验，
+// 所以这条测试不再承担"弱口令被拒"的职责，只验证"坏输入不落库"。
+func TestInstallRejectsMissingDSNWithoutCreatingAccount(t *testing.T) {
 	r, db, _ := setupInstallRouter(t)
 	response := performJSON(r, http.MethodPost, APIPath+"/complete", completeRequest{
 		Username: "admin", Password: "short", Sitename: "Komari",
@@ -62,17 +64,37 @@ func TestInstallRejectsInvalidInputWithoutCreatingAccount(t *testing.T) {
 	}
 }
 
-func TestInstallRejectsWeakPasswordWithoutCreatingAccount(t *testing.T) {
+// 2026-09-18 契约变更之二（用户要求连长度也不校验）：3 个字符的口令现在**合法**。
+func TestInstallAcceptsShortPassword(t *testing.T) {
 	r, db, _ := setupInstallRouter(t)
+	metricDSN := "file:" + filepath.ToSlash(filepath.Join(t.TempDir(), "metrics.db")) + "?mode=rwc"
 	response := performJSON(r, http.MethodPost, APIPath+"/complete", completeRequest{
-		Username: "admin", Password: "lowercaseonly1", Sitename: "Komari", MetricDSN: "./data/metrics.db",
+		Username: "admin", Password: "abc", Sitename: "Komari", MetricDSN: metricDSN,
 	})
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("weak password status = %d, want %d: %s", response.Code, http.StatusBadRequest, response.Body.String())
+	if response.Code != http.StatusOK {
+		t.Fatalf("short password status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
 	}
 	var count int64
-	if err := db.Model(&models.User{}).Count(&count).Error; err != nil || count != 0 {
-		t.Fatalf("weak password created users: count=%d err=%v", count, err)
+	if err := db.Model(&models.User{}).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("install with short password should create exactly 1 admin: count=%d err=%v", count, err)
+	}
+}
+
+// 2026-09-18 契约变更（用户明确要求去掉密码复杂度限制）：
+// "≥8 位、只有小写与数字"的密码现在是**合法**的，安装应当成功并创建管理员。
+// 变更前的断言断的是"这种口令必须被拒"，随规则删除一并替换。
+func TestInstallAcceptsPasswordWithoutUppercase(t *testing.T) {
+	r, db, _ := setupInstallRouter(t)
+	metricDSN := "file:" + filepath.ToSlash(filepath.Join(t.TempDir(), "metrics.db")) + "?mode=rwc"
+	response := performJSON(r, http.MethodPost, APIPath+"/complete", completeRequest{
+		Username: "admin", Password: "lowercaseonly1", Sitename: "Komari", MetricDSN: metricDSN,
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("password without uppercase status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	var count int64
+	if err := db.Model(&models.User{}).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("install with simple password should create exactly 1 admin: count=%d err=%v", count, err)
 	}
 }
 
