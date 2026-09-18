@@ -1119,3 +1119,39 @@
 ### Next Steps
 
 - 后续升级直接用面板按钮（helper 会自动同步 compose 里的 tag）；可选改进项见 MAINTAINING §7
+
+
+## Session 35: compose 文件名核实并切到首选名 compose.yaml
+<!-- trellis-session: v=2 fp=64b49489b0c92e36 -->
+
+**Date**: 2026-09-18
+**Task**: compose 文件名核实并切到首选名 compose.yaml
+**Branch**: `main`
+
+### Summary
+
+实测证明 compose.yaml 优先（同时存在时告警并选它）、完整优先级链；切脚本/生产/文档到 compose.yaml，并记录改名后必须 --force-recreate 的坑
+
+### Main Changes
+
+- install-compose.sh 默认生成 compose.yaml + 历史名检测与迁移提示
+- 生产改名并强制重建（配置标签更新到 compose.yaml，tag 自动同步恢复有效）
+- MAINTAINING §15.1/§15.6 记录命名优先级实测与改名坑
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f263484` | chore(deploy): compose 文件名切到首选名 compose.yaml [task:compose-filename-verify] |
+
+### Testing
+
+- [OK] 判别性实验（优先级链/兼容性）+ installer E2E + 生产核对（healthy/标签/数据）+ check-repo --full 全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无；后续升级直接用面板按钮即可（helper 会同步 compose.yaml 里的 tag）

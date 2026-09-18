@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 34
+- **Total Sessions**: 35
 - **Last Active**: 2026-09-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1121 | Active |
+| `journal-1.md` | ~1157 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 35 | 2026-09-18 | compose 文件名核实并切到首选名 compose.yaml | `f263484` | `main` |
 | 34 | 2026-09-18 | 发布 0.0.18 + 生产升级（B 策略真正生效） | `4479580` | `main` |
 | 33 | 2026-09-18 | README 大面积删减（175 → 53 行） | `5d3bf9b` | `main` |
 | 32 | 2026-09-18 | 重启策略评估 + 一条命令部署（install-compose.sh） | `d907c6e` | `main` |
