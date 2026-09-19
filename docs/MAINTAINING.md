@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.17）
+# 维护本仓库（komari 自维护版 · 当前 0.0.18）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.17**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.18**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.17`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.18`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -33,6 +33,14 @@
 （该目录已从本仓库移除）在普通 tag 下会退化为克隆前端**默认分支**，这也是我们自己 vendor 的原因之一。
 
 **发版本规则**：递增三段中的 patch 位（`0.0.2`、`0.0.3`…）。
+
+> **发版前先查"这个号发过没有"（2026-09-19 加）**：`0.0.18` 的 release 已发布且用户
+> **明确保留、并按它部署了生产**，而仓库 `main` 的源码是回滚后的 0.0.17 状态——也就是说
+> **下一个版本号必须是 `0.0.19`**，直接发 0.0.18 会与已有 tag/release 撞号（`gh release create`
+> 会失败或产出与已发布资产不一致的内容）。
+> 查法：`gh release list -R zhemed/komari --limit 5` 与 `git tag --list | tail`。
+> 另注：已发布的 0.0.18 用的是**当时的** `install-komari.sh`（含后来被回滚的 compose 安装脚本与
+> 备份清理行为），本仓库 `main` 上的安装脚本与它在这几点上并不相同——升级它或改它前先看清。
 前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段并要求严格递增，
 所以带后缀的 tag（如 `0.0.1-fix1`）**永远不会**被判为"可更新"。
 
