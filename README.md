@@ -6,16 +6,17 @@ komari 1.4.3，此后独立演进——**不是上游官方发行版**。
 
 ## 快速开始
 
-**方式一：Docker 容器**（推荐一条命令，装到 `/opt/docker/komari`）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
-```
-
-**方式二：二进制 + systemd**：
+**方式一：二进制 + systemd**（推荐；默认装到 `/opt/komari`，本机生产即此形态）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhemed/komari/main/install-komari.sh | sudo bash
+```
+
+**方式二：Docker + compose**（备选，**生产未采用**；compose 路径有已知坑，见
+[docs/MAINTAINING.md](./docs/MAINTAINING.md) §15）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
 ```
 
 装完访问 `http://<主机>:25774` 完成初始化。Linux（amd64/arm64）均可，数据放在 `./data`（SQLite）。

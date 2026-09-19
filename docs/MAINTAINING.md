@@ -774,7 +774,13 @@ docker run -d --name komari --restart always --network host \
 - 故意**没有**给 `admin:upgradeServer` 标记 `rpc.MarkSensitive`：那会让每次调用都必须带 2FA 码，
   而面板目前没有该提示流程。若后续接上提示，应把它加入敏感方法。
 
-## 15. 部署约定：Docker Compose（2026-09-18 与用户共同定版）
+## 15. Docker Compose 部署（**备选路径**，2026-09-19 起生产未采用）
+
+> **现状（2026-09-19）**：生产已从 compose **回滚到 systemd 二进制**（`/opt/komari` + `komari.service`，
+> 见 §3.1 与 `install-komari.sh`），原因是 compose 路径在实际运行中暴露了严重问题
+> （容器配置标签与 compose 文件名的联动、tag 自动同步会静默失效等，详见下面各条实测记录）。
+> 本节保留 compose 形态的取值依据、升级交互与已知坑，**仅供参考**；新部署请用 systemd，
+> 或直接 `docker run`（不挂 socket、不用 compose）。
 
 ### 15.1 目录约定
 

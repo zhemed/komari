@@ -1,6 +1,10 @@
 #!/bin/bash
 #
-# Komari 服务器 · docker compose 一条命令部署
+# Komari 服务器 · docker compose 部署（**备选脚本**）
+#
+# ⚠️ 2026-09-19 起：生产已回滚到 systemd 二进制（install-komari.sh）。
+#    本脚本保留可用，但 compose 路径存在已知坑（容器配置标签/文件名联动、tag 同步静默失效、
+#    改名需 --force-recreate 等，详见 docs/MAINTAINING.md §15），不作为推荐部署方式。
 #
 #   curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
 #
