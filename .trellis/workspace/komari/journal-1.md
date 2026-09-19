@@ -1297,3 +1297,38 @@
 ### Next Steps
 
 - 若用户本意是其它回滚（整份 README / compose 文件名 / 升级方式 / 取消安装脚本），一句话即可执行
+
+
+## Session 40: 回滚 Dockerfile 基础镜像钉版（回到 alpine:3.21 tag）
+<!-- trellis-session: v=2 fp=742977506ab775f9 -->
+
+**Date**: 2026-09-19
+**Task**: 回滚 Dockerfile 基础镜像钉版（回到 alpine:3.21 tag）
+**Branch**: `main`
+
+### Summary
+
+定位到唯一被改过的构建方式（dc61273 的 digest 钉版）并回滚成 tag；文档同步更正；用回滚后的 Dockerfile 真构建镜像验证
+
+### Main Changes
+
+- 两个 Dockerfile：FROM alpine:3.21@sha256:… → FROM alpine:3.21（注释记日期与得失）
+- MAINTAINING §7 更正为回滚后状态（保留历史与重新钉的做法）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bd92c64` | revert(dockerfile): 基础镜像回滚到 alpine:3.21 tag（取消 digest 钉版） [task:rollback-image-base-tag] |
+
+### Testing
+
+- [OK] docker build 回滚后的 Dockerfile → 起容器 --help 输出 0.0.18；check-repo --full 全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如用户本意是别的回滚（部署/文件名/升级方式）或要重推 0.0.18 镜像，按一句话执行
