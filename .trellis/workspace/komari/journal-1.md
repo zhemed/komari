@@ -1262,3 +1262,38 @@
 ### Next Steps
 
 - 无
+
+
+## Session 39: README 恢复「源码构建」段落
+<!-- trellis-session: v=2 fp=7765d3768a36bdbb -->
+
+**Date**: 2026-09-19
+**Task**: README 恢复「源码构建」段落
+**Branch**: `main`
+
+### Summary
+
+按用户指令回滚该节删减：快速开始恢复 容器/systemd/源码构建 三段式，行数 53→71；同时记录'指令明确时不要反问'这一过程教训
+
+### Main Changes
+
+- README 加回源码构建（clone + build-komari/build-frontend/build-agent + 静态发布与镜像脚本）
+- 理顺快速开始段落顺序（'装完访问…'回到两个安装方式之后）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `50fb61f` | docs(readme): 恢复「源码构建」方式（回滚该节的删减） [task:readme-restore-build] |
+
+### Testing
+
+- [OK] check-repo 通过（156 条仓库内引用存在）；README 结构核对（方式一/二/三 + 其余章节不变）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 若用户本意是其它回滚（整份 README / compose 文件名 / 升级方式 / 取消安装脚本），一句话即可执行
