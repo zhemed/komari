@@ -6,13 +6,13 @@ komari 1.4.3，此后独立演进——**不是上游官方发行版**。
 
 ## 快速开始
 
-容器（推荐一条命令，装到 `/opt/docker/komari`）：
+**方式一：Docker 容器**（推荐一条命令，装到 `/opt/docker/komari`）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
 ```
 
-二进制 + systemd：
+**方式二：二进制 + systemd**：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhemed/komari/main/install-komari.sh | sudo bash
@@ -21,6 +21,24 @@ curl -fsSL https://raw.githubusercontent.com/zhemed/komari/main/install-komari.s
 装完访问 `http://<主机>:25774` 完成初始化。Linux（amd64/arm64）均可，数据放在 `./data`（SQLite）。
 节点在面板「节点 → 添加」里生成安装命令（`install-agent.sh` / `install-agent.ps1` /
 `ghcr.io/zhemed/komari-agent`，覆盖 14 个平台）。
+
+**方式三：源码构建**
+
+```bash
+git clone https://github.com/zhemed/komari.git
+cd komari
+
+./scripts/build-komari.sh        # 开发用：动态链接，需 Go ≥1.25 + gcc；前端产物已随仓库下发
+./bin/komari server              # 默认监听 0.0.0.0:25774
+
+# 改了面板前端（frontend/）或 agent（agent/）时
+./scripts/build-frontend.sh      # 需 Node + 网络（npm ci）；重建 web/public/defaultTheme/
+./scripts/build-agent.sh         # 纯 Go 交叉编译，14 个平台
+
+# 发布形态（静态链接，需 zig）与自建镜像
+KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
+./scripts/build-server-image.sh --push
+```
 
 ## 能力
 
