@@ -186,7 +186,8 @@ if apiResponse.Code != http.StatusNotFound { ... }
 
 前端源码**已在本仓库**（`frontend/`，上游快照 + 我们内联的改动，2026-09-16 导入），
 由 `scripts/build-frontend.sh` 在本地构建；`.build/`、`frontend/node_modules/` 与 `frontend/dist/`
-都是生成物，**不要**当源码改。因此：
+都是**生成物**（不入库，见 `frontend/.gitignore`，可 `npm ci` + `scripts/build-frontend.sh` 重建），
+**不要**当源码改。因此：
 
 - **改前端行为要改补丁，不要改 `.build/komari-web/`**（会被 `git clean -xfdq` + 重新检出覆盖）。
   现有 3 个补丁：`0001-update-check-repo.patch`、`0002-reproducible-build-time.patch`、

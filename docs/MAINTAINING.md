@@ -52,13 +52,34 @@
 ## 2.1 仓库自检（一条命令跑完机械检查）
 
 ```bash
-./scripts/check-repo.sh          # 秒级 8 项：版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门
+./scripts/check-repo.sh          # 秒级：第 1-8 项 + 第 12 项（版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门、自检自测）
 ./scripts/check-repo.sh --full   # 追加第 9-11 项：go build/vet/test、离线构建、agent 三道门禁
 ```
 
 它只做**能机械判定**的检查，不猜意图；任何一项不通过都会打印具体文件与原因并以非 0 退出。
 涉及的检查项与"为什么这样查"都写在脚本头部注释里。**改文档/脚本后应当跑一次快速检查，
 发版前跑一次 `--full`。**
+
+### 2.1.1 第 12 项：自检的自测（2026-09-19 加）
+
+`scripts/check-repo-selftest.sh` 在**临时 git 仓库**里用夹具复跑 `check-repo.sh`，逐条断言第 2 项
+的计数与结论。它的存在理由是一次真实事故：2026-09-19 清理本地产物后，第 2 项把
+`frontend/node_modules/`、`frontend/dist/`（被 `.gitignore` 覆盖、**按设计就不在磁盘上**）
+误报为"文档引用了不存在的路径"，4 条假失败。
+
+修法是给第 2 项加"被 `git check-ignore` 覆盖的路径不算缺失"的豁免——而**放宽检查必须同时证明
+没变瞎**，所以固化成断言，其中三条是判别性的：
+
+| 断言 | 防的是 |
+|---|---|
+| 夹具里真缺失的路径仍被报出 | 豁免写宽了，把真缺失也吃掉 |
+| 被忽略路径**不**被报缺失 | 假失败复发 |
+| 被忽略路径上的 `file:line` 锚点**仍报超界** | 豁免连锚点检查一起跳过（最隐蔽的过度放宽） |
+
+夹具特意让"被忽略目录里的文件真的存在"（模拟本地构建过的脏状态），否则锚点检查会因
+`-f` 守卫直接跳过、断言变成空转。跑法：`./scripts/check-repo-selftest.sh`（`check-repo.sh`
+第 12 项会自动跑；自测内部用 `KOMARI_SKIP_SELFTEST=1` 断开递归）。CI 见
+`.github/workflows/trellis-gate.yml` 的 `repo-consistency` 任务。
 
 ## 2.2 流程闸门：Trellis 强制规则（2026-09-17 起）
 
@@ -168,7 +189,7 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
    ./scripts/gen-release-sums.sh        # 产出 dist/komari-SHA256SUMS（两行：amd64/arm64）
    ```
 4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含第 8 项 Trellis 流程闸门、版本字面量一致性、
-   文档锚点、`go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希）。
+   文档锚点、`go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希、第 12 项自检自测）。
    自检里的 agent 门禁构建到 `.build/check-agent`，**不会动 `dist/`**；反过来说，
    `scripts/build-agent.sh` 默认写的就是 `dist/agent` 并会先清空该目录，别拿它当临时构建用。
 5. `git tag <版本> && git push origin <版本>`
@@ -194,7 +215,30 @@ tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TA
 > `tag 0.0.1 exists locally but has not been pushed to komari-monitor/komari`。
 > 发布时给 `gh` 显式加 `-R zhemed/komari`。
 
-### 3.5 命令行子命令
+### 3.5 本地产物与清理（2026-09-19 清理后定稿）
+
+工作区里**只有源码与主题产物入库**，其余全是可重建的本地目录。清理前的实测体积与还原方式
+留在 `.build/purge-manifest-20260919.txt`（含关键 sha256），这里是常规对照表：
+
+| 本地产物 | 谁生成 | 还原方式 |
+|---|---|---|
+| `bin/komari` | `./scripts/build-komari.sh` | 同左（开发用动态链接构建） |
+| `dist/`（发版资产） | `build-komari.sh` + `build-agent.sh` + `gen-release-sums.sh` | 同左；也可直接从对应 release 下载（发布过的内容与本地副本 sha256 相同） |
+| `.build/tools/` | 手工解压的 zig（仅静态发版用） | `https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz` 解压进 `.build/tools/` |
+| `.build/*-image/` | `scripts/build-*-image.sh` | 构建时脚本自己生成 |
+| `.build/check-agent/` | `check-repo.sh --full` 第 11 项 | 跑一次 `--full` |
+| `.build/rel-notes-*.md` | 每次发版手写 | **不要删**：发版说明的唯一副本，`gh release create --notes-file` 的来源 |
+| `frontend/node_modules/` | `npm ci` | 同左（`package-lock.json` 已入库） |
+| `frontend/dist/` | `./scripts/build-frontend.sh` | 同左 |
+| `data/` | 本地开发运行面板 | 新起实例即可 |
+| `utils/geoip/data/GeoLite2-Country.mmdb` | 手工下载 | 重下（源码里没有下载脚本，所以别删） |
+
+判定标准（清理时逐条举证，不是凭感觉）：**陈旧**（内嵌版本/提交与仓库状态矛盾）、
+**可重建**（有脚本或已记录的下载路径）、**已发布副本**（sha256 与线上 release 完全一致）、
+**无来源**（运行时副产物如 `__pycache__`）。被 `.gitignore` 覆盖的路径**不一定在磁盘上**——
+这正是 `check-repo.sh` 第 2 项对它豁免、并由第 12 项自测守住的原因（§2.1.1）。
+
+### 3.6 命令行子命令
 
 服务器只有一个二进制，子命令见 `cmd/`（实测 `komari --help`）：
 
@@ -209,7 +253,7 @@ tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TA
 CLI 的帮助文本里保留着上游作者署名（`Made by Akizon77 with love.`），归属信息同时由
 `LICENSE` / `NOTICE` 承载。
 
-### 3.6 数据与备份
+### 3.7 数据与备份
 
 | 路径 | 说明 |
 |---|---|

@@ -49,7 +49,15 @@ fi
 head_ "2. 文档里引用的仓库内路径存在，且 file:line 锚点没超界"
 # 只查"我们自己的东西"（构建输入、我们维护的目录），不查 Go import 路径 / HTTP 路由 /
 # owner/repo slug / 运行时数据路径——那些本来就不是文件路径，逐条判断只会产生噪声。
-ref_ok=0; missing=0; out_of_range=0
+# is_ignored：被 .gitignore 覆盖的路径**故意不在磁盘上**（构建产物/本地数据），
+# 一律不算缺失——2026-09-19 清理本地产物后，spec 里写的 frontend/node_modules/、
+# frontend/dist/ 就属于这一类：它们"不在磁盘上"是正确状态，不是文档写错。
+is_ignored() {
+  git check-ignore -q -- "$1" 2>/dev/null && return 0
+  git check-ignore -q -- "${1%/}/" 2>/dev/null && return 0
+  return 1
+}
+ref_ok=0; missing=0; out_of_range=0; ref_ignored=0
 for f in README.md docs/MAINTAINING.md .trellis/spec/backend/*.md; do
   dir="$(dirname "$f")"
   while IFS= read -r line; do
@@ -65,6 +73,8 @@ for f in README.md docs/MAINTAINING.md .trellis/spec/backend/*.md; do
       case "$ref" in *'*'*|*'<'*|*'http'*|*'...'*) continue ;; esac
       if [ -e "${ref#./}" ] || [ -e "${dir}/${ref#./}" ]; then
         ref_ok=$((ref_ok + 1))
+      elif is_ignored "${ref#./}" || is_ignored "${dir}/${ref#./}"; then
+        ref_ignored=$((ref_ignored + 1))
       else
         bad "$f 引用了不存在的路径：$ref"; missing=$((missing + 1))
       fi
@@ -78,9 +88,13 @@ for f in README.md docs/MAINTAINING.md .trellis/spec/backend/*.md; do
     done
   done < "$f"
 done
-[ "$missing" = 0 ] && [ "$out_of_range" = 0 ] \
-  && ok "引用的仓库内路径全部存在（${ref_ok} 条），file:line 锚点均未超界" \
-  || true
+# 无论通过与否都报出计数——失败时也要能一眼看出"哪一类、几条"，自测脚本同样依赖这行做断言。
+if [ "$missing" = 0 ] && [ "$out_of_range" = 0 ]; then
+  ok "引用的仓库内路径全部存在（引用 ${ref_ok} 条；另有 ${ref_ignored} 条被 .gitignore 覆盖的可重建/本地路径按设计跳过；缺失 0 条，锚点超界 0 条）"
+else
+  printf '  \033[33m·\033[0m 引用检查：引用 %s 条；另有 %s 条被 .gitignore 覆盖的可重建/本地路径按设计跳过；缺失 %s 条，锚点超界 %s 条\n' \
+    "${ref_ok}" "${ref_ignored}" "${missing}" "${out_of_range}"
+fi
 
 # ---------- 3. 脚本语法 ----------
 head_ "3. 脚本语法 + 工作流 YAML"
@@ -167,6 +181,23 @@ if [ "${FULL}" = "1" ]; then
   fi
 else
   printf '\n[check-repo] 提示：加 --full 可追加 Go 门禁、离线构建与 agent 门禁\n'
+fi
+
+# ---------- 12. 自检的自测（防止"检查器自己坏掉却报绿"） ----------
+# 2026-09-19：第 2 项曾把被 .gitignore 覆盖的可重建目录误报为文档错误（4 条假失败）；
+# 修它的时候必须同时证明"没变瞎"，所以固化成自动化断言（scripts/check-repo-selftest.sh）。
+# 递归护栏：自测内部会在临时仓库里跑本脚本，用 KOMARI_SKIP_SELFTEST 断开二次调用。
+if [ "${KOMARI_SKIP_SELFTEST:-0}" = 1 ]; then
+  printf '\n[check-repo] 12. 自检自测：已按 KOMARI_SKIP_SELFTEST=1 跳过\n'
+elif [ -x "${REPO_ROOT}/scripts/check-repo-selftest.sh" ]; then
+  head_ "12. 自检自测（第 2 项路径/锚点检查的判别性断言）"
+  if ./scripts/check-repo-selftest.sh >/tmp/check-repo-selftest.log 2>&1; then
+    ok "自测全绿（$(grep -c '✓' /tmp/check-repo-selftest.log) 条断言）"
+  else
+    bad "自检自测失败（详见 /tmp/check-repo-selftest.log）"; grep '✗' /tmp/check-repo-selftest.log | sed 's/^/      /'
+  fi
+else
+  printf '\n[check-repo] 12. 自检自测：scripts/check-repo-selftest.sh 不存在，跳过\n'
 fi
 
 printf '\n[check-repo] 结论：'

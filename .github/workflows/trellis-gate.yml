@@ -26,3 +26,15 @@ jobs:
 
       - name: 审计提交是否都绑定了 Trellis 任务
         run: ./scripts/check-trellis-gate.sh --audit-only
+
+  repo-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 自检的自测（第 2 项路径/锚点检查的判别性断言）
+        # 2026-09-19 加：防止"检查器自己坏掉却报绿"。本地由 check-repo.sh 第 12 项自动跑，
+        # 这里在干净克隆上再跑一次——干净克隆没有 frontend/node_modules 与 frontend/dist，
+        # 正是当初产生假失败的现场条件。
+        run: ./scripts/check-repo-selftest.sh

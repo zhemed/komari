@@ -30,7 +30,8 @@
   `KOMARI_FRONTEND_SOURCE_DATE_EPOCH`、`FRONTEND_TREE_SHA256`）。
 - 依赖安装一律用 `npm ci`（`frontend/package-lock.json` 已入库；注意 `frontend/.gitignore`
   里上游原本忽略了它，我们已取消忽略），**不要用 `npm install`**。
-- `frontend/node_modules/`、`frontend/dist/` 不入库（由 `frontend/.gitignore` 兜住）。
+- `frontend/node_modules/`、`frontend/dist/` **不入库、磁盘上也不必有**（由 `frontend/.gitignore` 兜住；
+  `npm ci` 与 `scripts/build-frontend.sh` 可随时重建），因此 `scripts/check-repo.sh` 第 2 项对它们按设计跳过。
 
 ### 1.3 产物必须可复现（`FRONTEND_TREE_SHA256`）
 
