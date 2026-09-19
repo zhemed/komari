@@ -1473,3 +1473,46 @@
 ### Next Steps
 
 - 等用户决定三项未决事项：是否撤下 0.0.18 release/镜像、是否清理 /opt/docker/komari、是否重建弧线前删除的本地产物
+
+
+## Session 45: 全面整理：垃圾清零 + 一致性对齐 + 自检加自测
+<!-- trellis-session: v=2 fp=77358a0b5c5788bd -->
+
+**Date**: 2026-09-19
+**Task**: 全面整理：垃圾清零 + 一致性对齐 + 自检加自测
+**Branch**: `main`
+
+### Summary
+
+用户指令：全面整理项目、保证一致性、垃圾全部移除、要看到效果。删 12 项本地产物（1.2G→43M，文件数 50211→1541），逐条 sha256/还原方式留档；顺带抓到并修掉自检第 2 项在干净克隆必然假失败的缺陷，新增自检自测（7 断言，3 条判别性）接入 check-repo 第 12 项与 CI。
+
+### Main Changes
+
+- 清理：删 .build/tools(449M zig)、frontend/node_modules(320M)、dist(236M，与已发布 0.0.18 资产 sha256 相同)、.build/*-image(102M)、bin(26M 陈旧 0.0.18 构建)、check-agent、frontend/dist、shots、bundle-analysis.html、__pycache__、rel-server.sha256
+- 留档：.build/purge-manifest-20260919.txt（体积 + 关键 sha256 + 逐条还原命令 + 前后实测）
+- 修复：check-repo.sh 第 2 项对被 gitignore 覆盖的路径豁免（git check-ignore），计数改为无条件打印（失败时也能看出哪类几条）
+- 新增：scripts/check-repo-selftest.sh（临时 git 仓库夹具复跑第 2 项，7 条断言）；check-repo 第 12 项自动跑，KOMARI_SKIP_SELFTEST 断递归
+- CI：trellis-gate.yml 新增 repo-consistency 任务，在干净克隆上跑自测（正是当初产生假失败的现场条件）
+- 文档：docs/CLEANUP-2026-09-19.md（给人看的报告）、MAINTAINING §2.1.1 与 §3.5（自测理由/断言表 + 本地产物对照表）、0.0.18 发布说明加归档注记
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f65d004` | chore(cleanup): 全面整理——垃圾清零、一致性对齐、自检加自测 [task:repo-consistency-purge] |
+
+### Testing
+
+- [OK] check-repo.sh --full 12 项全绿（含 Go 门禁、GOPROXY=off 离线构建、agent 三道门禁、自测 7 断言）
+- [OK] go build / go vet / go test 全绿；生产 HTTP 200、systemd active、二进制 sha256 af56db79… = 已发布 0.0.17 资产
+- [OK] CI 双任务 success（audit + 新增 repo-consistency），run 35423801625
+- [OK] 判别性验证：夹具里真缺失路径仍被报出、被忽略路径不误报、被忽略路径的锚点超界仍被检出
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户决定线上 0.0.18 release/镜像（仍是 Latest）的处置——这是当前唯一公开面与仓库面的不一致
+- 等用户决定 /opt/docker/komari 与 /opt/komari 的历史备份（*.backup.*、data.pre-rollback-*）是否清理

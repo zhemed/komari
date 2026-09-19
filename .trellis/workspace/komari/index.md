@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 44
+- **Total Sessions**: 45
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1475 | Active |
+| `journal-1.md` | ~1518 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 45 | 2026-09-19 | 全面整理：垃圾清零 + 一致性对齐 + 自检加自测 | `f65d004` | `main` |
 | 44 | 2026-09-19 | 回答：0.0.18 修复了什么（只读核对） | - | `main` |
 | 43 | 2026-09-19 | 全面审查 + 全面回滚（compose 弧线 12 提交/19 文件 → 0.0.17；生产二进制回 0.0.17） | `fb66759` | `main` |
 | 42 | 2026-09-19 | 仓库侧回滚 compose 主推地位（systemd 回到方式一） | `69e5d14` | `main` |
