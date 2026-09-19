@@ -40,7 +40,9 @@
 - Linux（amd64/arm64），systemd 或 Docker
 - 默认端口 **25774**；数据默认放在工作目录的 `./data`（SQLite）
 
-### 一键安装（systemd）
+### 一键安装 / 升级（systemd，推荐）
+
+这是**本仓库唯一主推的部署路径**（我们自己的生产就用它，升级也只用它）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhemed/komari/main/install-komari.sh -o install-komari.sh
@@ -50,7 +52,13 @@ sudo bash install-komari.sh
 交互式菜单提供安装 / 升级 / 卸载 / 查看状态 / 查看日志 / 重启 / 停止 / 清理升级备份；
 默认装到 `/opt/komari`，创建 `komari.service`（`Restart=always`）。
 
-### 方式一：Docker 镜像（无需源码）
+- **升级也走同一条命令**：再跑一次，菜单里选「2 升级 Komari」（2026-09-19 已验收）；
+  面板的"有新版本"一键升级在 systemd 形态同样可用，但**命令行菜单升级是验收过的那条**。
+- 数据在 `/opt/komari/data/`（SQLite）；升级前自动留二进制备份与数据备份，可回滚。
+
+### 替代方案：Docker 镜像（无需源码）
+
+> **非主推路径**，自行维护即可；需要 compose 时也归在这里，不要再分叉出别的部署方式。
 
 ```bash
 docker run -d --name komari --restart always \
@@ -66,6 +74,8 @@ docker run -d --name komari --restart always \
 - 可选：把 `/var/run/docker.sock` 挂进来则改用"拉镜像 + 重建容器"模式——版本与镜像完全一致，
   但等于把**宿主机 root 等价权限**交给该容器，请自行权衡；
   不挂 socket 时，**重建容器**（`docker rm + run` / `compose up`）会把二进制退回镜像版本。
+- **host 网络 + 挂 socket 的注意**：0.0.17 及更早在该形态下会静默退回"容器内替换"，
+  镜像 tag 落后、下次重建容器把版本拉回去（0.0.18 修掉了，见 `docs/MAINTAINING.md` §14.2）。
 - 不想用 host 网络时，把 `--network host` 换成 `-p 25774:25774`
 
 ### 方式二：源码构建

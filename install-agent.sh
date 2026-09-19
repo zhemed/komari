@@ -1,4 +1,5 @@
 #!/bin/bash
+# deploy-entry: 节点 agent 安装脚本（唯一入口，见 docs/MAINTAINING.md §3.4.1）
 
 # ---------------------------------------------------------------------------
 # Komari Agent 安装脚本（zhemed/komari 发行线）

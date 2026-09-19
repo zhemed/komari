@@ -243,6 +243,59 @@ else
   bad "判别性验证失败：硬规则对历史提交 dd0486a 无告警，等于永远为绿（护栏失效）"
 fi
 
+# ---------- 14. 部署路径唯一（2026-09-19 用户定调后加的守卫） ----------
+# 用户验收 install-komari.sh 后定调：「我们还是用这样的部署命令吧，别用其他的了」。
+# 这条守卫防的不是"容器不能用"，而是**部署自动化在仓库里分叉**：
+# 多一套安装/升级脚本 = 多一条必须在生产上验证的路径，而上一套就是这么出事的。
+head_ "14. 部署路径唯一（install-komari.sh 是唯一部署/升级入口）"
+# 判据：仓库根（含 scripts/）里带 `deploy-entry:` 标记的只有三个文件——服务器的 install-komari.sh
+# 与 agent 的 install-agent.sh/.ps1。新增任何第二个部署自动化都不该带这个标记，于是被挡下。
+DEPLOY_ALLOWED='install-komari.sh|install-agent.sh|install-agent.ps1'
+deploy_entries() {   # 扫仓库根（排除 .git/node_modules/.build/dist，否则递归进无关树）
+  grep -rl '^# deploy-entry:' --include='*.sh' --include='*.ps1' \
+    --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.build --exclude-dir=dist \
+    . 2>/dev/null | sed 's|^\./||' | sort
+}
+DEPLOY_OK=1
+DEPLOY_FOUND="$(deploy_entries)"
+DEPLOY_EXTRA="$(printf '%s\n' "${DEPLOY_FOUND}" | grep -vE "^(${DEPLOY_ALLOWED})$" || true)"
+if [ -n "${DEPLOY_EXTRA}" ]; then
+  bad "发现第二个部署/升级入口（只允许 ${DEPLOY_ALLOWED}）：$(printf '%s' "${DEPLOY_EXTRA}" | tr '\n' ' ')"
+  bad "  用户 2026-09-19 定调：部署/升级只用一条命令，见 docs/MAINTAINING.md §3.4.1"
+  DEPLOY_OK=0
+fi
+grep -qE "^REPO_TAG=\"\\\$\{KOMARI_TAG:-${VER}\}\"" install-komari.sh \
+  || { bad "install-komari.sh 的默认 tag 不是 ${VER}（与 scripts/version.env 不一致）"; DEPLOY_OK=0; }
+grep -q '^BINARY_PATH="\$INSTALL_DIR/komari"$' install-komari.sh \
+  || { bad "install-komari.sh 不再装到 \$INSTALL_DIR/komari（部署口径变了，需人确认）"; DEPLOY_OK=0; }
+grep -q '^WorkingDirectory=\${DATA_DIR}$' install-komari.sh \
+  || { bad "install-komari.sh 的 systemd 单元不再以 \${DATA_DIR} 为工作目录（数据路径口径变了）"; DEPLOY_OK=0; }
+if [ "${DEPLOY_OK}" = 1 ]; then
+  ok "唯一部署入口就位：install-komari.sh（含 upgrade_komari 菜单）+ agent 的 install-agent.sh/.ps1；默认 tag = ${VER}"
+fi
+if [ "${FULL}" = 1 ]; then
+  grep -q '^upgrade_komari()' install-komari.sh \
+    || { bad "install-komari.sh 里没有 upgrade_komari()——唯一升级路径不能丢"; DEPLOY_OK=0; }
+  grep -q 'whiptail\|dialog' install-komari.sh \
+    || { bad "install-komari.sh 的 TUI 改成别的实现了（MAINTAINING §3.4.1 的驱动要点会失效，需同步更新）"; DEPLOY_OK=0; }
+  if [ -f README.md ] && ! grep -q '唯一主推的部署路径' README.md; then
+    bad "README 不再声明 install-komari.sh 是唯一主推路径（部署口径被改动了）"; DEPLOY_OK=0
+  fi
+  grep -q '3\.4\.1 唯一的部署/升级路径' docs/MAINTAINING.md \
+    || { bad "MAINTAINING 缺少 §3.4.1「唯一的部署/升级路径」"; DEPLOY_OK=0; }
+  # 判别性验证：**真的**造一个 install-compose.sh（带 deploy-entry 标记）到仓库根，
+  # 守卫必须报出"第二个部署入口"；验证完立刻删掉（trap 保证异常也会清）。
+  GUARD_TMP="${REPO_ROOT}/install-compose.sh"
+  printf '#!/usr/bin/env bash\n# deploy-entry: 模仿被禁的第二套部署自动化（判别性验证用）\n' > "${GUARD_TMP}"
+  trap 'rm -f "${GUARD_TMP}"' EXIT
+  if [ -n "$(printf '%s\n' "$(deploy_entries)" | grep -vE "^(${DEPLOY_ALLOWED})$" || true)" ]; then
+    ok "判别性验证：造一个 install-compose.sh 立刻被本项命中（守卫不是摆设）"
+  else
+    bad "判别性验证失败：造出 install-compose.sh 后守卫没报警（本项永远为绿）"
+  fi
+  rm -f "${GUARD_TMP}"; trap - EXIT
+fi
+
 printf '\n[check-repo] 结论：'
 if [ "${FAIL}" = 0 ]; then
   printf '\033[32m全部通过\033[0m\n'; exit 0

@@ -1,4 +1,5 @@
 # Windows PowerShell installation script for Komari Agent
+# deploy-entry: 节点 agent 安装脚本（Windows，唯一入口）
 # ---------------------------------------------------------------------------
 # 来源：上游 komari-monitor/komari-agent 的 install.ps1，commit 1186aafb0d41445daac05d8d282d748a897fd495（2026-08-07，1.4.3 同期）
 #       —— 刻意停在 1.4.3 同期的代码，不跟随上游 agent 1.5.x（见 docs/MAINTAINING.md §11）

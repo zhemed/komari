@@ -60,8 +60,8 @@
 ## 2.1 仓库自检（一条命令跑完机械检查）
 
 ```bash
-./scripts/check-repo.sh          # 秒级：第 1-8 项 + 第 12 项（版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门、自检自测）
-./scripts/check-repo.sh --full   # 追加第 9-11 项：go build/vet/test、离线构建、agent 三道门禁
+./scripts/check-repo.sh          # 秒级：第 1-8 项 + 第 12-14 项（版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门、自检自测、compose 事故护栏、部署路径唯一）
+./scripts/check-repo.sh --full   # 追加第 9-11 项：go build/vet/test、离线构建、agent 三道门禁；并跑第 14 项的深度检查
 ```
 
 它只做**能机械判定**的检查，不猜意图；任何一项不通过都会打印具体文件与原因并以非 0 退出。
@@ -222,6 +222,46 @@ tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TA
 > `gh release create` 可能把仓库解析成 `upstream`，报
 > `tag 0.0.1 exists locally but has not been pushed to komari-monitor/komari`。
 > 发布时给 `gh` 显式加 `-R zhemed/komari`。
+
+### 3.4.1 唯一的部署/升级路径（2026-09-19 用户验收后定稿）
+
+**用户定调：「我们还是用这样的部署命令吧，别用其他的了」。** 从此：
+
+- **部署与升级都只用 `install-komari.sh`**（systemd 形态，装到 `/opt/komari`）。
+- **不要**再引入 compose / 容器安装脚本 / 第三方部署方式；需要容器形态时按 README 的
+  "替代方案"自行维护，且不得再往仓库里加第二套部署自动化。
+- 面板的"有新版本"一键升级在 systemd 形态仍然可用，但**命令行菜单升级是验收过的那条**。
+
+**验收过的升级步骤（2026-09-19 实测 0.0.17 → 0.0.18）**：
+
+```bash
+KOMARI_TAG=<目标版本> bash install-komari.sh      # 主菜单选「2 升级 Komari」→ 通道 stable
+```
+
+它按顺序做：停服务 → 备份当前二进制到 `/opt/komari/komari.backup.<时间戳>` → 下载目标版本 →
+校验 `komari-SHA256SUMS` → 替换 → 启动 → 数据侧由程序自己备份到 `data/backup/upgrade-<时间戳>.zip`。
+
+**验收清单（每次升级后照着核一遍）**：
+
+```bash
+curl -s http://127.0.0.1:25774/api/version           # version 与 hash 是否为目标版本
+sha256sum /opt/komari/komari                          # 与 release 资产 digest 比对
+systemctl is-active komari && journalctl -u komari --since '10 min ago' | grep -ciE 'error|fail|panic'
+```
+
+再加一眼面板：节点在、agent 显示 online、最近流量在涨。
+
+**非交互执行时的三个坑（2026-09-19 全踩过，记以免重犯）**：
+
+1. 脚本是 **TUI（whiptail）**，要有**控制终端**：`script -qec ...` 不够（日志里会留下
+   `[<not executed on terminal>]`，菜单直接取消、**什么都没做也不会报错**）。要用 pty
+   （例如 python `pexpect`）驱动。
+2. 菜单用**方向键**选，不是数字键：直接发 `2` 会被当成默认项（安装），得到"已安装"提示。
+3. `pexpect` 默认按 ASCII 解码：中文输出抛 `UnicodeEncodeError`；用 `encoding=None` 走字节匹配，
+   且 `expect()` 不收元组（要写成单条正则）。
+
+**回滚**：把 `/opt/komari/komari` 换回上一个 `komari.backup.<时间戳>` 并 `systemctl restart komari`；
+数据用 `data/backup/upgrade-<时间戳>.zip`（升级前的自动备份）。
 
 ### 3.5 本地产物与清理（2026-09-19 清理后定稿）
 
