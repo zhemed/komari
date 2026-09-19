@@ -1554,3 +1554,43 @@
 ### Next Steps
 
 - 线上 0.0.18 release（仍是 Latest）与镜像仍在，而分支/生产已回 0.0.17——撤下不可逆，等用户决定
+
+
+## Session 47: 按用户决定保留 0.0.18，并用仓库部署命令把生产升上去
+<!-- trellis-session: v=2 fp=a5d7274c19a67cc9 -->
+
+**Date**: 2026-09-19
+**Task**: 按用户决定保留 0.0.18，并用仓库部署命令把生产升上去
+**Branch**: `main`
+
+### Summary
+
+用户明确 0.0.18 保留，要求按其部署命令重跑。先用只读取证证明当时生产实为 0.0.17（面板版本串 + 二进制 sha256 + 进程启动时间），再用 KOMARI_TAG=0.0.18 驱动 install-komari.sh 完成升级，事后复核版本/服务/agent/日志，并把仓库里过时的 0.0.17 记录对齐到事实。
+
+### Main Changes
+
+- 执行：KOMARI_TAG=0.0.18 install-komari.sh → 菜单「2 升级」→ stable 通道；日志含 停止服务/备份二进制/下载 0.0.18/重启服务/升级成功
+- 生产：/api/version 0.0.17→0.0.18（hash 4479580f9b61…）；二进制 af56db79…→b5b024ac…；systemd active；agent online (v2)；0 条 error
+- 仓库对齐：4 处版本字面量 + MAINTAINING 版本表 → 0.0.18；新增发版号守卫（下一个必须是 0.0.19，0.0.18 已发布且生产在用）
+- 规范更正：server-upgrade §5 说明'源码 0.0.17 / 发行物 0.0.18'并存，并注明生产是 systemd 形态（与 host 网络 compose 无关）
+- 更正追加：事故案例与整理报告补记结局（原记录保留不改写）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4b24cc2` | chore(release): 按用户决定保留 0.0.18 并把记录对齐到事实（生产已升 0.0.18） [task:realign-deployed-0-0-18] |
+
+### Testing
+
+- [OK] check-repo.sh --full 13 项全绿（第 1 项四处字面量 = 0.0.18）
+- [OK] 驱动踩坑记录：whiptail 需控制终端（script -c 不够，要 pty）；pexpect 默认 ASCII 需 encoding=None；expect() 不收 tuple；目录菜单要方向键而非数字
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户决定：/opt/docker/komari 与 /opt/komari 的历史备份（*.backup.* / data.pre-rollback-* / data/backup/*.zip）是否清理
+- 下次发版从 0.0.19 起；若要让源码与发行物一致，需决定是否把 0.0.18 的能力重新落进 main

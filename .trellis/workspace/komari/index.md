@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 46
+- **Total Sessions**: 47
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1556 | Active |
+| `journal-1.md` | ~1596 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 47 | 2026-09-19 | 按用户决定保留 0.0.18，并用仓库部署命令把生产升上去 | `4b24cc2` | `main` |
 | 46 | 2026-09-19 | compose 事故复盘：把最严重的失误写死成规范 | `613c143` | `main` |
 | 45 | 2026-09-19 | 全面整理：垃圾清零 + 一致性对齐 + 自检加自测 | `f65d004` | `main` |
 | 44 | 2026-09-19 | 回答：0.0.18 修复了什么（只读核对） | - | `main` |
