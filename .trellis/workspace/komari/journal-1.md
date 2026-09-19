@@ -1332,3 +1332,38 @@
 ### Next Steps
 
 - 如用户本意是别的回滚（部署/文件名/升级方式）或要重推 0.0.18 镜像，按一句话执行
+
+
+## Session 41: 回滚部署：compose → systemd（0.0.18 二进制 + 数据同步）
+<!-- trellis-session: v=2 fp=80da7978effc7a65 -->
+
+**Date**: 2026-09-19
+**Task**: 回滚部署：compose → systemd（0.0.18 二进制 + 数据同步）
+**Branch**: `main`
+
+### Summary
+
+按用户明确指令把生产从 compose 回滚到 systemd 二进制：停 compose、数据同步回 /opt/komari/data、校验并安装 0.0.18 二进制、启用 systemd；验证版本/数据/agent/端口全部正常，回滚材料保留
+
+### Main Changes
+
+- 停 compose + 同步数据 + 换 0.0.18 二进制 + systemctl enable --now
+- 保留四份回滚材料（compose 数据备份、迁移前备份、滚动前数据、0.0.14 旧二进制）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c555fb0` | chore(task): 建立回滚任务并写清候选目标（停止猜测） |
+
+### Testing
+
+- [OK] systemd active/enabled、面板 200、版本 0.0.18（sha256 校验）、节点/用户/流量完好、agent 重连、无 compose 容器
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 无；如需再回 compose 或改回其它形态，按一句话执行

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 40
+- **Total Sessions**: 41
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1334 | Active |
+| `journal-1.md` | ~1369 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 41 | 2026-09-19 | 回滚部署：compose → systemd（0.0.18 二进制 + 数据同步） | `c555fb0` | `main` |
 | 40 | 2026-09-19 | 回滚 Dockerfile 基础镜像钉版（回到 alpine:3.21 tag） | `bd92c64` | `main` |
 | 39 | 2026-09-19 | README 恢复「源码构建」段落 | `50fb61f` | `main` |
 | 38 | 2026-09-18 | install-compose 备份名唯一化（修同一秒连跑互相覆盖） | `f9e8520` | `main` |
