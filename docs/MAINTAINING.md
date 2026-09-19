@@ -779,17 +779,17 @@ docker run -d --name komari --restart always --network host \
 ### 15.1 目录约定
 
 - 伞目录 `/opt/docker/`（750，root:root），**一项目一子目录**；komari 落在 `/opt/docker/komari/`；
-- 里面只有两样东西：`compose.yaml` 与 `data/`——**`data/` 是唯一有状态的东西**（备份它即可）；
+- 里面只有两样东西：`docker-compose.yml` 与 `data/`——**`data/` 是唯一有状态的东西**（备份它即可）；
 - 容器以 root 运行（镜像未设 `USER`），bind mount 由 docker 创建为 root:root，与伞目录 750 不冲突；
-- **文件名用 `compose.yaml`**：compose v2 的**首选名**。实测（本机 compose 5.4.0，成对比较）
-  优先级为 `compose.yaml` > `compose.yml` > `docker-compose.yml` > `docker-compose.yaml`；
-  同时存在多个会告警并选优先级最高者。`docker-compose.yml` 是 v1 时代的历史名，v2 仍然认，
-  但保留它容易让人误以为要用老的 `docker-compose` 二进制，新部署不再使用。
-- **改名后要 `--force-recreate` 一次**（2026-09-18 实测）：`mv docker-compose.yml compose.yaml` 之后
-  直接 `docker compose up -d` **不会**重建容器（配置哈希没变），容器上的
-  `com.docker.compose.project.config_files` 标签仍指向旧路径——而 §15.4 的 tag 自动同步正是读这个标签，
-  会因此静默失效（日志里是"compose 文件不可读"）。跑一次
-  `docker compose up -d --force-recreate` 让标签更新即可。
+- **文件名固定用 `docker-compose.yml`**（2026-09-19 回滚）：曾一度改名成 compose v2 的首选名
+  `compose.yaml`，**已回滚**——改名引入的坑比收益大：① 改名后容器上的
+  `com.docker.compose.project.config_files` 标签仍指向旧路径，而 `up -d` 不会重建（配置哈希没变），
+  §15.4 的 tag 自动同步会因此**静默失效**（日志里只有"compose 文件不可读"）；
+  ② 按旧文档/旧安装脚本部署的目录会被新脚本当"历史命名"拒绝执行。
+  （顺带记录实测：compose v2 的优先级是
+  `compose.yaml` > `compose.yml` > `docker-compose.yml` > `docker-compose.yaml`，多个并存会告警并选最高者。）
+- **万一真要改名**（不推荐）：`mv` 之后必须 `docker compose up -d --force-recreate` 一次，
+  否则容器标签不会更新、tag 自动同步会失效。
 
 ### 15.2 定稿 compose 的取值与依据
 
@@ -855,11 +855,11 @@ curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/insta
 它做的事：建目录（默认 `/opt/docker/komari`，750）→ 写 compose（内容与 §15.2 定稿一致）→
 `docker compose up -d` → 等 healthy → 打印访问地址、数据目录、升级与回滚方式。要点：
 
-- **幂等**：已存在 compose 文件（`compose.yaml` 或任一历史名）时**拒绝覆盖**（保护现有部署），
+- **幂等**：已存在 compose 文件（`docker-compose.yml` 或其它名字）时**拒绝覆盖**（保护现有部署），
   要覆盖得显式 `--force`；`./data` 永远不会被脚本删除或覆盖；
-- **不会让两个 compose 文件名并存**（2026-09-18，用户点名）：发现历史命名时脚本拒绝执行并打印迁移命令
-  （`mv … compose.yaml && docker compose up -d --force-recreate`，并说明**这会触发一次重建**、
-  为什么要重建）；`--force` 覆盖时把已有的 `compose.yaml`/历史文件逐个改名成 `.bak-<时间戳>` 再写新文件，
+- **不会让两个 compose 文件名并存**：发现别的名字（如 `compose.yaml`）时脚本拒绝执行并打印迁移命令
+  （`mv … docker-compose.yml && docker compose up -d --force-recreate`，并说明**这会触发一次重建**、
+  为什么要重建）；`--force` 覆盖时把已有文件逐个改名成 `.bak-<时间戳>` 再写新文件，
   所以覆盖完目录里只有一个可被 compose 识别的文件名（实测：两个文件都在的情况下也能清干净，且再跑
   compose 不再出现 "Found multiple config files" 告警）；
 - **备份名必须唯一到亚秒级**（2026-09-18，用户实测报告）：最初只用了
@@ -870,8 +870,8 @@ curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/insta
   50 次连续生成 0 重复。
   *教训*：这条最初逃过了验证，因为当时的回归测试在循环里加了 `sleep 1`——**测试写法把待测路径避开了**；
   现在回归测试改成无间隔连跑。
-- **备份不会无限累积**（2026-09-18，用户建议）：`compose.yaml.bak-*` 只保留最近 **3** 份，更旧的自动
-  清理并在输出里逐条写明；**历史名备份（`<历史名>.bak-*`）是用户原来的文件，永不自动删**。
+- **备份不会无限累积**（2026-09-18，用户建议）：`docker-compose.yml.bak-*` 只保留最近 **3** 份，更旧的自动
+  清理并在输出里逐条写明；**其它名字的备份（`<名字>.bak-*`）是用户原来的文件，永不自动删**。
   成功摘要里会印出当前 `.bak-*` 份数，并提示"确认新文件无误后可自行删除"
   （实测：连续 5 次 `--force` 后只剩 3 份 yaml 备份 + 1 份历史名备份）；
 - 参数：`--dir` 换目录、`--name` 换容器名、`--tag` 换版本、`--port` 用端口映射替代 host 网络、

@@ -21,7 +21,7 @@ const sampleCompose = `services:
 func writeTemp(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "compose.yaml")
+	path := filepath.Join(dir, "docker-compose.yml")
 	if err := os.WriteFile(path, []byte(content), 0o640); err != nil {
 		t.Fatalf("准备临时 compose 文件失败：%v", err)
 	}
@@ -150,7 +150,7 @@ func TestSyncComposeImageServiceBlockBoundary(t *testing.T) {
 func TestComposeInfoFromLabelsAndBinds(t *testing.T) {
 	info := NewComposeInfo(map[string]string{
 		composeServiceLabel: "komari",
-		composeFilesLabel:   "/opt/docker/komari/compose.yaml, /opt/docker/komari/override.yml",
+		composeFilesLabel:   "/opt/docker/komari/docker-compose.yml, /opt/docker/komari/override.yml",
 	})
 	if !info.Usable() || info.Service != "komari" || len(info.Files) != 2 {
 		t.Fatalf("解析 labels 失败：%+v", info)

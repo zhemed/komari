@@ -4,7 +4,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
 #
-# 它做的事：建项目目录（默认 /opt/docker/komari，750）→ 写 compose.yaml
+# 它做的事：建项目目录（默认 /opt/docker/komari，750）→ 写 docker-compose.yml
 # （钉版本 / host 网络 / 日志上限 / healthcheck / 可选挂 docker.sock）→ docker compose up -d
 # → 等健康检查通过 → 打印访问地址与后续操作。
 #
@@ -83,11 +83,15 @@ done
 command -v docker >/dev/null 2>&1 || die "未找到 docker：请先安装 Docker Engine（https://docs.docker.com/engine/install/）"
 docker compose version >/dev/null 2>&1 || die "未找到 docker compose（v2）：请安装 docker-compose-plugin"
 
-# 文件名用 compose.yaml：compose v2 的**首选名**（实测优先级 compose.yaml > compose.yml >
-# docker-compose.yml > docker-compose.yaml）。后两个是 v1 时代的历史名，v2 仍认，但不建议新部署使用。
-COMPOSE_FILE="$PROJECT_DIR/compose.yaml"
+# 文件名固定用 docker-compose.yml（2026-09-19 回滚）。
+# 背景：compose v2 的首选名确实是 compose.yaml，我们切过去后又回滚了——改名带来的坑比收益大：
+#   ① 改名后容器上的 com.docker.compose.project.config_files 标签仍指向旧路径，而 `compose up -d`
+#      不会重建容器（配置哈希没变）→ 0.0.18 的 compose tag 自动同步会**静默失效**；
+#   ② 按旧文档/旧安装脚本部署的目录（写的是 docker-compose.yml）会被新脚本当成"历史命名"拒绝执行。
+# 所以这里保持 docker-compose.yml；其它名字（含 compose.yaml）一律视为"已有其它 compose 文件"。
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 LEGACY_NAMES=()
-for f in compose.yml docker-compose.yml docker-compose.yaml; do
+for f in compose.yaml compose.yml docker-compose.yaml; do
   [ -f "$PROJECT_DIR/$f" ] && LEGACY_NAMES+=("$f")
 done
 if [ -f "$COMPOSE_FILE" ]; then
@@ -104,13 +108,13 @@ if [ "$EXISTS" = 1 ] && [ "$FORCE" != 1 ]; then
       NOTE="
       （注意：$COMPOSE_FILE 也在，--force 会把它一并备份成 .bak-<时间戳>）"
     fi
-    die "项目目录里已有 compose 文件：${LEGACY_NAMES[*]}
-      compose v2 的首选名是 compose.yaml，${LEGACY_NAMES[0]} 是 v1 时代的历史名；多个并存会让每次
-      compose 命令都告警。迁移方式（只留一个文件；改名后容器上的配置标签仍指向旧路径，
+    die "项目目录里已有别的 compose 文件名：${LEGACY_NAMES[*]}
+      本部署约定统一用 docker-compose.yml（2026-09-19 回滚：改名会让容器配置标签与 tag 自动同步失效）。
+      迁移方式（只留一个文件；改名后容器上的配置标签仍指向旧路径，
       所以要 --force-recreate 触发**一次重建**——几秒空窗）：
         mv $PROJECT_DIR/${LEGACY_NAMES[0]} $COMPOSE_FILE
         cd $PROJECT_DIR && docker compose up -d --force-recreate
-      确实要覆盖：加 --force —— 会把历史文件改名为 <名字>.bak-<时间戳> 并写入 compose.yaml，
+      确实要覆盖：加 --force —— 会把已有文件改名为 <名字>.bak-<时间戳> 并写入 docker-compose.yml，
       不会让两个 compose 文件名并存。$NOTE"
   else
     die "$COMPOSE_FILE 已存在（可能是现有部署）。要覆盖请加 --force（会先备份成 .bak-<时间戳>）；
@@ -118,19 +122,19 @@ if [ "$EXISTS" = 1 ] && [ "$FORCE" != 1 ]; then
   fi
 fi
 if [ "$EXISTS" = 1 ] && [ "$FORCE" = 1 ]; then
-  for f in ${COMPOSE_FILE:+compose.yaml} "${LEGACY_NAMES[@]}"; do
+  for f in docker-compose.yml "${LEGACY_NAMES[@]}"; do
     [ -f "$PROJECT_DIR/$f" ] || continue
     backup_path="$(unique_backup_name "$f")"
     mv "$PROJECT_DIR/$f" "$backup_path"
     warn "已把 $f 备份为 $(basename "$backup_path")（保证只有一个 compose 文件生效）"
   done
-  # 反复 --force 会让 compose.yaml.bak-* 累积；只保留最近 $BACKUP_KEEP 份。
-  # 历史名备份（<历史名>.bak-*）是**用户原来的文件**，永远不自动删。
+  # 反复 --force 会让 docker-compose.yml.bak-* 累积；只保留最近 $BACKUP_KEEP 份。
+  # 其它名字的备份是**用户原来的文件**，永远不自动删。
   BACKUP_KEEP=3
-  old_backups="$(ls -1t "$PROJECT_DIR"/compose.yaml.bak-* 2>/dev/null | tail -n +$((BACKUP_KEEP + 1)) || true)"
+  old_backups="$(ls -1t "$PROJECT_DIR"/docker-compose.yml.bak-* 2>/dev/null | tail -n +$((BACKUP_KEEP + 1)) || true)"
   if [ -n "$old_backups" ]; then
     while IFS= read -r f; do
-      rm -f "$f" && warn "清理较旧的备份 $(basename "$f")（只保留最近 $BACKUP_KEEP 份 compose.yaml 备份）"
+      rm -f "$f" && warn "清理较旧的备份 $(basename "$f")（只保留最近 $BACKUP_KEEP 份 docker-compose.yml 备份）"
     done <<< "$old_backups"
   fi
 fi
