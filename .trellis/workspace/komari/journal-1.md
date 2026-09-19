@@ -1367,3 +1367,39 @@
 ### Next Steps
 
 - 无；如需再回 compose 或改回其它形态，按一句话执行
+
+
+## Session 42: 仓库侧回滚 compose 主推地位（systemd 回到方式一）
+<!-- trellis-session: v=2 fp=a93f621ee41ad12a -->
+
+**Date**: 2026-09-19
+**Task**: 仓库侧回滚 compose 主推地位（systemd 回到方式一）
+**Branch**: `main`
+
+### Summary
+
+把 systemd 恢复为推荐部署路径、compose 降级为备选并标注已知坑；补齐'回滚 compose'的仓库侧（生产侧上一轮已回滚）
+
+### Main Changes
+
+- README 方式一=二进制+systemd（推荐），compose 降为方式二（备选、生产未采用）
+- MAINTAINING §15 标题与现状横幅：已回滚、仅备选、列出已知问题
+- install-compose.sh 文件头加备选警示
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `69e5d14` | revert(docs): systemd 回到推荐路径，compose 降级为备选（回滚 compose 主推地位） [task:rollback-compose-docs] |
+
+### Testing
+
+- [OK] check-repo --full 全绿；生产 systemd active / 0.0.18 / 面板 200 / 数据完好
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如目标另有其它（版本回 0.0.17、删 install-compose.sh、恢复构建产物），等用户点明
