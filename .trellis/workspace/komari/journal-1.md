@@ -1516,3 +1516,41 @@
 
 - 等用户决定线上 0.0.18 release/镜像（仍是 Latest）的处置——这是当前唯一公开面与仓库面的不一致
 - 等用户决定 /opt/docker/komari 与 /opt/komari 的历史备份（*.backup.*、data.pre-rollback-*）是否清理
+
+
+## Session 46: compose 事故复盘：把最严重的失误写死成规范
+<!-- trellis-session: v=2 fp=d3e0316ebf212dd3 -->
+
+**Date**: 2026-09-19
+**Task**: compose 事故复盘：把最严重的失误写死成规范
+**Branch**: `main`
+
+### Summary
+
+用户定调 compose 线是维护以来最严重的 bug 与失误。取证（时间线含哈希）→ 写成事故案例规范（严重性四条举证/机制/五层根因/五条硬规则）→ 补上 spec 里一直缺失的 host 网络已知遗留 → 加 check-repo 第 13 项护栏（对历史提交 dd0486a 做判别性验证）→ 接入三处入口。
+
+### Main Changes
+
+- 新增 .trellis/spec/guides/incident-compose-autosync.md：严重性、时间线（644169c/6ed7fbd/dd0486a/4479580/f263484/4c2c204/fb66759）、机制、五层根因、五条硬规则、可复用教训
+- spec/backend/server-upgrade.md 新增 §5：host 网络 + 挂 socket 时容器模式静默失效（升级后镜像 tag 不变、重建即回退）；回滚后该遗留重新存在
+- check-repo.sh 第 13 项：硬失败 com.docker.compose/selfid.go/compose.go；存量 DetectSelfContainerID 只提示；对 dd0486a 判别性验证必须报红
+- 入口接入：guides/index.md、backend/index.md Pre-Development Checklist、MAINTAINING §14.2 顶部警示；4 个 spec 文件 mode 600→644
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `613c143` | docs(postmortem): compose 事故复盘入规范 + 第 13 项护栏（带判别性验证） [task:compose-incident-postmortem] |
+
+### Testing
+
+- [OK] check-repo.sh --full 13 项全绿
+- [OK] 判别性验证：第 13 项硬规则对已回滚提交 dd0486a 报红（证明规则会报警而不是永远为绿）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 线上 0.0.18 release（仍是 Latest）与镜像仍在，而分支/生产已回 0.0.17——撤下不可逆，等用户决定
