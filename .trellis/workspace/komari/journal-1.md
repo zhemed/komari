@@ -1403,3 +1403,38 @@
 ### Next Steps
 
 - 如目标另有其它（版本回 0.0.17、删 install-compose.sh、恢复构建产物），等用户点明
+
+
+## Session 43: 全面审查 + 全面回滚（compose 弧线 12 提交/19 文件 → 0.0.17；生产二进制回 0.0.17）
+<!-- trellis-session: v=2 fp=c700f922ca7a0c65 -->
+
+**Date**: 2026-09-19
+**Task**: 全面审查 + 全面回滚（compose 弧线 12 提交/19 文件 → 0.0.17；生产二进制回 0.0.17）
+**Branch**: `main`
+
+### Summary
+
+先审查出弧线范围（19 文件），再把仓库恢复到 0.0.17 边界（14 改回/5 删除、build+test+check-repo 全绿），生产二进制从 0.0.18 换回 0.0.17（先以数据副本验证兼容，数据完好）
+
+### Main Changes
+
+- 仓库：compose 脚本/代码/文档全部回退到 3698480 状态，版本字面量回 0.0.17，已推送
+- 生产：试跑验证 0.0.17 能读当前数据后，留存 0.0.18 二进制并换装 0.0.17，systemd active
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fb66759` | revert(arc): 全面回滚 compose 弧线（12 提交 / 19 文件）到 0.0.17 状态 [task:rollback-full-arc] |
+
+### Testing
+
+- [OK] git diff 与边界为空；go build/vet/单测通过；check-repo 全绿；生产 200/数据完好/agent 重连
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 待用户决定：0.0.18 release 与镜像是否撤回；/opt/docker/komari 是否清理；体检删掉的产物是否重建
