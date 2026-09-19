@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.18）
+# 维护本仓库（komari 自维护版 · 当前 0.0.17）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.18**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.17**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -18,7 +18,7 @@
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.18`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.17`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -153,8 +153,7 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 一次发布 = **整套栈**：服务器静态产物 + 14 个 agent 资产 + agent 镜像。
 
 1. 同步版本字面量（`scripts/version.env` 的 `KOMARI_VERSION`、`install-komari.sh` 的 `REPO_TAG`、
-   `install-compose.sh` 的 `DEFAULT_TAG`、`install-agent.sh` 的 `default_agent_version`、
-   `install-agent.ps1` 的 `$DefaultAgentVersion`；`check-repo` 第 1 项逐个校验）。
+   `install-agent.sh` 的 `default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`）。
    **发布说明的措辞门禁**（2026-09-17 事故后加，见 `.trellis/spec/guides/evidence-and-claims-guide.md`）：
    说明里每写一条"修复/原因/已知问题"，都必须能指向一条判别性验证（命令或测试）写进正文；
    是推断就要标置信度，是"已知问题"就要给下一步实验，不许把推断写成"已定位"。
@@ -305,8 +304,8 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   决定采纳时有意识地 `git fetch upstream <ref>` 后 cherry-pick——`upstream` 的 fetch refspec
   目前被锁在 tag 1.4.3，这是防止误引入 1.5.x 的**安全默认**，不要随手改掉。
 - **关于页/GitHub 按钮已指向我们**（补丁 0006）：`src/pages/admin/about.tsx` 读的是本仓库 README。
-- **`install-komari.sh` / `install-compose.sh` 的 tag 是字面量**：它们是给 `curl | bash` 用的独立脚本，
-  没法在运行时读 `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步；漏改会被 `check-repo` 第 1 项拦下）。
+- **`install-komari.sh` 的 tag 是字面量**：它是给 `curl | bash` 用的独立脚本，没法在运行时读
+  `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步）。
 - **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
   `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本仓库（无插件/无通知）
   有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
@@ -361,11 +360,11 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   `frontend/src/components/admin/AdminPanelBar.tsx:714`），状态未知时不渲染按钮。
   本条目从"待修"改为"已修"，保留记录以免重复排查。
 
-- **两个 Dockerfile 的基础镜像用 tag**（`alpine:3.21`）：2026-09-17 的仓库体检曾把它钉成 digest
-  以换取「同一份源码跨时间构建可复现」，**2026-09-19 按用户要求回滚**——上游 3.21.x 的安全更新
-  能自动跟进，代价是构建不完全可复现（二进制产物本身一直可复现）。
-  想重新钉 digest：改两个 Dockerfile 后重跑 `scripts/build-server-image.sh` /
-  `scripts/build-agent-image.sh` 验证，并在这里更新本条记录。
+- **两个 Dockerfile 的基础镜像已钉到 digest**（2026-09-17，仓库体检）：
+  `alpine:3.21@sha256:48b0309c…07d`（Docker Hub 上的 manifest list，2026-04-17 的快照），
+  这样同一份源码在不同时间构建的镜像可复现。代价：上游 3.21.x 的安全更新**不再自动进来**，
+  要手动更新 digest（改两个 Dockerfile 后重跑 `scripts/build-server-image.sh` /
+  `scripts/build-agent-image.sh` 验证）。二进制产物本身一直是可复现的。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
 - **agent 自带测试里的 3 个外网用例已改为默认跳过**（2026-09-17，仓库体检）：
   `agent/server/task_test.go` 的 `TestICMPPing` / `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的
@@ -757,7 +756,7 @@ docker run -d --name komari --restart always --network host \
 ```
 
 - `docker restart` / `docker compose restart` **不会**升级（还是旧镜像），必须是 pull + 重建；
-  compose 用户见 §15（本仓库生产约定：挂 socket 用面板升级，并把 compose 里的 tag 同步改掉）；
+  compose 用户用 `docker compose pull && docker compose up -d`；
 - 数据在数据卷里（`-v ./data:/app/data`），重建容器不影响；
 - 升级前后对比实测（0.0.5 → 0.0.9，用生产库副本）：节点数、累计流量、metric rollups 全部保留；
 - 服务端在版本变化前会自己备份：`./data/backup/upgrade-<时间>.zip`
@@ -773,128 +772,3 @@ docker run -d --name komari --restart always --network host \
   签名体系（minisign/GPG）留待后续；
 - 故意**没有**给 `admin:upgradeServer` 标记 `rpc.MarkSensitive`：那会让每次调用都必须带 2FA 码，
   而面板目前没有该提示流程。若后续接上提示，应把它加入敏感方法。
-
-## 15. Docker Compose 部署（**备选路径**，2026-09-19 起生产未采用）
-
-> **现状（2026-09-19）**：生产已从 compose **回滚到 systemd 二进制**（`/opt/komari` + `komari.service`，
-> 见 §3.1 与 `install-komari.sh`），原因是 compose 路径在实际运行中暴露了严重问题
-> （容器配置标签与 compose 文件名的联动、tag 自动同步会静默失效等，详见下面各条实测记录）。
-> 本节保留 compose 形态的取值依据、升级交互与已知坑，**仅供参考**；新部署请用 systemd，
-> 或直接 `docker run`（不挂 socket、不用 compose）。
-
-### 15.1 目录约定
-
-- 伞目录 `/opt/docker/`（750，root:root），**一项目一子目录**；komari 落在 `/opt/docker/komari/`；
-- 里面只有两样东西：`docker-compose.yml` 与 `data/`——**`data/` 是唯一有状态的东西**（备份它即可）；
-- 容器以 root 运行（镜像未设 `USER`），bind mount 由 docker 创建为 root:root，与伞目录 750 不冲突；
-- **文件名固定用 `docker-compose.yml`**（2026-09-19 回滚）：曾一度改名成 compose v2 的首选名
-  `compose.yaml`，**已回滚**——改名引入的坑比收益大：① 改名后容器上的
-  `com.docker.compose.project.config_files` 标签仍指向旧路径，而 `up -d` 不会重建（配置哈希没变），
-  §15.4 的 tag 自动同步会因此**静默失效**（日志里只有"compose 文件不可读"）；
-  ② 按旧文档/旧安装脚本部署的目录会被新脚本当"历史命名"拒绝执行。
-  （顺带记录实测：compose v2 的优先级是
-  `compose.yaml` > `compose.yml` > `docker-compose.yml` > `docker-compose.yaml`，多个并存会告警并选最高者。）
-- **万一真要改名**（不推荐）：`mv` 之后必须 `docker compose up -d --force-recreate` 一次，
-  否则容器标签不会更新、tag 自动同步会失效。
-
-### 15.2 定稿 compose 的取值与依据
-
-| 项 | 取值 | 依据 |
-|---|---|---|
-| 镜像 tag | 钉明确版本（如 `:0.0.17`），不用 `:latest` | 回滚有落点；且**≥0.0.13** 才有面板一键升级（0.0.11 才引入 helper 子命令） |
-| `network_mode` | `host` → **不写 `ports`** | 容器与宿主同 netns，`127.0.0.1` 即宿主回环（实测） |
-| `KOMARI_LISTEN` | `0.0.0.0:25774` | 真实环境变量：`cmd/server.go:25` 读取，默认值即此 |
-| `TZ` | `Asia/Shanghai` | 镜像装了 tzdata；实测容器日志 21:40(CST) vs 探针 13:40(UTC) |
-| 数据卷 | `./data:/app/data` | 应用用相对路径 `./data`（`database/dbcore/dbcore.go:204`）+ `WORKDIR /app` |
-| `logging` | `max-size: "10m"` + `max-file: "3"`（上限 30 MB） | 实测：空载 120 s、仪表盘常开 180 s 均 **0 行**；每次请求 ~74 B；v2(WS) 上报不落日志，v1(POST) 每报一行（3 s 间隔 ≈ **4.5 MB/天**）。典型部署 30 MB ≈ 数周；跑 v1 老 agent 的用 `20m × 5` |
-| `healthcheck` | `curl -fsSL -o /dev/null http://127.0.0.1:25774/` | 镜像自带 curl（实测退出码 0）；`wget -qO-` 会把整个 HTML 灌进健康日志（实测单次 **3020 B**） |
-
-> 面板"日志"页读的是数据库 `models.Log`，有 **30 天**保留（`database/auditlog/log.go:30`），
-> 因此 docker 日志轮转**不会**丢掉面板里能看到的内容。
-
-### 15.3 升级策略（用户拍板：B）
-
-**B = 挂 `/var/run/docker.sock`，走"拉镜像 + helper 重建容器"**：面板拉取目标 tag 的镜像，
-helper 容器按原 `Config`/`HostConfig` 重建自身容器 → **版本与镜像始终一致**，容器名不变，
-旧容器改名为 `<名字>-old-<时间戳>` 留作回滚点（见 §14.6）。代价：docker socket ≈ 宿主 root。
-
-> **host 网络下的自身识别（0.0.18 修）**：`network_mode: host` 时容器 hostname 是**宿主名**、
-> cgroup v2 只有 `0::/`，上游那两条"认出自己是谁"的线索全失效 → 面板会**静默退回容器内替换**，
-> B 策略形同虚设（2026-09-18 实测：`mode=container-replace`，无 helper、旧容器也不留）。
-> 现在多了一条线索：读 `/proc/self/mountinfo` 里的 **bind 挂载宿主路径**，与 Docker 容器列表
-> 的 `Mounts` 比对（`internal/dockerapi/selfid.go`）。与网络模式、hostname、cgroup 版本都无关。
-
-### 15.4 Compose 与面板升级的交互（2026-09-18 实测）
-
-实测方法：compose 项目（钉 `0.0.18-test` + 挂 socket）→ 用真 helper 重建到 `0.0.16`（等价于面板升级）→ 观察。
-
-| 场景 | 实测结果 | 含义 |
-|---|---|---|
-| 文件不动，直接 `docker compose up -d` | 容器仍是面板升到的版本，没有重建回文件里的旧 tag | compose 用 `com.docker.compose.config-hash` 判断、**不比对镜像 tag**；helper 逐字段照抄 `Config`，所以 compose 标签保留、`docker compose ps` 照常识别 |
-| 改了文件**任一字段**（`max-size` 10m→11m）后再 `up -d` | **0.0.18 起：仍是新版本**（文件已被 helper 同步）；**0.0.17 及更早：会按文件里的旧 tag 回退** | 这就是"tag 落后"陷阱；0.0.18 起由 helper 自动改文件消除，不再需要手工同步 |
-| 升级后再次 `up -d` / `down` | 回滚点 `komari-<name>-old-<ts>` 被当作孤儿容器 **Removed** | 想保住回滚点：在需要回滚之前别跑 compose 命令。`docker compose ps` 不受影响 |
-
-**0.0.18 起的自动同步**（helper 在**新容器启动成功之后**执行，失败不影响升级）：
-
-- 只改目标 service 块里的 `image:` 行，**保留仓库名**（私有 registry/镜像加速不会被改掉）、
-  保留缩进与行尾注释；值已一致则不动文件；
-- 改前留 `<file>.bak`，写临时文件 + `os.Rename` 原子替换，文件权限原样保留；
-- 认不出就跳过（`image:` 用了 `${变量}`、找不到 service、文件不可读）——日志里会写明原因，
-  查 `docker logs komari-upgrade-helper-*`；
-- 路径来源是容器自己的 compose 标签（`com.docker.compose.project.config_files` / `…service`），
-  非 compose 部署**完全不受影响**（helper 不多挂目录、不写文件）。
-
-### 15.5 与"不挂 socket"形态的关系
-
-不挂 socket 时走**容器内替换**（0.0.13 起的零配置路径），那种形态下**重建容器会退回镜像版本**；
-两种形态的完整对照见 §14.2 与 §14.4.2。生产约定选 B，是为了"版本与镜像一致、避免回退困惑"，
-代价是接受 socket 的权限面。
-
-### 15.6 一条命令部署（install-compose.sh）与重启策略
-
-**一条命令**（仓库根的 `install-compose.sh`，`curl | bash` 形态）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhemed/komari/refs/heads/main/install-compose.sh | sudo bash
-```
-
-它做的事：建目录（默认 `/opt/docker/komari`，750）→ 写 compose（内容与 §15.2 定稿一致）→
-`docker compose up -d` → 等 healthy → 打印访问地址、数据目录、升级与回滚方式。要点：
-
-- **幂等**：已存在 compose 文件（`docker-compose.yml` 或其它名字）时**拒绝覆盖**（保护现有部署），
-  要覆盖得显式 `--force`；`./data` 永远不会被脚本删除或覆盖；
-- **不会让两个 compose 文件名并存**：发现别的名字（如 `compose.yaml`）时脚本拒绝执行并打印迁移命令
-  （`mv … docker-compose.yml && docker compose up -d --force-recreate`，并说明**这会触发一次重建**、
-  为什么要重建）；`--force` 覆盖时把已有文件逐个改名成 `.bak-<时间戳>` 再写新文件，
-  所以覆盖完目录里只有一个可被 compose 识别的文件名（实测：两个文件都在的情况下也能清干净，且再跑
-  compose 不再出现 "Found multiple config files" 告警）；
-- **备份名必须唯一到亚秒级**（2026-09-18，用户实测报告）：最初只用了
-  `<名字>.bak-<YYYYmmdd-HHMMSS>`，**同一秒内**连续 `--force` 会互相覆盖——4 次连跑后只剩 1 份，
-  "只保留最近 3 份"形同虚设（脚本/CI 高频调用时会真的踩到）。现在备份名是
-  `<名字>.bak-<时间戳>-<微秒>`（`date +%N` 前 6 位；没有 `%N` 的平台回退 `PID-RANDOM`），
-  并带"名字被占用就继续抖"的兜底：实测同一秒连跑 5 次 → 3 份备份名字互不相同，
-  50 次连续生成 0 重复。
-  *教训*：这条最初逃过了验证，因为当时的回归测试在循环里加了 `sleep 1`——**测试写法把待测路径避开了**；
-  现在回归测试改成无间隔连跑。
-- **备份不会无限累积**（2026-09-18，用户建议）：`docker-compose.yml.bak-*` 只保留最近 **3** 份，更旧的自动
-  清理并在输出里逐条写明；**其它名字的备份（`<名字>.bak-*`）是用户原来的文件，永不自动删**。
-  成功摘要里会印出当前 `.bak-*` 份数，并提示"确认新文件无误后可自行删除"
-  （实测：连续 5 次 `--force` 后只剩 3 份 yaml 备份 + 1 份历史名备份）；
-- 参数：`--dir` 换目录、`--name` 换容器名、`--tag` 换版本、`--port` 用端口映射替代 host 网络、
-  `--no-socket` 做不挂 socket 的最小权限部署、`--no-start` 只写文件不启动；
-- **容器名冲突预检**（实测踩到）：同名容器若属于别的项目目录，脚本在启动前就报错并给出解法
-  （本机已有生产容器 `komari` 时，用默认名会撞车——不能等 `compose up` 起一半再报 Conflict）；
-  预检只在**真要启动**时做：`--no-start` 是干跑（只写文件、不碰容器），此时跳过预检以便用它生成文件做对比。
-
-**重启策略：定稿用 `unless-stopped`**，与 `always` 的差别：
-
-| 场景 | `unless-stopped` | `always` |
-|---|---|---|
-| 进程崩溃 / 升级兜底 `exit(42)`（`web/rpc/jsonrpc/admin.upgrade.go:229`） | 重启（**实测**：杀掉 PID 1 → `RestartCount=1`，服务 2 秒后恢复 307） | 重启 |
-| 宿主 / dockerd 重启 | 重启；**但之前被 `docker stop` 过就保持停止** | 重启，**包括你手工 `docker stop` 过的**（Docker 既定语义，本机未重启 dockerd 验证） |
-| 面板升级重建容器（B 策略） | 策略随 `HostConfig` 复制保留（**实测**：`unless-stopped` → `unless-stopped`） | 同 |
-| healthcheck 失败 | 不触发重启（需要外部 autoheal，两者一样） | 同 |
-
-结论：用 `unless-stopped`——它覆盖了"崩了要拉起来"的全部现实场景（含升级失败兜底），
-同时尊重运维的一次 `docker stop`；`always` 会在下一次 dockerd/宿主重启时把被刻意停掉的容器
-又拉起来，属于惊吓而不是健壮。

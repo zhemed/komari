@@ -311,8 +311,7 @@ func TestPrepareContainerReadOnlyFallsBackToManual(t *testing.T) {
 	}
 }
 
-// helper 容器的参数与挂载必须正确：用当前镜像、带重建参数、只挂 socket 与数据目录
-// （非 compose 部署时**不**多挂任何目录）。
+// helper 容器的参数与挂载必须正确：用目标镜像、带重建参数、只挂 socket 与数据目录。
 func TestHelperPayloadAndBinds(t *testing.T) {
 	self := dockerapi.Container{
 		ID:   "abcdefabcdefabcdef",
@@ -335,17 +334,13 @@ func TestHelperPayloadAndBinds(t *testing.T) {
 	}
 
 	payload := helperPayload("ghcr.io/zhemed/komari:0.0.11", "komari-upgrade-helper-test", self.ID,
-		"ghcr.io/zhemed/komari:0.0.11", "0.0.11", "/app/data", DefaultDockerSocket, "", binds, ComposeInfo{})
+		"ghcr.io/zhemed/komari:0.0.11", "0.0.11", "/app/data", DefaultDockerSocket, "", binds)
 	cmd, _ := payload["Cmd"].([]string)
 	joinedCmd := strings.Join(cmd, " ")
 	for _, want := range []string{"docker-self-recreate", "--container abcdefabcdefabcdef", "--image ghcr.io/zhemed/komari:0.0.11", "--sanity-tag 0.0.11", "--state-dir /app/data"} {
 		if !strings.Contains(joinedCmd, want) {
 			t.Errorf("helper 命令缺少 %q：%s", want, joinedCmd)
 		}
-	}
-	// 非 compose 部署必须**不带**同步参数，否则 helper 会去动不存在的文件。
-	if strings.Contains(joinedCmd, "--compose-") {
-		t.Errorf("非 compose 部署不应带 compose 同步参数：%s", joinedCmd)
 	}
 	hc, _ := payload["HostConfig"].(map[string]any)
 	// AutoRemove 故意是 false：helper 失败时要留下容器与日志供排障（由下次升级前清理）
@@ -354,39 +349,6 @@ func TestHelperPayloadAndBinds(t *testing.T) {
 	}
 	if labels, _ := payload["Labels"].(map[string]string); labels["komari.upgrade.helper"] != "1" {
 		t.Fatalf("helper 缺少标识标签：%+v", payload["Labels"])
-	}
-}
-
-// compose 部署：必须多挂 compose 文件所在目录，并把 service/文件路径传给 helper。
-func TestHelperPayloadAndBindsForCompose(t *testing.T) {
-	self := dockerapi.Container{
-		ID: "abcdefabcdefabcdef",
-		Config: map[string]any{
-			"Labels": map[string]any{
-				composeServiceLabel: "komari",
-				composeFilesLabel:   "/opt/docker/komari/docker-compose.yml",
-			},
-		},
-		Mounts: []dockerapi.Mount{
-			{Type: "bind", Source: "/srv/komari/data", Destination: "/app/data"},
-			{Type: "bind", Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"},
-		},
-	}
-	binds := helperBinds(self, DefaultDockerSocket, "/app/data")
-	joined := strings.Join(binds, ",")
-	// 挂的是**目录**（原子替换需要 rename 到同一目录内）
-	if !strings.Contains(joined, "/opt/docker/komari:/opt/docker/komari") {
-		t.Fatalf("compose 目录未挂进 helper：%v", binds)
-	}
-	payload := helperPayload("ghcr.io/zhemed/komari:0.0.18", "helper", self.ID,
-		"ghcr.io/zhemed/komari:0.0.18", "0.0.18", "/app/data", DefaultDockerSocket, "", binds,
-		composeInfoFromContainer(self))
-	cmd, _ := payload["Cmd"].([]string)
-	joinedCmd := strings.Join(cmd, " ")
-	for _, want := range []string{"--compose-files /opt/docker/komari/docker-compose.yml", "--compose-service komari"} {
-		if !strings.Contains(joinedCmd, want) {
-			t.Errorf("helper 命令缺少 %q：%s", want, joinedCmd)
-		}
 	}
 }
 

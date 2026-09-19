@@ -34,7 +34,6 @@ check_literal() {
   if grep -q -- "$pattern" "$file"; then ok "${label} = ${VER}"; else bad "${label} 不是 ${VER}（$file）"; fi
 }
 check_literal install-komari.sh "REPO_TAG=\"\${KOMARI_TAG:-${VER}}\"" "install-komari.sh REPO_TAG"
-check_literal install-compose.sh "^DEFAULT_TAG=\"${VER}\"" "install-compose.sh DEFAULT_TAG"
 check_literal install-agent.sh "^default_agent_version=\"${VER}\"$" "install-agent.sh default_agent_version"
 check_literal install-agent.ps1 "^\\\$DefaultAgentVersion = \"${VER}\"$" "install-agent.ps1 \$DefaultAgentVersion"
 if grep -q "当前 \*\*${VER}\*\*" docs/MAINTAINING.md; then ok "MAINTAINING 里声明的当前版本 = ${VER}"; else bad "MAINTAINING 里声明的当前版本不是 ${VER}"; fi
@@ -86,7 +85,7 @@ done
 # ---------- 3. 脚本语法 ----------
 head_ "3. 脚本语法 + 工作流 YAML"
 syn_fail=0
-for s in scripts/*.sh install-komari.sh install-compose.sh install-agent.sh .githooks/pre-commit .githooks/commit-msg; do
+for s in scripts/*.sh install-komari.sh install-agent.sh .githooks/pre-commit .githooks/commit-msg; do
   if head -1 "$s" | grep -q "sh$" && ! head -1 "$s" | grep -q "bash"; then
     sh -n "$s" 2>/dev/null || { bad "$s 语法错误"; syn_fail=$((syn_fail + 1)); }
   else
@@ -100,7 +99,7 @@ for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
       || { bad "$wf YAML 解析失败（$(tail -1 /tmp/check-repo-yaml.log)）"; syn_fail=$((syn_fail + 1)); }
   fi
 done
-[ "$syn_fail" = 0 ] && ok "scripts/*.sh + 三个安装脚本 + .githooks 语法正常，工作流 YAML 可解析"
+[ "$syn_fail" = 0 ] && ok "scripts/*.sh + 安装脚本 + .githooks 语法正常，工作流 YAML 可解析"
 
 # ---------- 4. 跟踪文件卫生 ----------
 head_ "4. 不该入库的东西没入库"
