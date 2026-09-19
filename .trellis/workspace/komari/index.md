@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 47
+- **Total Sessions**: 48
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1596 | Active |
+| `journal-1.md` | ~1633 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 48 | 2026-09-19 | 定稿唯一部署路径：install-komari.sh（用户验收后） | `d43ce46` | `main` |
 | 47 | 2026-09-19 | 按用户决定保留 0.0.18，并用仓库部署命令把生产升上去 | `4b24cc2` | `main` |
 | 46 | 2026-09-19 | compose 事故复盘：把最严重的失误写死成规范 | `613c143` | `main` |
 | 45 | 2026-09-19 | 全面整理：垃圾清零 + 一致性对齐 + 自检加自测 | `f65d004` | `main` |

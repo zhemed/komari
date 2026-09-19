@@ -1594,3 +1594,40 @@
 
 - 等用户决定：/opt/docker/komari 与 /opt/komari 的历史备份（*.backup.* / data.pre-rollback-* / data/backup/*.zip）是否清理
 - 下次发版从 0.0.19 起；若要让源码与发行物一致，需决定是否把 0.0.18 的能力重新落进 main
+
+
+## Session 48: 定稿唯一部署路径：install-komari.sh（用户验收后）
+<!-- trellis-session: v=2 fp=c85e03da72e37da7 -->
+
+**Date**: 2026-09-19
+**Task**: 定稿唯一部署路径：install-komari.sh（用户验收后）
+**Branch**: `main`
+
+### Summary
+
+用户验收成功并定调只用这条部署命令。把 systemd 一键安装写成唯一主推路径（README + MAINTAINING §3.4.1：验收过的升级步骤、三道验收命令、非交互驱动三坑、回滚方式），Docker 降为替代方案；新增 check-repo 第 14 项守卫部署路径唯一，并用判别性验证抓到该守卫自身的 bug。
+
+### Main Changes
+
+- README 部署段重排：唯一主推路径=install-komari.sh；升级=再跑一次菜单选 2；Docker 标为替代方案且不许分叉
+- MAINTAINING 新增 §3.4.1：KOMARI_TAG=<版本> bash install-komari.sh 的验收步骤、version/hash/sha256/日志三道复核、TUI 驱动三坑、回滚方式
+- check-repo 第 14 项：只允许三个带 deploy-entry: 标记的入口脚本；校验默认 tag、安装路径、systemd 工作目录；--full 查 upgrade_komari() 与文档口径
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d43ce46` | docs+check(deploy): 定稿唯一部署路径 install-komari.sh + 第 14 项守卫 [task:canonical-deploy-path] |
+
+### Testing
+
+- [OK] 手动判别性验证：造 install-compose.sh → 第 14 项报红；删除 → 通过
+- [OK] check-repo.sh --full 14 项全绿（含两次自检自测与两条判别性验证）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户决定 /opt/docker/komari 与 /opt/komari 历史备份是否清理
