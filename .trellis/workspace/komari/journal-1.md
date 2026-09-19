@@ -1438,3 +1438,38 @@
 ### Next Steps
 
 - 待用户决定：0.0.18 release 与镜像是否撤回；/opt/docker/komari 是否清理；体检删掉的产物是否重建
+
+
+## Session 44: 回答：0.0.18 修复了什么（只读核对）
+<!-- trellis-session: v=2 fp=c5e1600560ac5551 -->
+
+**Date**: 2026-09-19
+**Task**: 回答：0.0.18 修复了什么（只读核对）
+**Branch**: `main`
+
+### Summary
+
+核对 0.0.18 的修复内容：比对已发布 release 正文与本机保存的发布说明、查看 0.0.18 标签 diff、用 0.0.17 代码实证 host 网络下自识别失败的后果链；未改动任何文件、发布物或生产。
+
+### Main Changes
+
+- 只读核对：gh release view 0.0.18 -R zhemed/komari 正文与 .build/rel-notes-0.0.18.md 逐字节一致（仅末尾空行差异）
+- 定位修复 1 依据：internal/upgrade/docker.go:32-35 + internal/upgrade/upgrade.go:181-196（0.0.17 代码里 host 网络拿不到 ModeDockerRecreate）
+- 定位修复 2 依据：ListContainers 把整条 URL 传进会再拼 /v<api> 的函数 → 404，使新线索永不匹配
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 0.0.18：18 资产、非 prerelease、发布于 2026-09-18T14:47:59Z；标签指向提交 4479580，代码提交 dd0486a
+- [OK] 当前状态：仓库与生产 /opt/komari/komari 均为 0.0.17，上述两条修复已随全面回滚删除（未在本轮改回）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 等用户决定三项未决事项：是否撤下 0.0.18 release/镜像、是否清理 /opt/docker/komari、是否重建弧线前删除的本地产物
