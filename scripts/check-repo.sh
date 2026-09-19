@@ -200,6 +200,49 @@ else
   printf '\n[check-repo] 12. 自检自测：scripts/check-repo-selftest.sh 不存在，跳过\n'
 fi
 
+# ---------- 13. upgrade 路径不依赖"引擎运行时元数据" ----------
+# 2026-09-19 加的护栏，起因是本仓库最严重的一次失误：compose 全自动升级。
+# 详见 .trellis/spec/guides/incident-compose-autosync.md 与 spec/backend/server-upgrade.md。
+# 只扫**代码**（go 文件），不扫注释/文档——规范文档里本来就会提到这些词。
+#
+# 判据分两级，故意的：
+#   * 硬失败：容器 label 依赖（`com.docker.compose.*`）与那两个已删除的文件（selfid.go / compose.go）。
+#     它们正是事故的设计本身，重新出现必须有人先读事故案例。
+#   * 提示（不算失败）：`DetectSelfContainerID` 是 0.0.17 的**合法存量**（默认检测路径），
+#     但它在 host 网络下会静默失效——见 spec/backend/server-upgrade.md §5 的已知遗留。
+#     把它判成失败等于要求删掉存量功能，那是越权；所以只提示，并把遗留文档指出来。
+head_ "13. upgrade 路径不依赖引擎运行时元数据（compose 事故护栏）"
+META_HARD='com\.docker\.compose|selfid\.go|compose\.go'
+META_SOFT='DetectSelfContainerID'
+META_POSTMORTEM='.trellis/spec/guides/incident-compose-autosync.md'
+scan_meta() {  # scan_meta <模式> [git 树引用]
+  local pat="$1" ref="${2:-}"
+  if [ -n "${ref}" ]; then
+    git grep -nE "${pat}" "${ref}" -- 'internal/upgrade/*.go' 'cmd/dockerSelfRecreate.go' 2>/dev/null
+  else
+    git grep -nE "${pat}" -- 'internal/upgrade/*.go' 'cmd/dockerSelfRecreate.go' 2>/dev/null
+  fi
+}
+HARD_HITS="$(scan_meta "${META_HARD}")"
+if [ -z "${HARD_HITS}" ]; then
+  ok "当前代码没有容器 label / 引擎元数据依赖（判据：com.docker.compose 标签路径、compose 同步符号）"
+else
+  bad "upgrade 路径重新出现引擎运行时元数据依赖——先读 ${META_POSTMORTEM} 与 spec/backend/server-upgrade.md 的硬规则"
+  printf '%s\n' "${HARD_HITS}" | sed 's/^/      /'
+fi
+SOFT_HITS="$(scan_meta "${META_SOFT}")"
+if [ -z "${SOFT_HITS}" ]; then
+  ok "自身容器识别不再走 hostname/cgroup 线索（无遗留提示）"
+else
+  printf '  \033[33m·\033[0m 提示：仍在使用 DetectSelfContainerID（合法存量）——它在 host 网络下会静默失效，见 spec/backend/server-upgrade.md §5 已知遗留\n'
+fi
+# 判别性验证：硬规则必须能抓住历史缺陷，否则它只是装饰（对 dd0486a 必须报红）
+if [ -n "$(scan_meta "${META_HARD}" dd0486a)" ]; then
+  ok "判别性验证：硬规则对已回滚的历史提交 dd0486a 报红（说明规则真的会报警）"
+else
+  bad "判别性验证失败：硬规则对历史提交 dd0486a 无告警，等于永远为绿（护栏失效）"
+fi
+
 printf '\n[check-repo] 结论：'
 if [ "${FAIL}" = 0 ]; then
   printf '\033[32m全部通过\033[0m\n'; exit 0

@@ -72,7 +72,30 @@ DB 路径在 `cmd` 包里，导入会成环；升级本来就要写二进制目�
 
 ---
 
-## 5. 测试要求
+## 5. 已知遗留：host 网络下容器模式会静默失效（2026-09-19 记录，未修）
+
+**症状（可在装出来的实例上复核）**：容器 + `network_mode: host` + 挂了 socket 时，
+"自身容器识别"依赖的两条线索都会失效——hostname 是**宿主名**、cgroup v2 只有 `0::/`；
+`dockerSocketReady`（`internal/upgrade/docker.go:32`）因此拿不到 ID，`Prepare` 落到
+`Mode=container-replace`（`internal/upgrade/upgrade.go:181`）。
+
+**后果**：升级当次看起来成功，但**镜像不变**；compose 文件里的 `image:` tag 也不会跟着变，
+于是下一次容器重建 / `docker compose up -d` / 宿主重启会把版本**拉回**文件里的旧 tag。
+
+**为什么记在这里**：这是一次真实失误的根因（详见
+[事故案例：compose 全自动升级](../guides/incident-compose-autosync.md)）。0.0.18 曾修掉它
+（加第三条线索：`/proc/self/mountinfo` 的 bind 挂载比对）并额外做"tag 自动同步"，
+但整条弧线已按用户指令回滚，仓库与生产回到 0.0.17——**这条遗留重新存在**。
+不要在没读完事故案例前"顺手"重建那套机制。
+
+**现状与选择**：用 host 网络 + socket 的部署，目前只有两条路——① 用
+`Mode=container-replace`（二进制会新，镜像 tag 旧，重建即回退）；② 不用 host 网络（bridge + 端口映射），
+让 hostname/cgroup 两条线索继续有效。**没有第三条已实现的方案**；要新增就先过事故案例 §5.1 的硬规则
+（见事故案例：版本一致性只吃自己写的文件、静默降级必须有可见痕迹）。
+
+---
+
+## 6. 测试要求
 
 - `internal/upgrade/*_test.go`：版本比较/资产选择/校验和解析、校验失败不覆盖原二进制、
   自检失败不覆盖、容器分支只给 pull 命令、无 systemd 仅下载、已是最新报 `ErrUpToDate`、
@@ -83,7 +106,7 @@ DB 路径在 `cmd` 包里，导入会成环；升级本来就要写二进制目�
 
 ---
 
-## 6. 发版配套
+## 7. 发版配套
 
 - `scripts/gen-release-sums.sh` 生成 `dist/komari-SHA256SUMS`，release 资产数 17 → 18（见
   `docs/MAINTAINING.md` §3.4）。

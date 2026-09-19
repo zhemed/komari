@@ -25,6 +25,7 @@ These guides help you **ask the right questions before coding**.
 | [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
 | [Evidence & Claims Guide](./evidence-and-claims-guide.md) | 结论的证据标准：区分观测与推断、判别性实验、结论被推翻时的全落点更正 | 写下任何"原因/已定位/已知问题"结论时；修改文档或发布说明时 |
 | [Trellis 闸门指南](./trellis-gate-guide.md) | 强制规则怎么落地：三层闸门、消息锚点 `[task:<slug>]`、绕过与自证清单 | 任何会话开工前；提交前；任务收尾前 |
+| [事故案例：compose 全自动升级](./incident-compose-autosync.md) | 本仓库最严重一次失误的因果链、五层根因与五条硬规则（版本同步只吃自己写的文件、禁止静默降级…） | 任何要动 `internal/upgrade`、部署形态、容器/compose 集成、版本落地机制的改动**之前** |
 
 ---
 

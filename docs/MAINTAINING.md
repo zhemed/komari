@@ -684,6 +684,13 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 
 ### 14.2 支持矩阵（写实，不假装都支持）
 
+> **先读这条（2026-09-19）**：容器 + `network_mode: host` + 挂 socket 时，上表第 3 行的
+> "重建容器"**不成立**——自身容器识别在 host 网络下静默失效，实际会落到第 2 行的容器内替换，
+> 于是镜像不变、compose 文件 tag 落后，下次重建/`up -d`/宿主重启把版本拉回去。
+> 这是本仓库最严重一次失误的根因，完整因果与硬规则见
+> [事故案例：compose 全自动升级](../.trellis/spec/guides/incident-compose-autosync.md)
+> 与 [server-upgrade 规范 §5 已知遗留](../.trellis/spec/backend/server-upgrade.md)。
+
 | 部署形态 | 行为 |
 |---|---|
 | linux/amd64、linux/arm64 + systemd + 目录可写 | ✅ 下载 → 校验 → 自检 → 备份 + 原子替换 → 退出交 systemd 拉起 |
