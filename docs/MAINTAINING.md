@@ -361,11 +361,11 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   `frontend/src/components/admin/AdminPanelBar.tsx:714`），状态未知时不渲染按钮。
   本条目从"待修"改为"已修"，保留记录以免重复排查。
 
-- **两个 Dockerfile 的基础镜像已钉到 digest**（2026-09-17，仓库体检）：
-  `alpine:3.21@sha256:48b0309c…07d`（Docker Hub 上的 manifest list，2026-04-17 的快照），
-  这样同一份源码在不同时间构建的镜像可复现。代价：上游 3.21.x 的安全更新**不再自动进来**，
-  要手动更新 digest（改两个 Dockerfile 后重跑 `scripts/build-server-image.sh` /
-  `scripts/build-agent-image.sh` 验证）。二进制产物本身一直是可复现的。
+- **两个 Dockerfile 的基础镜像用 tag**（`alpine:3.21`）：2026-09-17 的仓库体检曾把它钉成 digest
+  以换取「同一份源码跨时间构建可复现」，**2026-09-19 按用户要求回滚**——上游 3.21.x 的安全更新
+  能自动跟进，代价是构建不完全可复现（二进制产物本身一直可复现）。
+  想重新钉 digest：改两个 Dockerfile 后重跑 `scripts/build-server-image.sh` /
+  `scripts/build-agent-image.sh` 验证，并在这里更新本条记录。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
 - **agent 自带测试里的 3 个外网用例已改为默认跳过**（2026-09-17，仓库体检）：
   `agent/server/task_test.go` 的 `TestICMPPing` / `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的

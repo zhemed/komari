@@ -12,11 +12,12 @@
 #      不装 tzdata，容器内时区为 UTC（面板展示不受影响）。
 #   3) 容器标记文件保留：agent 检测到后会跳过二进制自更新
 #      （见 scripts/patches-agent/0001-own-update-line.patch），升级请换镜像。
-#   4) 基础镜像钉到 digest（2026-09-17，仓库体检）：理由同仓库根 Dockerfile。
+#   4) 基础镜像回到 tag（2026-09-19 按用户要求回滚 digest 钉版）：理由同仓库根 Dockerfile。
+#      alpine 基础镜像自带 ca-certificates-bundle；不装 tzdata，容器内为 UTC。
 #
 # 构建入口是 scripts/build-agent-image.sh（它准备上下文并调 buildx）：
 # 上下文里必须已有 komari-agent-${TARGETOS}-${TARGETARCH} 与 komari-agent-container。
-FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+FROM alpine:3.21
 
 # OCI 标签：ghcr 包页面会链回本仓库，也便于溯源（见 docs/MAINTAINING.md §12）
 LABEL org.opencontainers.image.source="https://github.com/zhemed/komari" \

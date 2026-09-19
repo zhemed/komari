@@ -1,7 +1,6 @@
-# 基础镜像钉到 digest（2026-09-17，仓库体检）：tag 会随上游滚动，同一份源码在不同时间
-# 构建出的镜像不可复现。升基础镜像时改这里并重跑 scripts/build-server-image.sh 验证；
-# 代价是上游 3.21.x 的安全更新不再自动进来（见 docs/MAINTAINING.md §7）。
-FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+# 基础镜像用 tag（2026-09-19 按用户要求回滚 digest 钉版）：
+# 换取上游 alpine 3.21.x 的安全更新能自动跟进；代价是构建不完全可复现（见 docs/MAINTAINING.md §7）。
+FROM alpine:3.21
 
 # OCI 标签：ghcr 包页面会链回本仓库，也便于溯源（见 docs/MAINTAINING.md §12）
 LABEL org.opencontainers.image.source="https://github.com/zhemed/komari" \
