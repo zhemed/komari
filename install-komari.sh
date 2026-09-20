@@ -42,7 +42,7 @@ LISTEN_PORT=""
 # deploy-entry: 仓库唯一部署/升级入口（2026-09-19 用户验收后定稿，见 docs/MAINTAINING.md §3.4.1）
 REPO="${KOMARI_REPO:-zhemed/komari}"
 # 自有发布 tag：本仓库只维护自有版本线，故锁定 tag 而非使用 latest。
-REPO_TAG="${KOMARI_TAG:-0.0.20}"
+REPO_TAG="${KOMARI_TAG:-0.0.21}"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
 # TUI 工具: whiptail / dialog / 空（回退纯文本）

@@ -627,28 +627,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                                 opacity: 0.5,
                               }}
                             />
-                            {/* 能一键升级 → 升级按钮；不能（容器/无 systemd）→ 给可复制的命令入口。
-                                两者的区别只是服务端会不会真的替换二进制，前端入口都要有：
-                                0.0.9 的缺口就是"不支持"时把入口一起藏了，用户拿不到命令。 */}
-                            {upgradeStatus && upgradeStatus.enabled !== false && (
-                              <div className="flex justify-end">
-                                <Button
-                                  size="1"
-                                  variant="soft"
-                                  disabled={!!upgradeStatus?.running}
-                                  onClick={() =>
-                                    startUpgrade(r.tag_name || r.name)
-                                  }
-                                >
-                                  {canAutoUpgrade
-                                    ? t("upgrade.install_version", "安装此版本")
-                                    : t(
-                                        "upgrade.copy_pull_command",
-                                        "复制升级命令",
-                                      )}
-                                </Button>
-                              </div>
-                            )}
+                            {/* 每行的升级按钮已删除（用户 2026-09-20 要求去重）：
+                                列表首项与底部大按钮指向同一版本，重复；现在只保留底部那一个，
+                                这里仅展示版本信息。代价：不再能从列表里选特定版本/回滚。 */}
                           </div>
                         ))}
                       </div>
