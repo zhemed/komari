@@ -1781,3 +1781,37 @@
 ### Next Steps
 
 - 如还需更短可再压（但信息密度已到极限）
+
+
+## Session 56: 走 C：重发干净版 0.0.18（release/镜像/生产全线替换）
+<!-- trellis-session: v=2 fp=157de63fe2b31029 -->
+
+**Date**: 2026-09-20
+**Task**: 走 C：重发干净版 0.0.18（release/镜像/生产全线替换）
+**Branch**: `main`
+
+### Summary
+
+用户选 C。查清生产是 systemd 二进制后：顺手补删面板 compose 提示（回滚把它退掉了）、重建服务器静态双架构与 agent 14 平台、覆盖上传 release 0.0.18 的 18 个资产并改标题说明、覆盖推送双镜像、走 install-komari.sh 换掉生产二进制。四者现完全一致且无 compose。
+
+### Main Changes
+
+- 面板：删 AdminPanelBar 的 compose 提示块 + 5 语言包 inplace_hint；前端哈希 3b1c226b…
+- release 0.0.18 换标题与说明（19-20 重新构建为无 compose 版），18 资产覆盖上传
+- 镜像 komari / komari-agent 的 :0.0.18 与 :latest 覆盖为干净内容
+- 生产二进制替换为 3c409e6a…（旧版备份 komari.backup.20260920_021345）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9b7a693` | chore(task): archive 09-20-republish-0-0-18-clean |
+
+### Testing
+
+- [OK] 生产 sha256 = release 资产 digest（3c409e6abbac6a60）
+- [OK] 生产与镜像内 compose 痕迹均 0；面板 0.0.18；日志 0 错误；agent online (v2)
+
+### Status
+
+[OK] **Completed**

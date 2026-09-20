@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 55
+- **Total Sessions**: 56
 - **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1783 | Active |
+| `journal-1.md` | ~1817 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 56 | 2026-09-20 | 走 C：重发干净版 0.0.18（release/镜像/生产全线替换） | `9b7a693` | `main` |
 | 55 | 2026-09-20 | README 重新精简到 36 行 | `5ebc24d` | `main` |
 | 54 | 2026-09-20 | 全部回滚：仓库/发布/镜像回到 0.0.18（含 compose 起点定位） | `9c1ff36` | `main` |
 | 50 | 2026-09-20 | 修：README 删减未落盘（被自己的验证动作覆盖） | `b6a0c68` | `main` |
