@@ -1707,3 +1707,42 @@
 ### Next Steps
 
 - 若用户要更短可继续压到 ~60 行；compose 事故记录文件是否删除等用户决定
+
+
+## Session 54: 全部回滚：仓库/发布/镜像回到 0.0.18（含 compose 起点定位）
+<!-- trellis-session: v=2 fp=bf97d635f3df276e -->
+
+**Date**: 2026-09-20
+**Task**: 全部回滚：仓库/发布/镜像回到 0.0.18（含 compose 起点定位）
+**Branch**: `main`
+
+### Summary
+
+用户要求定位 compose 起点后全部回滚。定位：上游 komari 从来没有 compose 部署；用户的 compose 用法 09-18 起由用户提出（任务记录原文），09-18 14:01 644169c 定稿入仓，存活 15h12m。回滚执行：仓库文件树回到 662864a（0.0.18 口径）、删 release 0.0.19 与 tag 0.0.19、ghcr 镜像 :latest/0.0.18 归位并移除 0.0.19 tag、生产未动。今日工作保存在远程分支 pre-rollback-0.0.19（71019ce）。
+
+### Main Changes
+
+- 仓库：main 回到 0.0.18 状态（README 94 行、Docker 主方案、compose 已剔除、无 0.0.19）；前端目录树哈希回到 93a2b61b
+- 发布：删 release 0.0.19 + tag 0.0.19（本地与远程）；Latest 回到 0.0.18
+- 镜像：komari/:latest 与 komari-agent/:latest 退回 0.0.18 内容；ghcr 上移除 0.0.19 tag
+- 恢复点：pre-rollback-0.0.19（远程分支 → 71019ce）保留今日全部工作
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9c1ff36` | chore(task): archive 09-20-rollback-to-0-0-18-state |
+
+### Testing
+
+- [OK] docker run ghcr.io/zhemed/komari:latest --help → Komari Monitor 0.0.18 (hash 4479580f9b61…)
+- [OK] check-repo.sh 全部通过（含前端产物哈希一致）
+- [OK] ghcr tag 复查：komari 仅 0.0.18/latest/0.0.17…；agent 0.0.18/latest…
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 生产仍 0.0.18，未动；如需与仓库/镜像对齐无需操作
