@@ -6,25 +6,16 @@
     "readme_open_in_new_tab": "Buka di tab baru"
   },
   "account": {
-    "2fa_disabled": "Autentikasi dua faktor dinonaktifkan",
-    "2fa_enabled": "Autentikasi dua faktor diaktifkan",
-    "2fa_otp_input_prompt": "Silakan masukkan kode satu kali dari aplikasi autentikator Anda",
-    "2fa_qr_code_hint": "Pindai kode QR ini dengan aplikasi autentikator Anda untuk mengatur autentikasi dua faktor",
     "change_password_button": "Ubah Kata Sandi",
     "change_password_title": "Ubah Kata Sandi",
     "change_username_button": "Ubah",
     "change_username_title": "Ubah Nama Pengguna",
-    "disable_2fa": "Nonaktifkan 2FA",
-    "disable_2fa_confirmation": "Apakah Anda yakin ingin menonaktifkan 2FA?",
-    "enable_2fa": "Aktifkan 2FA",
     "greeting": "Halo, {{username}}! Mau melakukan apa hari ini?",
     "menu": "Akun",
     "new_password": "Kata sandi baru",
     "new_password_repeat": "Ulangi kata sandi",
-    "otp_empty_error": "Kode OTP tidak boleh kosong",
     "password_empty_error": "Kata sandi tidak boleh kosong",
     "password_mismatch_error": "Kata sandi tidak cocok",
-    "qr_fetch_error": "Tidak dapat memuat kode QR",
     "title": "Akun"
   },
   "account_settings": {
@@ -512,7 +503,6 @@
     "password": "Kata Sandi",
     "password_placeholder": "Masukkan kata sandi",
     "title": "Masuk",
-    "two_factor": "Autentikasi Dua Faktor",
     "username": "Nama Pengguna"
   },
   "logs": {

@@ -418,7 +418,6 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 
 func getMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
 	var resp struct {
-		TwoFAEnabled bool   `json:"2fa_enabled"`
 		LoggedIn     bool   `json:"logged_in"`
 		SSOId        string `json:"sso_id"`
 		SSOType      string `json:"sso_type"`
@@ -435,7 +434,6 @@ func getMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) 
 			resp.Username = "api_key"
 			return resp, nil
 		}
-		resp.TwoFAEnabled = meta.User.TwoFactor != ""
 		resp.LoggedIn = true
 		resp.SSOId = meta.User.SSOID
 		resp.SSOType = meta.User.SSOType

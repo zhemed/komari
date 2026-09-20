@@ -115,14 +115,6 @@ func registerAdminRoutes(r *gin.Engine) {
 		theme.POST("/market/install", admin.InstallThemeFromMarket)
 	}
 
-	// 2FA 含二维码 PNG / 敏感操作，保留 REST handler。
-	twoFactor := g.Group("/2fa")
-	{
-		twoFactor.GET("/generate", admin.Generate2FA)
-		twoFactor.POST("/enable", admin.Enable2FA)
-		twoFactor.POST("/disable", api.RequireSensitive2FA(), admin.Disable2FA)
-	}
-
 	// oauth2 绑定走重定向，保留 REST handler。
 	oauth2 := g.Group("/oauth2")
 	{
@@ -136,7 +128,7 @@ func registerAdminRoutes(r *gin.Engine) {
 	task := g.Group("/task")
 	{
 		task.GET("/all", jsonRpc.Bind("admin:getTasks"))
-		task.POST("/exec", api.RequireSensitive2FA(), jsonRpc.Bind("admin:exec"))
+		task.POST("/exec", jsonRpc.Bind("admin:exec"))
 		task.GET("/:task_id", jsonRpc.Bind("admin:getTaskById", jsonRpc.WithPath("task_id")))
 		task.GET("/:task_id/result", jsonRpc.Bind("admin:getTaskResultsByTaskId", jsonRpc.WithPath("task_id")))
 		task.GET("/:task_id/result/:uuid", jsonRpc.Bind("admin:getSpecificTaskResult", jsonRpc.WithPath("task_id", "uuid")))
@@ -171,7 +163,7 @@ func registerAdminRoutes(r *gin.Engine) {
 		clientGroup.POST("/:uuid/remove", jsonRpc.Bind("admin:removeClient", jsonRpc.WithPath("uuid")))
 		clientGroup.GET("/:uuid/token", jsonRpc.Bind("admin:getClientToken", jsonRpc.WithPath("uuid"), jsonRpc.WithFlat()))
 		clientGroup.POST("/order", jsonRpc.Bind("admin:orderClients"))
-		clientGroup.GET("/:uuid/terminal", api.RequireSensitive2FA(), terminal.RequestTerminal)
+		clientGroup.GET("/:uuid/terminal", terminal.RequestTerminal)
 	}
 
 	// records

@@ -17,7 +17,6 @@ import (
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	TwoFa    string `json:"2fa_code"`
 }
 
 const sessionCookieMaxAge = 2592000
@@ -61,18 +60,6 @@ func Login(c *gin.Context) {
 	if !success {
 		api.RespondError(c, http.StatusUnauthorized, "Invalid credentials")
 		return
-	}
-	// 2FA
-	user, _ := accounts.GetUserByUUID(uuid)
-	if user.TwoFactor != "" { // 开启了2FA
-		if data.TwoFa == "" {
-			api.RespondError(c, http.StatusUnauthorized, "2FA code is required")
-			return
-		}
-		if ok, err := accounts.Verify2Fa(uuid, data.TwoFa); err != nil || !ok {
-			api.RespondError(c, http.StatusUnauthorized, "Invalid 2FA code")
-			return
-		}
 	}
 	// Create session
 	session, err := accounts.CreateSession(uuid, sessionCookieMaxAge, c.Request.UserAgent(), c.ClientIP(), "password")

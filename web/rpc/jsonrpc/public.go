@@ -100,7 +100,6 @@ func publicGetMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 		"uuid":        u.UUID,
 		"sso_type":    u.SSOType,
 		"sso_id":      u.SSOID,
-		"2fa_enabled": u.TwoFactor != "",
 	}, nil
 }
 

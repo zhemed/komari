@@ -27,8 +27,7 @@ import (
 //   - 目标仓库来自服务端设置，**不接受请求参数里的 URL**；
 //   - 需要管理员权限（admin 命名空间）并写审计日志；
 //   - 校验 SHA256 只能保证"下载内容与发布清单一致"，不防发布链被篡改（签名体系留 v2）；
-//   - 故意**没有**标记 rpc.MarkSensitive：那会要求每次调用都带 2FA 码，
-//     而面板目前没有该提示流程。若后续接上 2FA 提示，这里应改为 MarkSensitive("admin:upgradeServer")。
+//   - 升级接口不做额外的二次验证（2026-09-20 移除 2FA 后，敏感操作验证机制一并删除）。
 
 const defaultUpgradeRepo = "zhemed/komari"
 

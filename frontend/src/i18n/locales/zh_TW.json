@@ -6,25 +6,16 @@
     "readme_open_in_new_tab": "在新標籤頁中開啟"
   },
   "account": {
-    "2fa_disabled": "雙重身份驗證已禁用",
-    "2fa_enabled": "雙重身份驗證已啟用",
-    "2fa_otp_input_prompt": "請輸入您的身份驗證應用生成的動態口令",
-    "2fa_qr_code_hint": "使用您的身份驗證應用掃描此二維碼以設定雙重身份驗證",
     "change_password_button": "更改密碼",
     "change_password_title": "修改密碼",
     "change_username_button": "修改使用者名稱",
     "change_username_title": "更改使用者名稱",
-    "disable_2fa": "禁用",
-    "disable_2fa_confirmation": "您確定禁用2FA嗎？",
-    "enable_2fa": "開啟雙重身份驗證",
     "greeting": "{{username}}，您今天想做什麼？",
     "menu": "帳戶",
     "new_password": "新密碼",
     "new_password_repeat": "重複新密碼",
-    "otp_empty_error": "空驗證碼",
     "password_empty_error": "不允許空密碼",
     "password_mismatch_error": "兩次輸入的密碼不一致",
-    "qr_fetch_error": "無法載入二維碼",
     "title": "帳戶"
   },
   "account_settings": {
@@ -512,7 +503,6 @@
     "password": "密碼",
     "password_placeholder": "請輸入您的密碼",
     "title": "登入",
-    "two_factor": "雙因素認證",
     "username": "使用者名稱"
   },
   "logs": {

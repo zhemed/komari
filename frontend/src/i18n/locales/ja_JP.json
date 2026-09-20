@@ -6,25 +6,16 @@
     "readme_open_in_new_tab": "新しいタブで開く"
   },
   "account": {
-    "2fa_disabled": "二要素認証は無効になっています",
-    "2fa_enabled": "二要素認証が有効になりました",
-    "2fa_otp_input_prompt": "認証アプリが生成したワンタイムパスワードを入力してください",
-    "2fa_qr_code_hint": "このQRコードを認証アプリでスキャンして二要素認証を設定してください",
     "change_password_button": "パスワードを変更",
     "change_password_title": "パスワードを変更",
     "change_username_button": "ユーザー名を変更",
     "change_username_title": "ユーザー名を変更",
-    "disable_2fa": "無効にする",
-    "disable_2fa_confirmation": "本当に2FAを無効にしますか？",
-    "enable_2fa": "二要素認証を有効にする",
     "greeting": "{{username}}さん、今日は何をしますか？",
     "menu": "アカウント",
     "new_password": "新しいパスワード",
     "new_password_repeat": "新しいパスワードを再入力",
-    "otp_empty_error": "空の確認コード",
     "password_empty_error": "空のパスワードは許可されていません",
     "password_mismatch_error": "2回入力したパスワードが一致しません",
-    "qr_fetch_error": "QRコードを読み込めません",
     "title": "アカウント"
   },
   "account_settings": {
@@ -512,7 +503,6 @@
     "password": "パスワード",
     "password_placeholder": "パスワードを入力してください",
     "title": "ログイン",
-    "two_factor": "二要素認証",
     "username": "ユーザー名"
   },
   "logs": {
