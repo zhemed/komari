@@ -97,7 +97,7 @@ hostname 是**宿主名**、cgroup v2 只有 `0::/`；`dockerSocketReady`（`int
 （`/opt/komari/komari` = `b5b024ac…`、`version=0.0.18`）。
 
 **对使用者的实际结论**：主方案（Docker + 面板升级）用的是"容器内替换"，**不受这个遗留影响**；
-需要"镜像与版本永远一致"就用固定 tag 重建容器（见 `docs/MAINTAINING.md` §3.4.1）。
+需要"镜像与版本永远一致"就用固定 tag 重建容器（见 `docs/MAINTAINING.md`「部署口径」）。
 不要为此再引入 compose 或容器 label 检测——那是被拦掉的机制。
 
 ## 6. 测试要求
@@ -114,6 +114,6 @@ hostname 是**宿主名**、cgroup v2 只有 `0::/`；`dockerSocketReady`（`int
 ## 7. 发版配套
 
 - `scripts/gen-release-sums.sh` 生成 `dist/komari-SHA256SUMS`，release 资产数 17 → 18（见
-  `docs/MAINTAINING.md` §3.4）。
+  `docs/MAINTAINING.md`「发布一个版本」）。
 - `install-komari.sh` 的 `verify_download_checksum` 是**尽力而为**：清单不存在（≤0.0.7）时只告警，
   否则回滚到旧版本这条路会被自己堵死。

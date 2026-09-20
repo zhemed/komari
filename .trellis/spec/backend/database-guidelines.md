@@ -241,6 +241,6 @@ the administrator guide, rather than being changed during startup"）。
 1. **外部 sqlite3 读到"旧"数据**：WAL 模式下，只在 `-wal` 里、尚未 checkpoint 的写入对
    新连接是可见的（SQLite 保证），所以正常情况下外部读不会落后。但升级重启过程中出现过
    `komari.db-wal` 被 unlink、进程仍持有其 fd 的偶发状态，此时外部读会停在升级前——
-   **先重启一次服务端再判断**，别急着下"数据丢了"的结论（详见 `docs/MAINTAINING.md` §7）。
+   **先重启一次服务端再判断**，别急着下"数据丢了"的结论（重启一次服务端再判断，别急着下"数据丢了"的结论）。
 2. **不要用 `cp` 直接拷 `komari.db` 当备份**：WAL 里的写入可能不在主文件里。
    面板的备份走 `VACUUM INTO`（`web/api/admin/download.go:119`）拿到一致性快照。

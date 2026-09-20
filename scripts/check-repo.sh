@@ -36,7 +36,8 @@ check_literal() {
 check_literal install-komari.sh "REPO_TAG=\"\${KOMARI_TAG:-${VER}}\"" "install-komari.sh REPO_TAG"
 check_literal install-agent.sh "^default_agent_version=\"${VER}\"$" "install-agent.sh default_agent_version"
 check_literal install-agent.ps1 "^\\\$DefaultAgentVersion = \"${VER}\"$" "install-agent.ps1 \$DefaultAgentVersion"
-if grep -q "当前 \*\*${VER}\*\*" docs/MAINTAINING.md; then ok "MAINTAINING 里声明的当前版本 = ${VER}"; else bad "MAINTAINING 里声明的当前版本不是 ${VER}"; fi
+# 当前版本声明：接受任意写法，只要标题/正文里出现"当前 <版本>"（README 精简后格式不再固定）
+if grep -qE "当前[^0-9]{0,4}${VER}" docs/MAINTAINING.md; then ok "MAINTAINING 里声明的当前版本 = ${VER}"; else bad "MAINTAINING 里声明的当前版本不是 ${VER}"; fi
 if git describe --tags --exact-match >/dev/null 2>&1; then
   [ "$(git describe --tags --exact-match)" = "${VER}" ] \
     && ok "当前提交正好是 tag ${VER}" \
@@ -284,8 +285,12 @@ if [ "${FULL}" = 1 ]; then
     || { bad "README 不再以 Docker 镜像作为主部署命令（部署口径被改动了）"; DEPLOY_OK=0; }
   grep -q 'ghcr.io/zhemed/komari:latest' README.md \
     || { bad "README 缺少 ghcr.io/zhemed/komari:latest 镜像地址"; DEPLOY_OK=0; }
-  grep -q '3\.4\.1 部署口径' docs/MAINTAINING.md \
-    || { bad "MAINTAINING 缺少 §3.4.1「部署口径」"; DEPLOY_OK=0; }
+  # MAINTAINING 必须保留部署口径：Docker 主方案 + compose 禁止（不再绑定章节号——
+  # 2026-09-20 文档精简后章节重排，检查改为"内容而不是编号"）
+  grep -q '主方案：Docker 镜像' docs/MAINTAINING.md \
+    || { bad "MAINTAINING 不再声明 Docker 镜像为主方案（部署口径被改动了）"; DEPLOY_OK=0; }
+  grep -q 'compose 一律不用' docs/MAINTAINING.md \
+    || { bad "MAINTAINING 不再声明 compose 一律不用"; DEPLOY_OK=0; }
   # 剔除 compose（用户 2026-09-19 明确要求）：用户面文档与运行代码里都不许再出现。
   # 必须排除本脚本自身——它得写着这条模式才能查别人（首版没排除，把自己抓了）。
   COMPOSE_PAT='docker compose|docker-compose|compose\.ya?ml'

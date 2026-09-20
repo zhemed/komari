@@ -13,7 +13,7 @@
 | pre-commit 钩子 | 无 |
 | `gofmt` 一致性 | **当前树并非 gofmt-clean**：`gofmt -l` 列出 14 个文件（见 §3） |
 | CI 测试 | **本仓库没有 CI**：上游 `.github/workflows/`（10 个 workflow，只做前端构建 + `go build`，**无 `go test` / `go vet`**）已于 2026-09-16 整体移除 |
-| README 构建说明 | README 已改成**产品视角短文**（定位/特性/部署/维护）；构建与发布命令在 `docs/MAINTAINING.md` §3，README 只保留 `go build/vet/test` 自检三段 |
+| README 构建说明 | README 已改成**产品视角短文**（定位/特性/部署/维护）；构建与发布命令在 `docs/MAINTAINING.md`，README 只留部署命令、agent 命令与自检一条 |
 | `CONTRIBUTING.md` | 不存在 |
 
 所以：**质量靠自己跑命令 + code review**，不要假设推上去会被拦住。
@@ -35,7 +35,7 @@ go build ./... && go vet ./... && go test ./...
 工具链事实：`go.mod:3` 是 `go 1.25.0`，`docs/MAINTAINING.md:36-37` 要求 Go ≥ 1.25.0 + gcc（CGO 必需）。
 ⚠️ 上游 CI 有 7 个 workflow 写的是 `go-version: "1.23"`（如 `.github/workflows/build.yml:81`、
 `.github/workflows/release.yml:105`——该目录已移除，此处仅作历史说明），与 `go.mod` 不一致；
-`docs/MAINTAINING.md` §2 明确裁定**以 `go.mod` 为准**。
+**以 `go.mod` 为准**（工具链口径见 `docs/MAINTAINING.md`「构建」）。
 
 ## 3. 格式与静态检查
 
@@ -69,7 +69,7 @@ go build ./... && go vet ./... && go test ./...
 测试最富的包（2026-09-16 实测，全仓 77 个 `*_test.go`）：`pkg/metric`（19 个）、
 `web/rpc/jsonrpc`（8 个）、`agent/monitoring/unit`（5 个）、`internal/metricstore`（4 个）、
 `agent/server`（4 个）、`web/api/admin`（3 个）。前端与 agent 源码 vendor 进本仓库后，
-`agent/` 下的测试同样归我们维护（其中 3 个依赖外网，见 `docs/MAINTAINING.md` §7）。
+`agent/` 下的测试同样归我们维护（其中 3 个依赖外网）。
 
 **大量目录没有测试**（55 个），包括 `cmd/`、`internal/config/`、`database/accounts/`、
 `database/clients/`、`database/auditlog/`、`web/router/`、`web/upload/`。

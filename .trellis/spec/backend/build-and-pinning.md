@@ -3,7 +3,7 @@
 本文件记录**本 fork 特有**的构建契约。上游文档不覆盖这些约定，改动构建相关文件前必读。
 
 适用范围：`scripts/`、`web/public/`、`install-komari.sh`、`install-agent.sh`、`install-agent.ps1`、`Dockerfile`、`Dockerfile.agent`、`README.md`（产品视角，构建细节在 `docs/MAINTAINING.md`）。
-（本仓库已无 `.github/` 流水线——上游 CI 已于 2026-09-16 移除，见 §2 末尾与 `docs/MAINTAINING.md` §4。）
+（本仓库已无 `.github/` 流水线——上游 CI 已于 2026-09-16 移除，见 §2 末尾。）
 
 ---
 
@@ -87,7 +87,7 @@ chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变�
 
 - 源码：`agent/`（上游 `komari-agent@1186aafb`，2026-08-07、**1.4.3 同期**的快照 + 我们内联的改动）。
   **不要**把上游 agent main 整条覆盖进来（那会带进 1.5 行为：motd 安全告警注入、文件访问、
-  v2-only 协议，见 `docs/MAINTAINING.md` §11.5）；跟进上游请按 §11.3 手工挑改动。
+  v2-only 协议，见 `agent/update/update.go` 的协议选择实现）；跟进上游请按 §11.3 手工挑改动。
   溯源与构建参数在 `scripts/agent-build.env`；`scripts/patches-agent/` 已删除。
 - 构建：`scripts/build-agent.sh` 纯 Go 交叉编译（`CGO_ENABLED=0`），**不需要 zig/gcc**，
   矩阵与上游 `build_all.sh` 一致 = **14** 个平台（排除 windows/arm、darwin/{386,arm}、非 linux 的 loong64）。
@@ -95,7 +95,7 @@ chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变�
   三者都按这个名字找。
 - **自更新必须带资产过滤** `Filters: []string{"^komari-agent-"}`：`go-github-selfupdate` 按
   **后缀**（如 `linux-amd64`）匹配资产，不过滤会让 agent 刷成同 release 里的服务器二进制
-  （`komari-linux-amd64`）。实测证据见 `docs/MAINTAINING.md` §11.1，**升级上游时不得去掉**。
+  （`komari-linux-amd64`）。**升级上游时不得去掉**（原因见 §4.1 的实测记录）。
 - 自更新目标固定 `Repo = "zhemed/komari"`（源码默认 + 构建期 `-X` 双保险）；
   **默认关闭自动更新**（`EnableAutoUpdate` 默认 false，`--enable-auto-update` 才开）。
 - 安装脚本是**同一 pin** 的上游 `install.sh` / `install.ps1` 的 vendor + 补丁（因此沿用 `#!/bin/bash`）：默认安装目录 `/opt/komari-agent`
@@ -121,7 +121,7 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：lin
 zig 缺失时 `KOMARI_STATIC=1` 必须**明确报错**，不得静默退化为动态链接。
 
 改构建相关文件后的最小验证（也可以直接跑 `./scripts/check-repo.sh --full`，
-它把下面这些机械检查打包在一起，见 `docs/MAINTAINING.md` §2.1）：
+它把下面这些机械检查打包在一起，见 `docs/MAINTAINING.md`「自检与闸门」）：
 
 1. `GOPROXY=off GOFLAGS=-mod=mod ./scripts/build-komari.sh` —— 在**模块缓存已预热**的机器上必须成功。
    ⚠️ 本仓库**没有 `vendor/` 目录**（实测：`GOMODCACHE=<空目录> GOPROXY=off` 会报
@@ -137,7 +137,7 @@ zig 缺失时 `KOMARI_STATIC=1` 必须**明确报错**，不得静默退化为�
 
 **本仓库没有 CI**：上游 `.github/workflows`（10 个 workflow）只做前端构建 + `go build`，
 且会从前端默认分支构建、向 `ghcr.io/komari-monitor` 推镜像，因此已整体移除。
-上述验证必须**本地手动执行**，发布同样手动（见 `docs/MAINTAINING.md` §3.4）。
+上述验证必须**本地手动执行**，发布同样手动（见 `docs/MAINTAINING.md`「发布一个版本」）。
 
 ## 3. 禁止事项
 
