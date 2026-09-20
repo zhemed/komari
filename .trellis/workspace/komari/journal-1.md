@@ -1815,3 +1815,42 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 57: 彻底移除 2FA 并发布 0.0.19（含生产升级）
+<!-- trellis-session: v=2 fp=1464bdf55264baf2 -->
+
+**Date**: 2026-09-20
+**Task**: 彻底移除 2FA 并发布 0.0.19（含生产升级）
+**Branch**: `main`
+
+### Summary
+
+用户要求评估并彻底移除 2FA：账号级 + 敏感操作两层全删，连带 pquerna/otp 依赖、CLI 命令、关于页许可清单、5 语言包 10 键、前端 6 个文件；前端交由子代理执行、Lead 复核类型检查与产物；发 0.0.19 并升级生产。过程中纠正了自己'先构建后提交'的顺序错误与 agent 校验和漏传。
+
+### Main Changes
+
+- 后端：删 5 个文件（accounts/2fa.go、admin/2fa.go、AuthSensitive.go、rpc/sensitive.go、cmd/disable2FA.go），改 8 处（login/update/router/cors/system/common/public/models）+ transport 去掉整层敏感校验；go.mod 去 pquerna/otp
+- 前端：Login/RestrictedLoginDialog/account/exec/terminal/AccountContext + about 许可清单 + 5 语言包各删 10 键；产物重建 FRONTEND_TREE_SHA256 → 720e5638…
+- 发布：0.0.19（18 资产）+ 镜像 :0.0.19/:latest；修正后内嵌 hash = 提交 39b2bb2
+- 生产：0.0.18 → 0.0.19（备份 komari.backup.20260920_024534）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `275cd50` | chore(task): archive 09-20-twofa-removal-scope |
+
+### Testing
+
+- [OK] go build/vet/test 全绿；tsc -p tsconfig.app.json 0 错误；源码/产物/二进制 2FA 命中 0
+- [OK] 路由 /api/admin/2fa/* 已消失（SPA 兜底验证）；登录返回 Invalid credentials 而非 2FA 提示
+- [OK] 生产 sha256 与 release 资产一致、面板 0.0.19、agent online (v2)、日志 0 错误
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：加一条自检护栏防止 2FA 被重新引入；清理 /opt/komari 历史备份
