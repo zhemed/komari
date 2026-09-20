@@ -1745,3 +1745,41 @@
 ### Next Steps
 
 - compose 事故记录文件是否删除，仍等用户决定
+
+
+## Session 52: 删除面板里提到 compose 的提示文案并重建前端产物
+<!-- trellis-session: v=2 fp=5d9636256ed575ca -->
+
+**Date**: 2026-09-20
+**Task**: 删除面板里提到 compose 的提示文案并重建前端产物
+**Branch**: `main`
+
+### Summary
+
+用户选'一并删掉这句提示'。移除 AdminPanelBar 的 container-replace 提示块、5 个语言包逐行删除 inplace_hint、重建前端产物并更新目录树哈希。踩坑并修正：首版用 json.load/dump 重写语言包，把本来不统一的缩进整块重排（55 行/文件噪声），已回退改为逐行精确删除（每处 1 行）。
+
+### Main Changes
+
+- AdminPanelBar.tsx：删除 upgrade.inplace_hint 渲染块（socket 重建模式按用户决定保留）
+- 5 个语言包：逐行删除 inplace_hint（en/id_ID/ja_JP/zh_CN/zh_TW）
+- 重建产物：FRONTEND_TREE_SHA256 → 3b1c226b…；dist 文件数 428 与重建前一致
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `abd30cf` | chore(task): archive 09-20-remove-compose-ui-hint |
+
+### Testing
+
+- [OK] 产物与源码 'compose up' 0 命中、inplace_hint 0 命中
+- [OK] 保留键仍在：docker_socket_hint / upgrade_now_inplace / phase_inplace_restart
+- [OK] check-repo.sh --full 14 项全绿（第 6 项产物哈希一致）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 0.0.19 发版前建议对在跑的 0.0.18 做一次真机升级测试
