@@ -36,7 +36,7 @@ check_literal() {
 check_literal install-komari.sh "REPO_TAG=\"\${KOMARI_TAG:-${VER}}\"" "install-komari.sh REPO_TAG"
 check_literal install-agent.sh "^default_agent_version=\"${VER}\"$" "install-agent.sh default_agent_version"
 check_literal install-agent.ps1 "^\\\$DefaultAgentVersion = \"${VER}\"$" "install-agent.ps1 \$DefaultAgentVersion"
-if grep -q "当前 \*\*${VER}\*\*" docs/MAINTAINING.md; then ok "MAINTAINING 里声明的当前版本 = ${VER}"; else bad "MAINTAINING 里声明的当前版本不是 ${VER}"; fi
+if grep -qF "**当前版本：\`${VER}\`**" docs/MAINTAINING.md; then ok "MAINTAINING 里声明的当前版本 = ${VER}"; else bad "MAINTAINING 里声明的当前版本不是 ${VER}（应含 **当前版本：\`${VER}\`**）"; fi
 if git describe --tags --exact-match >/dev/null 2>&1; then
   [ "$(git describe --tags --exact-match)" = "${VER}" ] \
     && ok "当前提交正好是 tag ${VER}" \
