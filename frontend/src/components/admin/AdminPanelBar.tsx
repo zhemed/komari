@@ -683,14 +683,6 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                         )}
                       </div>
                     )}
-                    {isContainerReplace && (
-                      <div className="text-xs text-muted-foreground">
-                        {t(
-                          "upgrade.inplace_hint",
-                          "容器内替换二进制并原地重启：不需要挂载、不需要额外配置；但之后重建容器（docker rm + run / compose up）会退回镜像里的版本——想与镜像完全一致，请挂 /var/run/docker.sock 使用重建容器模式。",
-                        )}
-                      </div>
-                    )}
                     {upgradeNote && (
                       <div className="text-xs text-muted-foreground">
                         {upgradeNote}
