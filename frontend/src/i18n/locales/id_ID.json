@@ -1258,7 +1258,6 @@
       "enable_description": "Jika dinonaktifkan, panel tidak menampilkan tombol pembaruan dan API menolak permintaan pembaruan. Deployment container dan tanpa systemd memang tidak bisa memperbarui sendiri.",
       "enable_title": "Aktifkan pembaruan manual sekali klik",
       "hint_container": "Di dalam container, tarik image baru lalu buat ulang container",
-      "inplace_hint": "Mengganti biner di dalam container lalu menjalankannya kembali: tanpa mount, tanpa konfigurasi tambahan. Catatan: membuat ulang container nanti akan kembali ke versi image — mount /var/run/docker.sock jika ingin mode buat ulang container.",
       "install_version": "Pasang versi ini",
       "phase_completed": "Siap",
       "phase_downloading": "Mengunduh versi baru…",
