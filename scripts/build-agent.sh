@@ -9,7 +9,7 @@
 # 用法：
 #   ./scripts/build-agent.sh                        # 全部 14 个平台 → dist/agent/
 #   ./scripts/build-agent.sh --only linux/amd64     # 单平台（开发时快跑）
-#   KOMARI_VERSION=0.0.19 ./scripts/build-agent.sh   # 下一版本（见 scripts/version.env）
+#   KOMARI_VERSION=0.0.18 ./scripts/build-agent.sh   # 下一版本（见 scripts/version.env）
 #   KOMARI_AGENT_OUTPUT=/tmp/agent ./scripts/build-agent.sh
 #
 # 产物命名与上游一致（komari-agent-<os>-<arch>[.exe]）：安装脚本、前端生成的安装命令、

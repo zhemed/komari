@@ -1258,6 +1258,7 @@
       "enable_description": "When disabled the panel hides the upgrade buttons and the API rejects upgrade requests. Container and non-systemd deployments cannot self-upgrade regardless.",
       "enable_title": "Enable manual one-click upgrade",
       "hint_container": "In a container, pull the new image and recreate the container",
+      "inplace_hint": "Replaces the binary inside the container and re-executes it: no mounts, no extra configuration. Note: recreating the container later (docker rm + run / compose up) reverts to the image's version — mount /var/run/docker.sock if you want the container-recreate mode instead.",
       "install_version": "Install this version",
       "phase_completed": "Ready",
       "phase_downloading": "Downloading the new version…",

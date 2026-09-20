@@ -1,98 +1,877 @@
-# Komari 维护手册（自维护版 · 当前 0.0.19）
+# 维护本仓库（komari 自维护版 · 当前 0.0.18）
 
-自用项目：只维护 `0.0.x` 自己的版本线。服务端、面板前端（`frontend/`）、agent（`agent/`）
-源码都在本仓库内，构建不克隆上游；上游 komari 1.4.3 只是历史来源。
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.18**），
+服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
+上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
-代码细节规范在 `.trellis/spec/`（改代码前读对应文件），本文只讲**怎么干活**。
+- 上游后端：<https://github.com/komari-monitor/komari>
+- 上游前端：<https://github.com/komari-monitor/komari-web>
+- 上游 agent：<https://github.com/komari-monitor/komari-agent>
+- 本仓库：<https://github.com/zhemed/komari>
 
-## 版本口径
+> **代码来源**：0.0.1 由上游 `komari@1.4.3`（commit `bf6b45ec…`）+ `komari-web@1.4.3`（commit `4a74e8a8…`）派生。
+> 1.4.3 只是**历史来源**，不是我们对外声明的版本；对外一律是 0.0.x。
 
-- 唯一默认值：`scripts/version.env` 的 `KOMARI_VERSION`；新版号必须同步这三处：
-  `install-komari.sh` 的 `REPO_TAG`、`install-agent.sh` 的 `default_agent_version`、
-  `install-agent.ps1` 的 `$DefaultAgentVersion`（自检第 1 项会核对）。
-- 递增 patch 位；**发版前先查号发过没有**（`gh release list -R zhemed/komari --limit 5`）。
-  已发布：`0.0.1`…**`0.0.19`**（当前 Latest；0.0.18 保留为含 compose 那套机制的历史版本）。
-- 带后缀的 tag（`0.0.1-fix1`）永远不会被面板判为"可更新"（`parseSemver` 只认三段）。
+---
 
-## 构建
+## 1. 版本与固定点
 
-| 需要什么 | 命令 |
+| 组件 | 固定值 | 说明 |
+|---|---|---|
+| 项目版本 | `0.0.18`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
+| 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
+| 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
+| agent 源码 | **在本仓库**：`agent/`（上游 commit `1186aafb…`，2026-08-07，**1.4.3 同期**的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/agent-build.env`；见第 11 节 |
+| agent 资产 | `komari-agent-<os>-<arch>`（14 个平台） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
+| agent 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` / `:latest` | 由 `scripts/build-agent-image.sh --push` 推送 |
+
+**为什么前端源码/产物都在仓库里**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
+主题产物缺失时 `static()` 会在 `public.go:130` 直接 panic——即后端单独无法构建。所以：
+产物 `web/public/defaultTheme/` **提交进仓库**（离线可构建），源码 `frontend/` 也在仓库里
+（改前端不用克隆上游）。上游 CI 里的 `.github/actions/build-frontend/action.yml:34`
+（该目录已从本仓库移除）在普通 tag 下会退化为克隆前端**默认分支**，这也是我们自己 vendor 的原因之一。
+
+**发版本规则**：递增三段中的 patch 位（`0.0.2`、`0.0.3`…）。
+
+> **发版前先查"这个号发过没有"（2026-09-19 加）**：`0.0.18` 的 release 已发布且用户
+> **明确保留、并按它部署了生产**，而仓库 `main` 的源码是回滚后的 0.0.17 状态——也就是说
+> **下一个版本号必须是 `0.0.19`**，直接发 0.0.18 会与已有 tag/release 撞号（`gh release create`
+> 会失败或产出与已发布资产不一致的内容）。
+> 查法：`gh release list -R zhemed/komari --limit 5` 与 `git tag --list | tail`。
+> 另注：已发布的 0.0.18 用的是**当时的** `install-komari.sh`（含后来被回滚的那套容器安装脚本与
+> 备份清理行为），本仓库 `main` 上的安装脚本与它在这几点上并不相同——升级它或改它前先看清。
+前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段并要求严格递增，
+所以带后缀的 tag（如 `0.0.1-fix1`）**永远不会**被判为"可更新"。
+
+## 2. 工具链
+
+| 组件 | 要求 | 实测 |
+|---|---|---|
+| Go | ≥ `1.25.0`（以 `go.mod:3` 为准） | `go1.26.6` 通过 |
+| gcc | 必需（`CGO_ENABLED=1`，`mattn/go-sqlite3`） | `gcc 11.4.0` 通过 |
+| zig | 仅**静态**发布构建时需要（服务器） | `zig 0.16.0` 通过 |
+| Node / npm | 仅"重新生成前端"时需要 | `node v22.23.2` + `npm 10.9.8` 通过 |
+| （agent 构建） | **纯 Go，`CGO_ENABLED=0`——不需要 gcc、不需要 zig** | `go1.26.6` 通过 |
+
+> 上游 `.github/workflows/release.yml:105`（已随该目录移除）写的是 `go-version: "1.23"`，
+> 与 `go.mod` 的 `1.25.0` 不一致；**以 `go.mod` 为准**。
+
+## 2.1 仓库自检（一条命令跑完机械检查）
+
+```bash
+./scripts/check-repo.sh          # 秒级：第 1-8 项 + 第 12-14 项（版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门、自检自测、事故护栏、部署路径唯一）
+./scripts/check-repo.sh --full   # 追加第 9-11 项：go build/vet/test、离线构建、agent 三道门禁；并跑第 14 项的深度检查
+```
+
+它只做**能机械判定**的检查，不猜意图；任何一项不通过都会打印具体文件与原因并以非 0 退出。
+涉及的检查项与"为什么这样查"都写在脚本头部注释里。**改文档/脚本后应当跑一次快速检查，
+发版前跑一次 `--full`。**
+
+### 2.1.1 第 12 项：自检的自测（2026-09-19 加）
+
+`scripts/check-repo-selftest.sh` 在**临时 git 仓库**里用夹具复跑 `check-repo.sh`，逐条断言第 2 项
+的计数与结论。它的存在理由是一次真实事故：2026-09-19 清理本地产物后，第 2 项把
+`frontend/node_modules/`、`frontend/dist/`（被 `.gitignore` 覆盖、**按设计就不在磁盘上**）
+误报为"文档引用了不存在的路径"，4 条假失败。
+
+修法是给第 2 项加"被 `git check-ignore` 覆盖的路径不算缺失"的豁免——而**放宽检查必须同时证明
+没变瞎**，所以固化成断言，其中三条是判别性的：
+
+| 断言 | 防的是 |
 |---|---|
-| 本机二进制（开发用，需 Go + gcc） | `./scripts/build-komari.sh` → `bin/komari` |
-| 静态发布二进制（需 zig） | `KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh` |
-| agent 全 14 平台（纯 Go，不需 gcc/zig） | `./scripts/build-agent.sh` → `dist/agent/` |
-| 重新生成前端产物（改了 `frontend/` 时） | `./scripts/build-frontend.sh`（需 Node；产物 `web/public/defaultTheme/` 已入库） |
+| 夹具里真缺失的路径仍被报出 | 豁免写宽了，把真缺失也吃掉 |
+| 被忽略路径**不**被报缺失 | 假失败复发 |
+| 被忽略路径上的 `file:line` 锚点**仍报超界** | 豁免连锚点检查一起跳过（最隐蔽的过度放宽） |
 
-工具链：Go ≥ 1.25（`go.mod` 为准）、gcc（CGO，sqlite3）、zig 仅静态构建、Node 仅重建前端。
+夹具特意让"被忽略目录里的文件真的存在"（模拟本地构建过的脏状态），否则锚点检查会因
+`-f` 守卫直接跳过、断言变成空转。跑法：`./scripts/check-repo-selftest.sh`（`check-repo.sh`
+第 12 项会自动跑；自测内部用 `KOMARI_SKIP_SELFTEST=1` 断开递归）。CI 见
+`.github/workflows/trellis-gate.yml` 的 `repo-consistency` 任务。
 
-## 发布一个版本
+## 2.2 流程闸门：Trellis 强制规则（2026-09-17 起）
 
-```bash
-# 1) 提交 + 同步字面量到新版本号（见上）  2) 构建
-KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
-KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
-./scripts/build-agent.sh && ./scripts/gen-release-sums.sh
-# 3) 自检  4) 打 tag 推送  5) 发 release（18 资产）6) 推镜像
-./scripts/check-repo.sh --full
-git tag <版本> && git push origin <版本>
-gh release create <版本> -R zhemed/komari --title "<版本>" --notes-file <说明.md> \
-  dist/komari-linux-amd64 dist/komari-linux-arm64 dist/komari-SHA256SUMS \
-  dist/komari-agent-SHA256SUMS dist/agent/komari-agent-*
-./scripts/build-server-image.sh --push && ./scripts/build-agent-image.sh --push
-```
+用户定调：**调用 Trellis 不是口头承诺，是强制规则**；范围取最严——**任何会话工作，包括
+只读调查（看代码、查日志、读库定位原因），开工第一步都必须先建 Trellis 任务**。
 
-- **先提交后构建**：二进制里的 hash 来自构建时的 `git rev-parse HEAD`。
-- `gh` 有两个 remote，务必带 `-R zhemed/komari`（否则会解析到上游）。
-- 发布说明要写清"哪条修复、怎么验证的"（证据标准见
-  `.trellis/spec/guides/evidence-and-claims-guide.md`）。
-- 本仓库没有发布流水线；唯一 CI 是 `.github/workflows/trellis-gate.yml`（流程审计 + 自检自测）。
+| 层 | 实现 | 拦什么 | 绕过 |
+|---|---|---|---|
+| ① 当场拦 | `.githooks/pre-commit`、`.githooks/commit-msg`（`core.hooksPath=.githooks`） | 暂存区含**非 `.trellis/`** 改动时：没有 `status=in_progress` 的任务 → 拒绝；消息里没有 `[task:<slug>]` → 拒绝 | `git commit --no-verify`（git 内建，封不死） |
+| ② 事后审计 | `./scripts/check-trellis-gate.sh`，已接入 `check-repo.sh` **第 8 项** | 逐个提交核对（跳过 merge 与纯 `.trellis/` 提交）：改动非 `.trellis/` 就必须带 `[task:…]` | 无法绕过：跑一次检查就暴露，且**发版前必须跑 `--full`** |
+| ③ 远程兜底 | `.github/workflows/trellis-gate.yml`（push / PR） | 同一次审计，在 GitHub 上直接标红 | 无法绕过（删工作流是可见动作） |
 
-## 部署口径（用户定稿）
-
-- **主方案：Docker 镜像** —— `docker run -d --name komari --restart always --network host
-  -v ./data:/app/data ghcr.io/zhemed/komari:latest`；数据在宿主 `./data`。
-  升级走面板「有新版本」（容器内下载→校验→替换→原地重启，零配置）。
-- **备选：二进制 + systemd** —— `KOMARI_TAG=<版本> bash install-komari.sh`（菜单选 2 升级）；
-  装到 `/opt/komari`，数据 `data/`，`komari.service`（`Restart=always`）。
-  过程：停服务 → 备份 `komari.backup.<时间戳>` → 下载 → 校验 → 替换 → 启动 →
-  程序自己备份数据到 `data/backup/upgrade-<时间戳>.zip`。
-- **compose 一律不用**（用户明确剔除；自检第 13/14 项会拦）。事故记录：
-  `.trellis/spec/guides/incident-compose-autosync.md`。
-- 非交互跑安装脚本的三个坑：要真 PTY（whiptail）、菜单用方向键、pexpect 需 `encoding=None`。
-
-升级/换镜像后的验收：
+**每个新克隆要跑一次**（`core.hooksPath` 是本地配置，不随仓库分发）：
 
 ```bash
-curl -s http://127.0.0.1:25774/api/version    # version/hash 对不对
-docker ps --filter name=komari --format '{{.Image}} {{.Status}}'   # 或 systemctl is-active komari
-journalctl -u komari --since '10 min ago' | grep -ciE 'error|fail|panic'   # 容器用 docker logs
+./scripts/install-git-hooks.sh          # 装闸门
+./scripts/check-trellis-gate.sh         # 自检：闸门已装 + 提交可追溯
 ```
 
-## 数据与回滚
+提交消息统一带任务锚点（slug = `.trellis/tasks/<MM-DD>-<slug>` 去掉日期前缀）：
 
-- 数据：`<工作目录>/data/`（`komari.db` 配置与用户、`metrics.db` 指标、`backup/` 升级自动备份）。
-- 回滚：二进制换回 `komari.backup.<时间戳>`（或换回旧镜像 tag）后重启；
-  数据用 `data/backup/upgrade-<时间戳>.zip`。面板"安装指定版本"也能回滚。
+```
+feat: 一句话说明 [task:container-inplace-self-upgrade]
+```
 
-## agent 发行线
+刻意放行的两类：**纯 `.trellis/` 改动**（journal、任务归档、闸门自身）与 **merge 提交**。
 
-- 与服务器**同一个 release**（同一批 18 个资产），版本号一致；默认**不自动升级**
-  （要跟随发布加 `--enable-auto-update` 或 `AGENT_ENABLE_AUTO_UPDATE=1`）。
-- 构建脚本自带三道门禁（资产过滤 `^komari-agent-`、`Repo` 固定 zhemed/komari、
-  安装脚本版本字面量一致），改 agent 前先读 `.trellis/spec/backend/build-and-pinning.md`。
-- 容器里的 agent 会跳过二进制自更新——升级请换镜像。
+> **诚实边界**：机器能强制的是"提交前必须有任务"。"只读调查也先建任务"没有可审计的产物，
+> 靠 `AGENTS.md`「强制规则」+ journal 留痕，**不是自动的**，别把它说成自动。
 
-## 自检与闸门
+查看远程闸门结果（**`gh` 的默认仓库会被 `upstream` remote 抢走，必须带 `-R`**）：
 
 ```bash
-./scripts/check-repo.sh          # 秒级：版本字面量/文档锚点/脏文件/密钥/产物哈希/流程闸门/自检自测等
-./scripts/check-repo.sh --full   # 追加 go build|vet|test、GOPROXY=off 离线构建、agent 门禁
+gh run list -R zhemed/komari --workflow=trellis-gate.yml --limit 5
 ```
 
-提交必须绑定 Trellis 任务（消息带 `[task:<slug>]`），三层闸门见
-`.trellis/spec/guides/trellis-gate-guide.md`；每个新克隆要跑一次 `./scripts/install-git-hooks.sh`。
+实测证据（2026-09-17，两个方向都验过）：干净提交 → 工作流 `success`（run 35231550788，10s）；
+刻意用 `--no-verify` 推一个无锚点提交到临时分支并 `workflow_dispatch` → 同一工作流 `failure`
+（run 35231788694，9s），日志里逐条列出 `未带任务锚点：<sha> <subject>`。
 
-## 本地产物（可重建，别入库）
+## 3. 日常操作
 
-`bin/`、`dist/`、`.build/`、`frontend/node_modules/`、`frontend/dist/` 全部可重建；
-`.build/rel-notes-*.md` 是历次发布说明，**不要删**；`utils/geoip/data/` 是手工下载的 GeoIP 库。
+### 3.1 构建（只需 Go，不需要网络与 Node）
+
+```bash
+./scripts/build-komari.sh          # 输出 bin/komari
+```
+
+主题产物已 vendor 在仓库内，克隆后即可直接构建。若 `web/public/defaultTheme/` 缺失，
+脚本会明确报错并指出这正是 `public.go:130` panic 的根因。
+
+### 3.2 重新构建前端产物（改了 frontend/ 才需要，需要网络 + Node）
+
+```bash
+./scripts/build-frontend.sh
+```
+
+脚本会：在仓库内的 `frontend/`（上游快照 + 我们内联的改动）里 `npm ci`
+（依 `package-lock.json` 锁定）→ `npm run build` → 原子替换 `web/public/defaultTheme/`
+→ 校验目录树哈希与上游地址残留。**不克隆上游、不打补丁**；只改后端的人不需要跑它，
+因为产物已提交进仓库。
+
+哈希不一致时脚本会失败并给出实际值：确认接受后更新 `scripts/frontend-build.env`
+的 `FRONTEND_TREE_SHA256`，并在提交信息里说明原因。
+
+**为什么 `SOURCE_DATE_EPOCH` 是产物可复现的前提**：上游 `vite.config.ts:53` 取
+`new Date().toISOString()` 并经 `define.__BUILD_TIME__`（`vite.config.ts:125-126`）注入产物，
+最终由页脚 `src/components/Footer.tsx:26` 显示。这个每次构建都不同的常量会让承载它的 chunk
+改名 → 所有引用它的 chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变化，
+于是同源码同 lockfile 两次构建的哈希必然不同。`frontend/vite.config.ts` 里的 `buildTime`
+优先读取 `SOURCE_DATE_EPOCH`（[reproducible-builds](https://reproducible-builds.org/docs/source-date-epoch/)
+标准约定），脚本把它设为**上游 commit 的提交时间**（`KOMARI_FRONTEND_SOURCE_DATE_EPOCH=1786612131`），
+产物因此确定可复现。
+
+> 沙箱/受限环境下若 `~/.npm` 不可写，可加 `npm_config_cache=<某可写目录>` 前缀。
+
+### 3.3 静态构建（发布用）
+
+发布产物必须是**静态链接**的：`Dockerfile` 基于 `alpine:3.21`（musl），glibc 动态二进制在其中
+无法运行；而 glibc 静态虽然能链接成功，但 `getaddrinfo`/NSS 依赖宿主共享库，不作为发布形态。
+
+```bash
+KOMARI_STATIC=1 ./scripts/build-komari.sh                      # linux/amd64 静态（需 zig）
+KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静态
+```
+
+- zig 缺失或不可用时脚本**明确报错**，不会静默退化为动态链接（否则 alpine 部署会在运行期才失败）。
+- 受限环境下若 zig 默认缓存目录不可写，可设 `ZIG_GLOBAL_CACHE_DIR` / `ZIG_LOCAL_CACHE_DIR`。
+
+### 3.4 发布一个版本
+
+一次发布 = **整套栈**：服务器静态产物 + 14 个 agent 资产 + agent 镜像。
+
+1. 同步版本字面量（`scripts/version.env` 的 `KOMARI_VERSION`、`install-komari.sh` 的 `REPO_TAG`、
+   `install-agent.sh` 的 `default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`）。
+   **发布说明的措辞门禁**（2026-09-17 事故后加，见 `.trellis/spec/guides/evidence-and-claims-guide.md`）：
+   说明里每写一条"修复/原因/已知问题"，都必须能指向一条判别性验证（命令或测试）写进正文；
+   是推断就要标置信度，是"已知问题"就要给下一步实验，不许把推断写成"已定位"。
+2. 服务器静态产物（需 zig）：
+   ```bash
+   KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
+   KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
+   ```
+3. agent 全平台（14 个，纯 Go）：`./scripts/build-agent.sh`
+3.5 生成服务端校验和资产（面板一键升级按它校验下载内容，0.0.8 起必需）：
+   ```bash
+   ./scripts/gen-release-sums.sh        # 产出 dist/komari-SHA256SUMS（两行：amd64/arm64）
+   ```
+4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含第 8 项 Trellis 流程闸门、版本字面量一致性、
+   文档锚点、`go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希、第 12 项自检自测）。
+   自检里的 agent 门禁构建到 `.build/check-agent`，**不会动 `dist/`**；反过来说，
+   `scripts/build-agent.sh` 默认写的就是 `dist/agent` 并会先清空该目录，别拿它当临时构建用。
+5. `git tag <版本> && git push origin <版本>`
+6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes-file <说明.md> \
+      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/komari-SHA256SUMS \
+      dist/komari-agent-SHA256SUMS dist/agent/komari-agent-*`
+   （共 18 个资产：服务端 2 + `komari-SHA256SUMS` + agent 14 + `komari-agent-SHA256SUMS`。
+   0.0.8 起服务端也有校验和资产——面板一键升级与 `install-komari.sh` 都按它校验；
+   缺该资产的旧 release（≤0.0.7）在升级界面里会被明确拒绝："请用 install-komari.sh 升级"）
+7. 推送镜像：`./scripts/build-server-image.sh --push && ./scripts/build-agent-image.sh --push`
+
+> **顺序很重要**：服务器二进制的版本 hash 来自构建时的 `git rev-parse HEAD`，
+> 且 Go 会把 VCS 信息也编进去。所以**先提交、后构建**，否则 release 里的二进制
+> 声称的 hash 与实际 tag 不一致（0.0.4 发布时踩到过一次）。
+
+tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TAG` 拉取）。
+**同一个 release 里同时有服务器与 agent 资产是必需形态**——agent 靠补丁 0001 的资产过滤
+区分两者（见 §11.1）。**本仓库没有发布流水线**（上游流水线已移除），发布必须手动执行以上步骤；唯一的 CI 是
+`trellis-gate`（§2.2 的流程审计，不产出任何资产，也不替代这里的发布步骤）。
+
+> **`gh` 陷阱（0.0.1 发布时实际踩到）**：本仓库有两个 remote（`origin`=自有、`upstream`=只读参考），
+> `gh release create` 可能把仓库解析成 `upstream`，报
+> `tag 0.0.1 exists locally but has not been pushed to komari-monitor/komari`。
+> 发布时给 `gh` 显式加 `-R zhemed/komari`。
+
+### 3.4.1 部署口径（2026-09-19 用户定稿）
+
+**主方案是 Docker 镜像**（README 第一条命令）：
+
+```bash
+docker run -d --name komari --restart always \
+  --network host \
+  -v ./data:/app/data \
+  ghcr.io/zhemed/komari:latest
+```
+
+- 数据在宿主 `./data`（SQLite）：换 tag 重建容器不丢数据。
+- 升级走**面板「有新版本」**：容器里零配置——在容器内下载新版本、校验 `komari-SHA256SUMS`、
+  替换二进制并原地重启（不需要挂载、不需要 socket）。
+- 想固定镜像版本：`docker pull ghcr.io/zhemed/komari:<tag>` 后按同样命令重建容器，
+  或直接改上面命令里的 tag 重跑。
+
+**备选：二进制 + systemd**（`install-komari.sh`，装到 `/opt/komari`）：
+
+```bash
+KOMARI_TAG=<目标版本> bash install-komari.sh      # 主菜单选「2 升级 Komari」→ 通道 stable
+```
+
+它按顺序做：停服务 → 备份当前二进制到 `/opt/komari/komari.backup.<时间戳>` → 下载目标版本 →
+校验 `komari-SHA256SUMS` → 替换 → 启动 → 数据侧由程序自己备份到 `data/backup/upgrade-<时间戳>.zip`。
+
+**compose 一律不用（用户 2026-09-19 明确要求剔除）**：compose 相关的东西已从文档与代码里移除，
+仓库里**不允许**再出现 compose 部署方式或第二套部署自动化（自检第 13/14 项会拦）。
+原因与完整因果见 [事故案例：compose 全自动升级](../.trellis/spec/guides/incident-compose-autosync.md)——
+那是本仓库最严重的一次失误，别再碰。
+
+**验收清单（每次换镜像/升级后照着核一遍）**：
+
+```bash
+curl -s http://127.0.0.1:25774/api/version    # version 与 hash 是否为目标版本（容器形态同样可用）
+docker ps --filter name=komari --format '{{.Image}} {{.Status}}'
+docker logs --tail 50 komari | grep -ciE 'error|fail|panic'
+```
+
+systemd 形态则用 `systemctl is-active komari` 与 `journalctl -u komari --since '10 min ago'`。
+无论哪种形态，再看一眼面板：节点在、agent 显示 online、最近流量在涨。
+
+**非交互执行时的三个坑（2026-09-19 全踩过，记以免重犯）**：
+
+1. 脚本是 **TUI（whiptail）**，要有**控制终端**：`script -qec ...` 不够（日志里会留下
+   `[<not executed on terminal>]`，菜单直接取消、**什么都没做也不会报错**）。要用 pty
+   （例如 python `pexpect`）驱动。
+2. 菜单用**方向键**选，不是数字键：直接发 `2` 会被当成默认项（安装），得到"已安装"提示。
+3. `pexpect` 默认按 ASCII 解码：中文输出抛 `UnicodeEncodeError`；用 `encoding=None` 走字节匹配，
+   且 `expect()` 不收元组（要写成单条正则）。
+
+**回滚**：把 `/opt/komari/komari` 换回上一个 `komari.backup.<时间戳>` 并 `systemctl restart komari`；
+数据用 `data/backup/upgrade-<时间戳>.zip`（升级前的自动备份）。
+
+### 3.5 本地产物与清理（2026-09-19 清理后定稿）
+
+工作区里**只有源码与主题产物入库**，其余全是可重建的本地目录。清理前的实测体积与还原方式
+留在 `.build/purge-manifest-20260919.txt`（含关键 sha256），这里是常规对照表：
+
+| 本地产物 | 谁生成 | 还原方式 |
+|---|---|---|
+| `bin/komari` | `./scripts/build-komari.sh` | 同左（开发用动态链接构建） |
+| `dist/`（发版资产） | `build-komari.sh` + `build-agent.sh` + `gen-release-sums.sh` | 同左；也可直接从对应 release 下载（发布过的内容与本地副本 sha256 相同） |
+| `.build/tools/` | 手工解压的 zig（仅静态发版用） | `https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz` 解压进 `.build/tools/` |
+| `.build/*-image/` | `scripts/build-*-image.sh` | 构建时脚本自己生成 |
+| `.build/check-agent/` | `check-repo.sh --full` 第 11 项 | 跑一次 `--full` |
+| `.build/rel-notes-*.md` | 每次发版手写 | **不要删**：发版说明的唯一副本，`gh release create --notes-file` 的来源 |
+| `frontend/node_modules/` | `npm ci` | 同左（`package-lock.json` 已入库） |
+| `frontend/dist/` | `./scripts/build-frontend.sh` | 同左 |
+| `data/` | 本地开发运行面板 | 新起实例即可 |
+| `utils/geoip/data/GeoLite2-Country.mmdb` | 手工下载 | 重下（源码里没有下载脚本，所以别删） |
+
+判定标准（清理时逐条举证，不是凭感觉）：**陈旧**（内嵌版本/提交与仓库状态矛盾）、
+**可重建**（有脚本或已记录的下载路径）、**已发布副本**（sha256 与线上 release 完全一致）、
+**无来源**（运行时副产物如 `__pycache__`）。被 `.gitignore` 覆盖的路径**不一定在磁盘上**——
+这正是 `check-repo.sh` 第 2 项对它豁免、并由第 12 项自测守住的原因（§2.1.1）。
+
+### 3.6 命令行子命令
+
+服务器只有一个二进制，子命令见 `cmd/`（实测 `komari --help`）：
+
+| 命令 | 用途 |
+|---|---|
+| `komari server` | 启动服务；`-l/--listen` 指定监听地址（默认 `0.0.0.0:25774`，也可用环境变量 `KOMARI_LISTEN`） |
+| `komari chpasswd` | 忘记密码时强制改管理员密码 |
+| `komari disable-2fa` | 丢弃 2FA 配置 |
+| `komari permit-login` | 恢复密码登录（例如 SSO/OIDC 配置出错登不进去时） |
+
+全局参数：`-d/--database`（默认 `./data/komari.db`）、`-t/--db-type`（默认 `sqlite`）。
+CLI 的帮助文本里保留着上游作者署名（`Made by Akizon77 with love.`），归属信息同时由
+`LICENSE` / `NOTICE` 承载。
+
+### 3.7 数据与备份
+
+| 路径 | 说明 |
+|---|---|
+| `./data/komari.db` | 主库（配置、账号、节点） |
+| `./data/metrics.db` | 指标库 |
+| `./data/theme/` | 已安装主题 |
+| `./data/backup/` | 备份归档 |
+| `komari.db` 的 `client_traffic_totals` | **跨重启的流量累计**（本仓库自有扩展，`database/models/traffic.go`） |
+
+- 数据目录跟**工作目录**走（Docker 镜像里是 `/app/data`，systemd 单元里是 `/opt/komari/data`）。
+- 二进制的版本标识（`CurrentVersion-VersionHash`）与库中记录不一致时，启动会先把整个 `./data`
+  打包到 `data/backup/upgrade-<时间>.zip` 再继续（见 §7 最后一条）。
+- 后台可以上传备份并自动重启以应用。
+
+#### 流量累计为什么单独存一张表
+
+上游把面板“总流量”直接显示 agent 报的**开机以来计数器**（`/proc/net/dev`），因此**机器一重启，
+这个数字就归零**——历史上无法保存流量。我们的做法：服务端复用 metric store 已经算好的
+**重置感知增量**（`internal/metricstore/report_batcher.go` 的 `TrafficCounterDelta`），
+在 `client_traffic_totals` 里持续累加：
+
+- 首次见到某节点用**当时的计数器做基线**（避免功能上线后数字跳变），之后只加增量；
+- 因此 **agent 重启、机器重启（计数器归零）、服务端重启都不会让累计回退**；
+- 面板的卡片“总流量”和流量阈值进度读的是它（`web/rpc/jsonrpc/common.go` 的
+  `getNodesLatestStatus`）；没有累计行时回退到实时计数器；
+- 删除节点会一并删除该行（`database/clients/client.go` 的 `DeleteClient`）。
+
+接线方式：`internal/server/metric_store.go` 在 metric store 就绪后调用
+`clients.InitTrafficTotals()` 并用 `metricstore.SetTrafficAccumulator(...)` 注册回调，
+metricstore 不反向依赖 `database/*`。
+
+## 4. 与上游的解耦点
+
+| 位置 | 改动 | 原因 |
+|---|---|---|
+| `web/public/defaultTheme/` | vendor 进仓库 | 让后端无网络/无 Node 也可构建（见第 1 节） |
+| `web/public/.gitignore` | 取消忽略 `defaultTheme/*` | 上游默认忽略该注入目录，不改则 vendor 产物根本提交不进去 |
+| `frontend/`（源码内联） | 更新检查指向 `zhemed/komari`、构建时间可用 `SOURCE_DATE_EPOCH` 覆盖、删除插件系统、去掉非 HTTPS 告警横幅、删除通知系统、安装命令与镜像指向本仓库 | 这些原本是补丁 0001–0006，源码 vendor 化后**已内联进 `frontend/`**，见第 4 节与第 11 节 |
+| `agent/`（源码内联） | 自更新指向本仓库 + 资产过滤 + 容器内跳过 + 默认关自动更新 | 原本是 patches-agent 0001–0003，已内联进 `agent/`；理由见第 11 节（含实测证据） |
+| `install-komari.sh` | 指向自有仓库并锁定 tag；`curl -f` + 先下临时文件再替换 | 不再安装上游 1.5.x；失败时不写入错误页、不截断运行中的二进制 |
+| `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游 `komari` 规则锚定为 `/komari` | 后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
+| `Dockerfile` | `ARG TARGETOS/TARGETARCH` 给出默认值 `linux/amd64` | 让普通 `docker build`（非 buildx）也能定位上下文里的二进制 |
+| `.github/workflows`、`.github/actions`、`.github/ISSUE_TEMPLATE` | 上游流水线全部删除；**只补回我们自己的** `.github/workflows/trellis-gate.yml`（2026-09-17，审计"提交是否绑定 Trellis 任务"） | 上游流水线会从前端**默认分支**构建、并向 `ghcr.io/komari-monitor` 推镜像，对本仓库是错误产出；补回的这一个**不产出任何资产**，也不替代手动发布步骤（§3.4） |
+| `web/install/install.go`、`web/api/admin/update.go`、`frontend/src/pages/install.tsx`、`frontend/src/pages/admin/account.tsx` | **不再校验初始/改密口令的强度与长度**（2026-09-18，用户明确要求去掉全部限制）：删掉"大写+小写+数字"复杂度与 8/6 位长度下限，只保留"两次输入一致" | 自托管面板的口令强度由部署者自己承担；口令哈希是 sha256+常量盐（无 bcrypt 的 72 字节上限），所以去掉长度校验不会引入新的失败路径。回归测试断言"无大写"和"3 位"口令现在都安装成功 |
+| `README.md`、`README_zh-cn.md` | 删除上游版本，改为我们自己的单份 `README.md` | 上游 README 含上游徽章/部署按钮/截图与升级到 1.5.x 的指引 |
+
+更新检查的目标仓库可在构建期覆盖：
+
+```bash
+VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
+```
+
+## 5. 插件系统已移除
+
+**本仓库不包含插件系统**，这是刻意决定（见任务 `.trellis/tasks/archive/2026-09/09-16-rebase-0.0.1-drop-plugins/`）：
+
+- 已删除：`internal/plugin/` 整包、插件市场（后端 API + 前端页面）、插件 RPC、`/api/plugin/*`
+  公开路由、插件模型与迁移注册、备份白名单中的插件目录、WebSocket 插件帧拦截器、
+  前端插件页面/路由/菜单/类型。
+- **不要再重新引入**：升级上游代码时若带回这些文件，必须重新剔除。
+- 数据库中的历史插件表**保留**（孤儿表），未做破坏性迁移。
+- `pkg/jsruntime/` 在 0.0.3 已随通知系统一并移除（见第 6 节）；插件系统移除时它确实还被需要，两者不再共存。
+- 主题系统与主题市场**保留**，且主题本就没有版本门禁，不受版本号影响。
+- 流量报告：内置实现**仍可用**（上游计划在 1.5.0 移除，我们停留在 1.4.3 基线，故不受影响）；
+  原先指向插件市场的引导提示已删除。
+
+## 6. 通知系统与内嵌 JS 运行时已移除
+
+**本仓库不包含通知系统**（0.0.3 起），与插件系统同样属于刻意决定：
+
+- 已删除：`utils/messageSender/`（框架 + 8 个渠道：bark/email/javascript/serverchan3/
+  serverchanturbo/telegram/webhook/empty）、`utils/notifier/`（离线、负载、流量、
+  流量报告、到期提醒）、`database/notification/`、通知相关模型与迁移步骤、
+  通知 RPC 与路由、`admin:testSendMessage`、调度任务（`notifier:traffic`/`notifier:expire`）、
+  以及 `internal/config/settings.go` 里的通知配置项。
+- 调用点重接线（0.0.3 实际改动）：agent 上/下线改为 `logger.Infof("client-api", ...)`
+  日志（`web/api/client/report.go`、`report_v2.go`）；登录改为 `auditlog.EventLog("auth", ...)`
+  审计记录（`database/accounts/sessions.go`——此前登录**只有**通知这一条痕迹，故必须补）；
+  续费路径本就有 `auditlog.EventLog("renewal", ...)`，无需补。
+- 前端（补丁 `0005-drop-notification-system.patch`，纯删除 1,789 行）：删除
+  `pages/admin/notification/`（channels/general/load/offline/traffic_report）、通知菜单组与路由。
+- **`pkg/jsruntime`（46 文件 / 11,427 行）随之一并移除**：它的消费者只剩插件系统（更早移除）
+  与 JavaScript 通知渠道；同时从 `go.mod` 去掉了 goja / goja_nodejs / base64dec。
+- 数据库中的历史通知表**保留**（孤儿表），迁移步骤已删除但表与数据不动。
+- **不要再重新引入**：从上游 cherry-pick 时若带回这些文件，必须重新剔除。
+
+注：`pkg/rpc` 里的 `NewNotification` 是 JSON-RPC 协议概念（无 id 的通知型请求），与此无关，保留。
+
+## 7. 已知遗留与注意事项
+
+- **安全修复不会自动到来**：上游 1.5.x 之后的修复需我们自行判断是否 backport。
+  决定采纳时有意识地 `git fetch upstream <ref>` 后 cherry-pick——`upstream` 的 fetch refspec
+  目前被锁在 tag 1.4.3，这是防止误引入 1.5.x 的**安全默认**，不要随手改掉。
+- **关于页/GitHub 按钮已指向我们**（补丁 0006）：`src/pages/admin/about.tsx` 读的是本仓库 README。
+- **`install-komari.sh` 的 tag 是字面量**：它是给 `curl | bash` 用的独立脚本，没法在运行时读
+  `scripts/version.env`，发版要手动同步（见 §3.4 第 1 步）。
+- **面板“文档”链接仍指向上游文档站**：`menuConfig.json` 的 `common.documentation` →
+  `komari-document.pages.dev`。上游文档描述的是 1.4.3/1.5.x 的行为，与本仓库（无插件/无通知）
+  有出入。要改得加前端补丁并**重新发版**（前端内嵌在服务器二进制里），暂留。
+- **流量增量"个别分钟偏低/偶发 2×"已定位并修掉**（2026-09-17 实测：**不是数据丢失**，
+  是查询端的聚合语义）：
+
+  - **记录本身是准的**：60s 桶端点对齐后逐分钟核对（本桶 Σ增量 vs 相邻桶计数器差值），
+    636 个分钟**逐分钟零误差**（差值全为 0 B），10.5 小时全窗口差额 +336 B（+0.00%），
+    计数器零回退。面板"总流量"读的累计表由同一份增量喂入，因此同样准确。
+  - **更正一条旧记录**：本文件先前记的"05:38 整分钟只记到 5.5 KB，而计数器涨了 190 KB"
+    **是错的**（当时混着 60s 与 300s 两种分辨率在比）：实测该分钟 ΔC = 5,554 B、
+    ΔR = 5,554 B，完全一致。"增量扎堆"（一条 2.7 MB、其余约 144 B）也只是同一次突发
+    被分摊到一条上报上的正常形态，不是重复计数或丢数。
+  - **真正的根因**：`queryMetrics` 对 `traffic.up/down` 采用了客户端的全局聚合偏好
+    （面板默认 `avg`，前后端默认都是）。这两个指标每个采样点的含义是"两次上报之间的字节数"，
+    再取平均等于把点位又除以桶内采样条数：实测 60/60 分钟的"真实值 ÷ 点值"**精确等于该桶
+    采样条数**（20）。桶内条数不齐时（未封桶、回退窗口）缩放比随之变化，同一张图上相邻分钟
+    被除以不同的数，看着就是"个别分钟偏低/偶发 2×"；24 小时视图切到 300s 桶后条数变为 ~100，
+    量级再差 5 倍。
+  - **修法**：把"按指标语义固定"的聚合（`traffic.up/down → sum`、`net.total.up/down → last`，
+    即 records 路径里早就存在的 `recordMetricAggregation` 约定）抽成
+    `metricstore.SemanticAggregation`，并让 `resolveMetricAggregation` 的优先级变为
+    **按指标显式指定 > 语义默认 > 全局指定 > avg**。前端无需改动（面板照旧发 `avg`，
+    服务端按语义纠正）；确实要覆盖语义默认时用 `aggregation_by_metric`。
+  - **验证方式**（不改动线上部署）：复制 `data/`、用修复版二进制在备用端口起实例，
+    按面板同款参数（`hours=1/24`、`aggregation=avg`、`max_points=700`）与线上的 0.0.6 对拍——
+    线上每分钟点值恰为真实值的 1/20，修复版**逐分钟精确等于**真实值；`hours=24` 的 300s 桶值
+    等于该 5 分钟内各分钟之和（如 11:25 桶 1,653,537 B = 294+300+2,661+942+1,649,340）。
+
+  **一个已修掉、但从未被证实触发过的缺陷（0.0.6 写成"确因"，是过度断言，在此更正）**：
+  v2 协议的报告没有 `uptime` 字段，服务端读到 0，而"agent 是否重启"的判据是
+  `report.Uptime < values.uptime`；**若**节点在 v2 与 v1 之间切换（v2 整体失败降级到 v1，
+  之后重连回 v2——这是 agent 里真实存在的代码路径），两侧的 uptime 会互相误判成重启、
+  把该条上报的增量清零。判据已改为"两次上报都必须带有效 uptime"
+  （`report_batcher.go`），回归测试 `TestWriteReportKeepsTrafficWhenUptimeMissing`。
+  **证据边界**：本机 agent 的表报日志里只有 v2 WebSocket（从未降级），所以这个缺陷
+  有没有在真实环境触发过，我们**没有证据**；当初把它写成"已定位的原因"是把
+  "代码路径上必然发生"当成了"实测观测到"，这是本次错误的第二个来源。
+
+  **关于"两条通道"的更正**：agent 的设计是**同一时刻只走一条上报通道**——
+  v2 WebSocket（首选）→ 连不上时进 v2 HTTP POST 回退（报告 POST + 事件 pull 两条 POST 循环，
+  见 `agent/server/websocket.go` 的 `runPostFallback`/`runV2PullLoop`）→ v2 端点整体失败时
+  降级到 v1（`/api/clients/report`）直到连接断开。服务端日志里的 `online (POST session)` **不等于**
+  v1 通道：任何 POST 形态的 ingest 都会刷新 presence 而打出这条日志（v2 的 HTTP 入口也标
+  `markPresence=true`，`report_v2.go:53`）。本机 agent 从未进过回退/降级（日志里只有
+  "WebSocket connected using v2 protocol"）。
+
+- **升级弹窗未登录时会显示按钮（已修，2026-09-17 复核）**：当时的条件是 `upgradeStatus?.enabled !== false`，
+  `upgradeStatus` 为 null（未登录或状态接口失败）时求值为真，访客点击会得到
+  `RPC Error -32041: Permission denied`。现在两处按钮都已收紧为
+  `upgradeStatus && upgradeStatus.enabled !== false`（`frontend/src/components/admin/AdminPanelBar.tsx:633`、
+  `frontend/src/components/admin/AdminPanelBar.tsx:714`），状态未知时不渲染按钮。
+  本条目从"待修"改为"已修"，保留记录以免重复排查。
+
+- **两个 Dockerfile 的基础镜像已钉到 digest**（2026-09-17，仓库体检）：
+  `alpine:3.21@sha256:48b0309c…07d`（Docker Hub 上的 manifest list，2026-04-17 的快照），
+  这样同一份源码在不同时间构建的镜像可复现。代价：上游 3.21.x 的安全更新**不再自动进来**，
+  要手动更新 digest（改两个 Dockerfile 后重跑 `scripts/build-server-image.sh` /
+  `scripts/build-agent-image.sh` 验证）。二进制产物本身一直是可复现的。
+- **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
+- **agent 自带测试里的 3 个外网用例已改为默认跳过**（2026-09-17，仓库体检）：
+  `agent/server/task_test.go` 的 `TestICMPPing` / `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的
+  外部目标，在无外网或目标不可达的机器上必然失败（当时实测本机 34s 后 3 个全红）。现在这三个用例
+  开头调用 `requireOnlineTests(t)`：未设置环境变量时 `t.Skip`，所以离线 `go test ./...` 也能全绿；
+  要验真实链路时显式打开：
+
+  ```bash
+  (cd agent && KOMARI_AGENT_ONLINE_TESTS=1 go test ./server/...)
+  ```
+  `scripts/build-agent.sh` 仍然**不把 agent 测试当发布门禁**——外网用例即便改成可选，仍是 flaky 来源。
+- **偶发：升级重启后 `data/komari.db-wal` 被 unlink，外部读到旧数据**（2026-09-16 实测一次）。
+  现象：`0.0.4 → 0.0.5` 升级重启后，服务端进程持有 `komari.db-wal`/`-shm` 的 fd，但文件已从
+  目录消失（`ls -l /proc/<pid>/fd` 显示 `(deleted)`），此时用外部 `sqlite3` 读 `./data/komari.db`
+  看到的是升级前的数据（表现为面板里的节点版本停在旧值）。
+  - 已排除：外部只读连接不是原因（重启后连续两次外部 `SELECT` 均未触发，WAL 正常）；
+    升级流程也不删 WAL（代码里只有 `PRAGMA wal_checkpoint(TRUNCATE)`，`database/dbcore/dbcore.go:247`）。
+  - 处置：**重启一次服务端即恢复一致**（之后外部读到的就是实时数据），本次重启后
+    `komari.db-wal` 0 字节、fd 正常、外部读取实时。
+  - 影响面：WAL 处于 unlink 状态时，若进程被 `kill -9` 会丢掉尚未 checkpoint 的写入；
+    正常 `systemctl stop`（SIGTERM）会 checkpoint 回主库，本次未观察到数据丢失。
+  - 结论：升级后发现"外部工具读到旧数据"，先重启一次服务再判断，不要直接当成丢数据。
+- **`raw.githubusercontent.com/.../refs/heads/main/<新文件>` 会短暂 404**：面板安装命令用的就是这个
+  路径形式。0.0.4 实测：`main` 推上去后该路径仍 404 约 10 分钟（同一文件用 commit SHA 或
+  去掉 `refs/heads/` 的形式立刻 200），随后自愈。刚发完版别急着怀疑脚本没推上去。
+- **不要 `git push upstream`**：`upstream` 只作为只读参考。
+- **版本切换会触发一次升级备份**：`database/dbcore/dbcore.go:233` 的规则是"版本标识不同即备份"，
+  标识为 `CurrentVersion-VersionHash`。因此 1.4.3 → 0.0.1 首次启动会 zip 整个 `./data`
+  （`dbcore.go:258`）；之后每次以**不同 commit** 重新构建再启动也会再备份一次（上游同样如此，只是上游只在发版时构建）。
+
+## 8. 回滚
+
+- **回滚前端 vendor**：删除 `web/public/defaultTheme/` 并 `git revert` 对应提交即可；
+  注意此时 `go build` 会因 embed 缺失而失败，需重新运行 `build-frontend.sh` 或恢复该目录。
+- **回滚安装脚本/补丁**：`git checkout <commit> -- install-komari.sh scripts/`。
+- **回滚插件系统移除**：`git revert` 该提交即可恢复插件代码与 1.4.3 版本号（vendored 产物在同一提交内）。
+- **回滚 agent 发行线**：删掉 `install-agent.sh` / `install-agent.ps1` / `agent/` /
+  `scripts/build-agent.sh` / `scripts/build-agent-image.sh` / `Dockerfile.agent` / `scripts/agent-build.env`
+  并 `git revert` 对应改动（然后重跑 `build-frontend.sh`，哈希也要一起回填）。
+- **回滚已发布的 agent 资产/镜像**：`gh release delete-asset`、`gh api -X DELETE /user/packages/...`
+  （token 有 `delete:packages`）。
+- **部署侧回滚**：升级前自动生成的 `data/backup/upgrade-*.zip` 即为回滚素材。
+
+## 9. 克隆与推送
+
+- **只构建不需要历史**：`git clone --depth 1 <本仓库>` 后即可 `./scripts/build-komari.sh`。
+- **推送需要完整历史**：若以 `--depth 1` 克隆后直接 `git push`，会因缺少被引用对象报
+  `remote unpack failed: index-pack failed`。修复方式（本仓库实际使用）：
+
+  ```bash
+  git fetch --unshallow --refetch upstream "+refs/tags/1.4.3:refs/tags/1.4.3"
+  ```
+
+  注意仅 `git fetch --unshallow` 可能**无效**（refspec 只覆盖那个 tag 且 tip 未变时不会加深），
+  必须显式给出 refspec 并配合 `--refetch`。
+
+## 10. 提交历史与我们自己的仓库
+
+- **历史已于 2026-09-16 重写**：上游 835 个提交不再出现在历史中。上游代码以**单个快照根提交**
+  引入（`chore: import komari 1.4.3 (upstream bf6b45ec) as our 0.0.1 code snapshot`），
+  我们自己的提交重挂在该根之上，提交粒度保留。
+- 重写前的最后一次提交（`9d2bb44`，`docs: 用分支引用替代硬编码的重写前 HEAD`）曾保留在本地分支
+  `backup/pre-rewrite` 上作为回滚锚点；**该分支已于 2026-09-17 删除**（仓库体检，用户确认：
+  重写已稳定、分支只剩噪声）。因此旧 journal 里记录的 hash（如 `18305a9`、`77f36da`）
+  在重写后**已不可达**，只具历史意义。若日后确需找回：在 `git gc` 清理悬空对象之前
+  （默认约 90 天）可用 `git branch backup/pre-rewrite 9d2bb44` 复原；再往后只能从
+  `upstream` remote 取回上游侧的历史。
+- 「代码来源」由 `LICENSE` / `NOTICE` / `README.md` / 根提交信息承载，而不再由逐行历史承载。
+- 需要取回上游历史做 backport 时：`git fetch upstream --tags`（`upstream` remote 保留）。
+- 本地曾存在的 68 个上游 tag 已删除，避免上游对象长期驻留；本仓库只推送自己的 tag。
+- **前端与 agent 的源码也是快照导入**（2026-09-16，`chore(vendor): import ...`）：
+  同样不带上游历史，上游 commit 只作为溯源信息记在 `scripts/frontend-build.env` /
+  `scripts/agent-build.env` 与导入提交信息里。
+
+## 11. agent 发行线（0.0.4 起）
+
+**我们不 fork agent**：agent 二进制由本仓库自己构建、作为**本仓库 release 的资产**发布，
+所以自有仓库始终只有 `zhemed/komari` 一个（前面说的"三条线"是发布链上的三方，
+其中前端与 agent 都只是上游依赖）。
+
+| 环节 | 事实 |
+|---|---|
+| 源码 | **在本仓库**：`agent/`（上游 `komari-monitor/komari-agent@1186aafb…`，2026-08-07 的快照 + 我们内联的改动；溯源见 `scripts/agent-build.env`） |
+| 我们对源码做的改动 | 自更新目标改指本仓库、`selfupdate` 加资产过滤、容器内跳过自更新、自动更新默认关闭、`--enable-auto-update` 新参数；安装脚本见下表 |
+| 构建 | `./scripts/build-agent.sh`：在 `agent/` 里纯 Go 交叉编译（`CGO_ENABLED=0`，不需要 zig/gcc），一次出 **14** 个平台；用 `-buildvcs=false`，让产物只取决于源码与注入的版本号 |
+| 资产名 | `komari-agent-<os>-<arch>[.exe]`，与上游一致（安装脚本与自更新都按这个名字找资产） |
+| 版本号 | 与我们同一条 `0.0.x` 线（`scripts/version.env`），不沿用上游 agent 的 1.x |
+| 自更新目标 | `update.Repo = zhemed/komari`（源码默认值 + 构建期 `-X` 双保险） |
+| 自更新默认 | **关闭**；开启用 `--enable-auto-update` 或 `AGENT_ENABLE_AUTO_UPDATE=1`（旧的 `-autoUpdate` 仍表示开启） |
+| 安装脚本 | `install-agent.sh` / `install-agent.ps1`（放在仓库根，前端的安装命令直指这里）：默认装脚本 pin 的版本，`--install-version latest` 可装最新 |
+| 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`（多架构 amd64/arm64/armv7），`./scripts/build-agent-image.sh --push`；`Dockerfile.agent` **刻意不含任何 RUN**，否则没有 QEMU/binfmt 的机器上多架构构建会 `exec format error` |
+
+### 11.1 为什么必须给自更新加资产过滤（发布前实测过的坑）
+
+`go-github-selfupdate` 选资产用的是**后缀**匹配（`selfupdate/detect.go` 的 `findAssetFromRelease`：
+`strings.HasSuffix(name, "linux-amd64")` 之类），**不看前缀**。同一个 release 里既有服务器的
+`komari-linux-amd64`、又有 agent 的 `komari-agent-linux-amd64` 时，两者都命中后缀 `linux-amd64`，
+agent 可能把自己刷成**服务器二进制**。
+
+补丁 0001 因此传入 `selfupdate.Config{Filters: []string{"^komari-agent-"}}`（库在 `updater.go` 里
+要求过滤与后缀同时命中，见 `updater.go:53-67`）。0.0.4 发布前用两个临时 release 实测：
+
+- **带过滤**：跳过只有服务器资产的 `0.0.99`，取 `0.0.98` 的 `komari-agent-linux-amd64` → 更新后自证 `I-AM-AGENT`；
+- **去掉过滤（对照组）**：直接取 `0.0.99` 的 `komari-linux-amd64` → 更新后自证 `I-AM-SERVER`（节点报废）。
+
+结论：**这条防线不是装饰**，升级上游 agent 代码时必须保留；临时 release/tag 验完已删除。
+
+### 11.2 构建脚本自带的三道门禁
+
+`./scripts/build-agent.sh` 在构建前会 grep 源码并断言：
+
+1. `agent/update/update.go` 里仍有资产过滤 `Filters: []string{"^komari-agent-"}`——删了它
+   节点会被刷成服务器二进制（§11.1）；
+2. `agent/update/update.go` 的 `Repo` 仍是 `zhemed/komari`——自更新只能指向我们；
+3. `install-agent.sh` / `install-agent.ps1` 里 pin 的默认版本等于本次 `KOMARI_VERSION`
+   ——防止发版忘了同步（`KOMARI_VERSION` 与仓库默认值不同时按临时构建处理，只告警）。
+
+源码 vendor 化之前这里还有"源码树哈希""补丁回放比对"两道门禁：源码既然已经在仓库里，
+这两类问题（pin 漂移、补丁失效）从结构上就不存在了。
+
+### 11.3 如何跟进上游 agent 的修复
+
+源码已在仓库里，**没有 pin 和补丁可以重放**，跟进方式回到最朴素的 git 流程：
+
+1. 看上游要拿的 commit（`git log` 远程仓库，或 `gh api` 查 commit）改了什么；
+2. 在本仓库 `agent/` 里手工 apply/改写（不要整棵覆盖——我们内联过改动，直接覆盖会丢）；
+3. `./scripts/build-agent.sh --only linux/amd64`，三道门禁必须通过；
+4. 涉及自更新/协议的行为改动，先在 `.build/` 里搭临时 release 做对照实验（§11.1 的做法），
+   验完把这些提交信息写清楚。
+
+**不要**把上游 agent 整条线跟上来：0.0.4 的教训就是跟到了 1.5.10（§11.5）。
+
+### 11.4 已经装出去的上游 agent 怎么办
+
+我们**无法**远程改变别人机器上已装的上游 agent：它内部指向 `komari-monitor/komari-agent`，
+默认每 6 小时自更新到上游最新（当前 `1.5.10`）。能做的只有引导重装（面板里的安装命令已经
+指向我们的脚本）。服务器侧**不做版本闸门**，上游 agent 仍能正常上报（协议 v1/v2 未变）。
+
+## 12. 容器镜像
+
+两个镜像都发布在 ghcr.io 下，公开可拉：
+
+| 镜像 | 内容 | 平台 | 构建脚本 |
+|---|---|---|---|
+| `ghcr.io/zhemed/komari` | 服务器（alpine + 静态二进制） | amd64、arm64 | `scripts/build-server-image.sh --push` |
+| `ghcr.io/zhemed/komari-agent` | agent | amd64、arm64、armv7 | `scripts/build-agent-image.sh --push` |
+
+发布时（§3.4 第 7 步）：
+
+```bash
+gh auth token | docker login ghcr.io -u zhemed --password-stdin
+./scripts/build-server-image.sh --push    # 依赖 dist/komari-linux-{amd64,arm64}，且必须静态链接
+./scripts/build-agent-image.sh --push     # 依赖 dist/agent/komari-agent-linux-{amd64,arm64,arm}
+```
+
+- 版本号取自 `scripts/version.env`；`:latest` 与 `:<版本>` 一起推。
+- 两个脚本在缺产物、或产物不是静态链接时会**直接报错**，不会推一个跑不起来的镜像。
+- 服务器镜像里有 `RUN apk add`，跨架构构建需要本机有 QEMU/binfmt：
+  `docker run --privileged --rm tonistiigi/binfmt --install arm64`；
+  agent 镜像**刻意不含任何 RUN**（只有 COPY），因此不需要模拟器（0.0.4 实测）。
+- **包可见性只能手点**：用户级 ghcr 包的可见性无法用 API 改（`PATCH /user/packages/...`
+  实测一律 404，连已公开的包也一样），新建的包默认 **private**。要公开得去
+  `https://github.com/users/<user>/packages/container/<包名>/settings` → Change visibility → Public。
+  当前状态（2026-09-16）：`komari` 与 `komari-agent` 都已人工设为 **public**。
+- 验证公开可拉（发版后必跑）：空凭据目录能成功即为公开——
+  ```bash
+  mkdir -p /tmp/dockerclean
+  for t in 0.0.4 latest; do
+    DOCKER_CONFIG=/tmp/dockerclean docker manifest inspect "ghcr.io/zhemed/komari:$t" >/dev/null && echo "komari:$t ok"
+    DOCKER_CONFIG=/tmp/dockerclean docker manifest inspect "ghcr.io/zhemed/komari-agent:$t" >/dev/null && echo "komari-agent:$t ok"
+  done
+  ```
+  0.0.4 实测：四个 tag 全部匿名可拉，服务器镜像匿名 `docker run` 后 `/install` 200、
+  数据落在挂载卷。
+- Dockerfile 里带 `org.opencontainers.image.source` 标签，ghcr 包页面会链回本仓库。
+
+### 11.5 为什么停在 1.4.3 同期 agent（而不是上游最新的 agent）
+
+上游 agent 与服务器是**两个独立仓库、两条版本线**。服务器停在 `1.4.3` 血统，agent 也应该停在
+**同一天**的代码上，否则节点上跑的是比服务器更新一代的 agent。实测时间线：
+
+| 上游 agent | 时间 | 说明 |
+|---|---|---|
+| tag `1.2.60` | 2026-07-08 | |
+| **`1186aafb`（我们的 pin）** | **2026-08-07** | 服务器/前端 1.4.3 是 2026-08-13，这是它之前最后一个 agent 提交 |
+| tag `1.5.0` / `1.5.10` | 2026-09-14 / 09-15 | 1.5 线开始，1.5.10 就是我们**最初**误 pin 的 commit（`9e532e04`） |
+
+停在 1.4.3 同期实际付出的代价（逐条核对过）：
+
+- **不算损失**（我们这条血统根本调不到这些能力）：文件访问 `server/files.go`（1152 行）、
+  终端会话重连、文件上传链路修复 —— 服务器与前端都没有这些功能，agent 里有也永远不会被调用；
+  反过来，回退后节点上的 root 二进制里少掉整个文件读写实现，攻击面更小。
+- **真实损失**：3 个检测修复（AMD GPU 在 `rocm-smi` 缺失时读 sysfs、Android FUSE 磁盘识别、
+  macOS `nullfs` 去重）、安装脚本两处改进（无 bash 环境可装、snapshot 通道）。
+  需要时按 §7 的 backport 政策单独 cherry-pick，不要整条线跟上去。
+
+### 11.6 为什么会看到 “Remote control is enabled on this device”（0.0.4 时期发生的事）
+
+0.0.4 的 agent 是最初误 pin 的 **1.5.10**，它带一个上游在 `79d8d45 增强安全提醒`（2026-09-14）
+新加的提醒：**只要远程控制开着**（上游默认开），agent 就把一段告警写进 `/etc/motd`：
+
+```text
+[Komari] Remote control is enabled on this device
+127.0.0.1:25774 can execute commands and read or modify files on this device as root.
+...
+```
+
+这不是入侵痕迹，而是 agent 自己写的"你这台机器上远程控制是开着的"提示，内容说的就是
+WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没有**这段注入逻辑，
+只在 Web 终端的 shell 前置脚本里**读**一次 `/etc/motd`（`terminal/terminal_unix.go`）。
+
+排查这类提示的正确姿势：`journalctl -u komari-agent | grep -i "remote control"`，
+以及确认 agent 的启动日志里 `Github Repo:` 指向 `zhemed/komari`（不是上游仓库）。
+
+## 13. 上报协议：v1 / v2 与"1.4 时期"的口径
+
+**结论**：我们冻结的 1.4.3 血统里，上报协议是 **v2 主力 + v1 兜底并存**（不是"v1 时代"，
+也不是 v2-only）。两条都实现在本仓库内，都要维护。
+
+| 侧 | 实现 | 默认 |
+|---|---|---|
+| 服务端 | `protocol/v1/report.go`、`protocol/v2/{jsonrpc.go,networktest.go}`；路由 `/api/clients/report`（v1 WS/POST）与 `/api/clients/v2/rpc`（v2 WS/POST），见 `web/router/router.go:68-72` | 两套端点都开着，由 agent 选 |
+| agent | `agent/protocol/v1`、`agent/protocol/v2`、`agent/protocol/transport` | `--protocol-version` 默认 **2**（`AGENT_PROTOCOL_VERSION` 可覆盖） |
+
+### 13.1 时间线（上游实测）
+
+- **2026-05-31**：服务端 `protocol/v2` 引入（`e149e8b refactor: remove legacy client APIs and support v2 pings`，
+  处于 1.2.0→1.2.3 之间）；同一时期 agent 也加了 v2（`9f088ab feat(protocol): add configurable v2 reporting support`）。
+- **1.4.0（2026-08-05）～ 1.4.3（2026-08-13）**：v1 与 v2 全程并存——我们导入的 1.4.3 快照里两套路由、
+  两套协议文件都在，可以直接 `git show <snapshot>:web/router/router.go` 核对。
+- **2026-08-29**：上游 **agent** 做了 `8fdab5b refactor: 仅保留v2协议，移除v1回退`——注意这在我们
+  agent pin（`1186aafb`，2026-08-07）**之后**，属于 agent 的 1.5 线（1.5.0 = 2026-09-14）。
+  也就是说"**v1 兜底是 1.4 时期的行为**"，我们冻结 1.4.3 同期 agent 正好把它保留下来。
+
+### 13.2 选择与降级（agent 侧）
+
+```
+默认 v2 WebSocket ──连不上/失败达阈值──▶ 降级 v1（直到该连接断开）──▶ 断开后重试 v2
+        └─ WS 重试次数用尽 ─▶ v2 HTTP POST 回退（报告 POST + 事件 pull 循环，仍在 v2 端点）
+```
+
+两个容易误判的点：
+
+1. **同一时刻只走一条上报通道**；`online (POST session)` 只是 presence 刷新日志，
+   v2 的 HTTP 入口也会打（`web/api/client/report_v2.go` 的 `ingestReport(..., 2, true)`），
+   **不能**当成"v1 通道在工作"的证据。
+2. **面板看不到也不能选协议版本**：服务端只在内存里记 v2 与否（`web/agent/connections.go` 的
+   `IsV2Client`），没有暴露给前端。
+
+### 13.3 维护策略（当前事实）
+
+- 两条通道最终都汇入 `web/api/client/ingest.go` 的 `ingestReport` → `metricstore.WriteReport`，
+  因此**新逻辑一律做在协议无关层**（指标、流量、数据库、面板 RPC），两条通道同时受益；
+  0.0.x 至今的改动（删插件/通知、流量跨重启累计）都属于这一类。
+- 改协议层时要同时看两条入口；v1 属**冻结兼容**（服务老 agent 与降级路径），
+  不要在没有理由的情况下删它——删掉会让只懂 v1 的节点失联，也让 agent 的兜底失去意义。
+- 与协议版本唯一相关的一次修复：v2 报告没有 `uptime` 字段，而"agent 是否重启"的判据依赖它，
+  **若**发生 v1↔v2 切换就会误判并把增量清零（详见 §7；该缺陷存在但从未被证实触发过）。
+
+## 14. 面板一键升级（0.0.8 起）
+
+让管理员不必 SSH：在面板"有新版本"弹窗里点一下就完成升级。全部动作在**服务端**执行
+（`internal/upgrade`），前端只触发与展示进度。
+
+### 14.1 能做什么
+
+| 能力 | 说明 |
+|---|---|
+| 升到最新稳定版 | 取 release 列表里版本号最大的非 prerelease |
+| 安装指定版本 | 版本列表里选任意 tag（**回滚也走这条路**） |
+| 进度与结果 | `admin:upgradeStatus` 返回 `phase`（downloading/verifying/replacing/restarting/failed/completed）；进程重启后从状态文件读"上次结果" |
+| 开关与来源 | 系统设置 → "服务器升级"：`server_upgrade_enabled`（默认开）、`server_update_repo`（默认 `zhemed/komari`） |
+
+### 14.2 支持矩阵（写实，不假装都支持）
+
+> **先读这条（2026-09-19）**：host 网络 + 挂 `/var/run/docker.sock` 的容器部署，"重建容器"
+> 这条路径在本仓库**已停用**——自身容器识别在 host 网络下会静默失效，实际会落到"容器内替换"，
+> 于是镜像不变、tag 落后，下次重建容器/宿主重启把版本拉回去。**主方案（Docker + 面板一键升级）
+> 走的是"容器内替换"，不受此影响**；根因与完整因果见
+> [事故案例](../.trellis/spec/guides/incident-compose-autosync.md)。
+
+### 14.3 不变量（改这块代码必须保持）
+
+1. **目标仓库只来自服务端配置**，接口不接受请求方传入的 URL（否则就是任意代码执行入口）。
+2. **替换前必须自检**：下载物跑 `<新二进制> --help`，输出里要出现 `Komari Monitor <tag>`。
+   注意本项目的二进制**没有** `--version` flag（实测退出码 1），别改成它。
+3. **校验和先行**：`komari-SHA256SUMS` 缺失或对不上就拒绝安装并删除临时文件；
+   旧版本缺该资产时给出"用 install-komari.sh"的可操作提示。
+4. **旧二进制不丢**：替换前 `os.Rename` 成 `<二进制>.backup.<旧版本>`；任何一步失败都不覆盖它。
+5. **不做自动回滚**（0.0.8 的明确决策）：新二进制若在初始化阶段就崩，它自己没机会执行回滚；
+   兜底是 systemd 启动限流（`StartLimitBurst=5`/10s 后进入 failed，不会无限重启）+
+   "安装指定版本"手工回退。
+
+### 14.4 升级失败怎么救（照抄命令即可）
+
+```bash
+# 1) 看状态与备份路径
+journalctl -u komari -n 50 --no-pager | grep upgrade
+ls -l /opt/komari/komari.backup.* /opt/komari/.komari-upgrade* 2>/dev/null
+
+# 2) 用备份直接换回去
+systemctl stop komari
+mv /opt/komari/komari.backup.<旧版本> /opt/komari/komari
+systemctl start komari
+
+# 3) 或者重装指定版本（等价于回滚，脚本会做校验）
+KOMARI_TAG=<旧版本> bash install-komari.sh
+```
+
+### 14.4.1 0.0.8 的一处缺陷（已修，记录以免重犯）
+
+0.0.8 的自升级在**自检**这一步必然失败：下载出来是 0644，直接 `fork/exec` 报
+`permission denied`。因为替换发生在自检之后，失败**不会**动线上二进制（实测确认版本与数据不变），
+但面板上"一键升级"在那个版本上等于不可用。0.0.9 修复（下载后先补执行位再自检），
+并加了回归测试断言"被自检的文件必须可执行"（去掉修复即 FAIL，验证过测试不是永真）。
+要避开这段窗口：0.0.8 用 `install-komari.sh` 升一次，之后面板升级即可正常工作。
+
+### 14.6 容器一键升级（0.0.11 起；0.0.13 起不挂 socket 也能升级；0.0.12 修 helper 缺陷）
+
+**更正旧说法（两次）**：§14.4.2 一度把"容器不能自升级"写成架构限制——那是**取舍**；
+后来又写成"必须挂 socket 才能网页升级"——那也过头了：0.0.13 起**不挂 socket 也能在容器内升级**
+（容器内替换二进制 + 原地重执行）。挂 socket 只是"版本与镜像完全一致"的**充分条件**：
+
+| 形态 | 能否网页升级 | 版本与镜像一致 | 需要的额外配置 |
+|---|---|---|---|
+| 二进制 + systemd | ✅ | — | 无 |
+| 容器（默认，不挂 socket） | ✅ 容器内替换 + 原地重执行 | ❌ 重建容器会回退 | 无 |
+| 容器 + 挂 `/var/run/docker.sock` | ✅ 拉镜像 + 重建容器 | ✅ | 挂 socket（=宿主 root 等价权限） |
+| 只读 rootfs 容器 | ❌ 只能给命令 | — | — |
+
+服务端的重建容器实现（挂 socket 时）：用 Docker Engine API 拉取目标镜像，再由一个 **helper 容器**
+（用当前镜像启动、只挂 socket 与数据目录）把本容器按原配置 + 新镜像重建。
+
+```bash
+docker run -d --name komari --restart always --network host \
+  -v ./data:/app/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \   # ← 想用"重建容器"模式才需要这一行（可选）
+  ghcr.io/zhemed/komari:latest
+```
+
+- 重建时**逐字段沿用**旧容器的 `Config`/`HostConfig`/网络配置（卷、端口、restart 策略、env、别名…），
+  只换镜像；容器名保持不变，旧容器改名为 `<名字>-old-<时间戳>` 并保留为**停止状态**（回滚点）；
+- 任何一步失败都会把旧容器改名回去并启动（helper 里完成回滚）；
+- 没挂 socket 时走**容器内替换**（§14.2 第二行、§14.4.2），systemd 二进制形态也完全不受影响；
+- **安全边界**：docker socket ≈ 宿主 root。因此该模式只在 socket 存在时启用、仍受
+  `server_upgrade_enabled` 开关约束、每次升级写审计日志，界面也会明确提示这一点；
+- 回滚：`docker start komari-old-<时间戳>`（旧容器仍在），或按 §14.4.2 用镜像 tag 重建；
+- socket 路径可用设置 `server_upgrade_docker_socket` 改（默认 `/var/run/docker.sock`）；
+- helper 也可以手工跑（故障恢复用）：
+  `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v <数据目录>:<数据目录> \
+     <镜像> /app/komari docker-self-recreate --container komari --image ghcr.io/zhemed/komari:<tag> --sanity-tag <tag>`
+
+### 14.6.1 0.0.11 的容器升级缺陷（已修，记以免重犯）
+
+0.0.11 的容器一键升级在**降级到没有 helper 子命令的版本**时必然静默失败：helper 用**目标镜像**
+启动，而 `docker-self-recreate` 是 0.0.11 才引入的 —— 目标镜像（例如 0.0.10）里没有它，
+helper 一启动就退出；当时 helper 还配了 `AutoRemove`，现场被一并抹掉，用户只看到"点了没反应"。
+
+实测证据（docker events）：`create practical_boyd → start → die → destroy`（1 秒内），
+父容器停在 `phase=restarting` 直到 6 分钟超时。
+
+0.0.12 的修法：
+1. helper 改用**当前镜像**（本进程所在的镜像必然含该子命令）；
+2. helper **不自动删除**，命名为 `komari-upgrade-helper-<时间戳>` 并打标签
+   `komari.upgrade.helper=1`（下次升级前统一清理），失败时可用 `docker logs` 查因；
+3. 父进程**监视 helper**：helper 先退出即视为失败，把它的日志尾部写进状态并回报面板，
+   不再让用户干等超时。
+
+### 14.4.2 容器部署怎么升级（实测于 2026-09-17）
+
+容器升级按下面两种方式（**面板一键升级是主路径**）：
+
+1. **面板一键升级（推荐，0.0.11 起，0.0.13 起零配置可用）**：容器里点一下即可。两种底层方式：
+   - **不挂 socket（默认，0.0.13 起）**：容器内下载 release 资产 → 校验 `komari-SHA256SUMS` →
+     自检 → 备份 + 原子替换 → `syscall.Exec` 原地重执行（PID 不变、不需要 restart 策略）。
+     代价：**重建容器**会退回镜像版本（`docker restart` 不会）；
+   - **挂 `/var/run/docker.sock`（可选）**：改为拉镜像 + helper 重建容器，版本与镜像完全一致；
+     代价是容器获得宿主 root 等价权限（见 §14.6）；
+2. **手工升级**（只读 rootfs 等无法替换的场景，或你想手工控制）：拉新镜像 + 用同一个数据卷重建容器：
+
+```bash
+docker pull ghcr.io/zhemed/komari:latest       # 或固定版本号（每次发版都会移动 :latest）
+docker stop komari && docker rm komari
+docker run -d --name komari --restart always --network host \
+  -v ./data:/app/data ghcr.io/zhemed/komari:latest
+```
+
+- `docker restart` **不会**升级（还是旧镜像），必须 pull + 重建容器（`docker rm` 后按同一条
+  `docker run` 重跑）；
+- 数据在数据卷里（`-v ./data:/app/data`），重建容器不影响；
+- 升级前后对比实测（0.0.5 → 0.0.9，用生产库副本）：节点数、累计流量、metric rollups 全部保留；
+- 服务端在版本变化前会自己备份：`./data/backup/upgrade-<时间>.zip`
+  （日志行 `[upgrade-backup] … before upgrade`）；
+- 建议固定版本号（`:0.0.9`）而不是 `:latest`，便于回滚与复现；
+- 主方案（Docker 容器内替换）与备选（二进制 + systemd）都能面板一键升级；只有**只读 rootfs** 等
+  无法写入二进制的场景才需要按上面手工重建容器（挂 socket 的重建模式是另一条可选路径）。
+
+### 14.5 安全边界（诚实写明）
+
+- 面板因此获得"下载并执行代码"的能力 → 限制为管理员 RPC、固定仓库、审计日志（`auditlog`）、可开关；
+- **SHA256 只保证"下载内容与发布清单一致"**：发布账号/发布流水线被攻破时它不提供保护；
+  签名体系（minisign/GPG）留待后续；
+- 故意**没有**给 `admin:upgradeServer` 标记 `rpc.MarkSensitive`：那会让每次调用都必须带 2FA 码，
+  而面板目前没有该提示流程。若后续接上提示，应把它加入敏感方法。

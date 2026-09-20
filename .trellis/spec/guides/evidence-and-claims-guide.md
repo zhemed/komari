@@ -78,7 +78,7 @@ grep -rn "docker.sock\|没挂 socket\|只能改用" --include="*.md" --include="
 
 ---
 
-## 发布前的强制检查（与 `docs/MAINTAINING.md`「发布一个版本」配合）
+## 发布前的强制检查（与 `docs/MAINTAINING.md` §3.4 配合）
 
 发布说明里每出现一条"修复/原因/已知问题"，都要能回答：
 
