@@ -1783,3 +1783,43 @@
 ### Next Steps
 
 - 0.0.19 发版前建议对在跑的 0.0.18 做一次真机升级测试
+
+
+## Session 53: 构建并发布 0.0.19（release 18 资产 + 双镜像 :latest 迁移）
+<!-- trellis-session: v=2 fp=77ec6c2f23df248c -->
+
+**Date**: 2026-09-20
+**Task**: 构建并发布 0.0.19（release 18 资产 + 双镜像 :latest 迁移）
+**Branch**: `main`
+
+### Summary
+
+用户要求构建 0.0.19。装回 zig（上次清理删过）→ 同步 4 处版本字面量 → 构建服务器静态双架构 + agent 14 平台 + 校验和 → 自检 --full 全绿 → 发 release（18 资产）→ 推双镜像并把 :latest 移到 0.0.19。过程中自己犯了两个错：agent 校验和因通配符漏传、文档更新被 grep 短路，均已修正并记录。
+
+### Main Changes
+
+- 版本字面量 → 0.0.19（version.env / install-komari.sh / install-agent.sh / install-agent.ps1 / build-agent.sh 注释 / MAINTAINING）
+- 服务器静态产物：amd64 35,511,576、arm64 34,375,488；内嵌 hash 5722a4a = HEAD；--help 含 Komari Monitor 0.0.19
+- 发布：release 0.0.19（18 资产，Latest）；镜像 komari:0.0.19/:latest（2 架构）+ komari-agent:0.0.19/:latest（3 架构）
+- .build/rel-notes-0.0.19.md：发布说明（含相对 0.0.18 少了什么与行为差异）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b4ba1e8` | chore(task): archive 09-20-build-0-0-19 |
+
+### Testing
+
+- [OK] 线上实测：docker run ghcr.io/zhemed/komari:latest --help → Komari Monitor 0.0.19 (hash 5722a4a…)
+- [OK] compose 残留：发布产物与线上镜像内 com.docker.compose / compose up 均 0 命中
+- [OK] 资产清单与 0.0.18 diff 为空（18 个）
+- [OK] check-repo.sh --full 全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户决定何时把生产从 0.0.18 升到 0.0.19（重建容器或面板一键升级）

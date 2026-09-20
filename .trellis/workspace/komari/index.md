@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 52
+- **Total Sessions**: 53
 - **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1785 | Active |
+| `journal-1.md` | ~1825 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 53 | 2026-09-20 | 构建并发布 0.0.19（release 18 资产 + 双镜像 :latest 迁移） | `b4ba1e8` | `main` |
 | 52 | 2026-09-20 | 删除面板里提到 compose 的提示文案并重建前端产物 | `abd30cf` | `main` |
 | 51 | 2026-09-20 | 文档精简到极限（README 36 行 / MAINTAINING 98 行） | `c2a55bf` | `main` |
 | 50 | 2026-09-20 | 修：README 删减未落盘（被自己的验证动作覆盖） | `b6a0c68` | `main` |
