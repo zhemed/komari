@@ -7,8 +7,8 @@
 ## Current Status
 
 <!-- @@@auto:current-status -->
-- **Active File**: `journal-1.md`
-- **Total Sessions**: 60
+- **Active File**: `journal-2.md`
+- **Total Sessions**: 61
 - **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,8 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1963 | Active |
+| `journal-2.md` | ~45 | Active |
+| `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 61 | 2026-09-20 | 升级弹窗按钮去重并发布 0.0.21（含生产升级） | `3977f5a` | `main` |
 | 60 | 2026-09-20 | 移除面板「文档」入口并发布 0.0.20（含生产升级） | `7f1ec2c` | `main` |
 | 59 | 2026-09-20 | 自检第 15 项：2FA 护栏（防重新引入） | `ef66141` | `main` |
 | 58 | 2026-09-20 | 写入全局规则：给选项必须用交互式提问组件 | `8e634cd` | `main` |
