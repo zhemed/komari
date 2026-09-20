@@ -11,7 +11,7 @@
   `install-komari.sh` 的 `REPO_TAG`、`install-agent.sh` 的 `default_agent_version`、
   `install-agent.ps1` 的 `$DefaultAgentVersion`（自检第 1 项会核对）。
 - 递增 patch 位；**发版前先查号发过没有**（`gh release list -R zhemed/komari --limit 5`）。
-  已发布：`0.0.1`…`0.0.18`（0.0.18 仍是线上 Latest 的镜像之一）；本次要发 **0.0.19**。
+  已发布：`0.0.1`…**`0.0.19`**（当前 Latest；0.0.18 保留为含 compose 那套机制的历史版本）。
 - 带后缀的 tag（`0.0.1-fix1`）永远不会被面板判为"可更新"（`parseSemver` 只认三段）。
 
 ## 构建
