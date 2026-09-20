@@ -309,6 +309,34 @@ if [ "${FULL}" = 1 ]; then
   rm -f "${GUARD_TMP}"; trap - EXIT
 fi
 
+# ---------- 15. 2FA 不得被重新引入 ----------
+# 2026-09-20 用户要求**彻底移除 2FA**（账号级 + 敏感操作验证两层），并选择加这条护栏防回归。
+# 回归的真实路径：从上游快照拷代码时把 pquerna/otp 一起带回来、或看到数据库还剩 two_factor 列
+# 就顺手把模型字段加回去。所以：扫 Go 源码 / go.mod / 前端源码，命中即报红。
+head_ "15. 2FA 不得被重新引入（用户 2026-09-20 要求彻底移除）"
+TWOFA_PAT='pquerna/otp|two_factor|TwoFactor|RequireSensitive2FA|api/admin/2fa'
+twofa_scan() {  # twofa_scan [git 树引用]
+  local ref="${1:-}"
+  if [ -n "${ref}" ]; then
+    git grep -lE "${TWOFA_PAT}" "${ref}" -- '*.go' 'go.mod' 'frontend/src' 2>/dev/null
+  else
+    git grep -lE "${TWOFA_PAT}" -- '*.go' 'go.mod' 'frontend/src' 2>/dev/null
+  fi
+}
+TWOFA_HITS="$(twofa_scan)"
+if [ -z "${TWOFA_HITS}" ]; then
+  ok "代码里没有 2FA 痕迹（判据：pquerna/otp、two_factor、TwoFactor、RequireSensitive2FA、/api/admin/2fa）"
+else
+  bad "2FA 又被加回来了——用户 2026-09-20 明确要求彻底移除，不要补回来"
+  printf '%s\n' "${TWOFA_HITS}" | sed 's/^/      /'
+fi
+# 判别性验证：规则必须能抓住"还有 2FA"的历史提交，否则它只是装饰
+if [ -n "$(twofa_scan 0.0.18)" ]; then
+  ok "判别性验证：规则对 0.0.18（含 2FA 的历史提交）报红（说明规则真的会报警）"
+else
+  bad "判别性验证失败：规则对含 2FA 的历史提交无告警，等于永远为绿（护栏失效）"
+fi
+
 printf '\n[check-repo] 结论：'
 if [ "${FAIL}" = 0 ]; then
   printf '\033[32m全部通过\033[0m\n'; exit 0
