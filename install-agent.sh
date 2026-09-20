@@ -54,7 +54,7 @@ log_config() {
 # Default values
 # 本 fork 的发行线参数，集中在这里，避免仓库名散落各处
 agent_repo="zhemed/komari"
-default_agent_version="0.0.18"
+default_agent_version="0.0.19"
 service_name="komari-agent"
 target_dir="/opt/komari-agent"
 github_proxy=""
