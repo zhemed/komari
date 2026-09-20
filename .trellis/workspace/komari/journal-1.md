@@ -1889,3 +1889,37 @@
 ### Next Steps
 
 - 用组件再问一次 2FA 自检护栏是否要加
+
+
+## Session 59: 自检第 15 项：2FA 护栏（防重新引入）
+<!-- trellis-session: v=2 fp=0aadad67dc2c5a74 -->
+
+**Date**: 2026-09-20
+**Task**: 自检第 15 项：2FA 护栏（防重新引入）
+**Branch**: `main`
+
+### Summary
+
+用户选择加护栏。check-repo.sh 新增第 15 项：扫 Go/go.mod/前端源码命中 2FA 特征即报红，并带判别性验证（对 0.0.18 历史提交必须报红）。实测：塞回探针 → 报红；还原 → 通过；--full 15 项全绿。
+
+### Main Changes
+
+- check-repo.sh 第 15 项（含 twofa_scan 函数与判别性验证）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ef66141` | chore(task): archive 09-20-check-item-15-twofa-guard |
+
+### Testing
+
+- [OK] 判别性验证对 0.0.18 报红；手测探针报红；还原后全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：清理 /opt/komari 历史备份与恢复分支 pre-rollback-0.0.19
