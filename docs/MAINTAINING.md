@@ -39,7 +39,7 @@
 > **下一个版本号必须是 `0.0.19`**，直接发 0.0.18 会与已有 tag/release 撞号（`gh release create`
 > 会失败或产出与已发布资产不一致的内容）。
 > 查法：`gh release list -R zhemed/komari --limit 5` 与 `git tag --list | tail`。
-> 另注：已发布的 0.0.18 用的是**当时的** `install-komari.sh`（含后来被回滚的 compose 安装脚本与
+> 另注：已发布的 0.0.18 用的是**当时的** `install-komari.sh`（含后来被回滚的那套容器安装脚本与
 > 备份清理行为），本仓库 `main` 上的安装脚本与它在这几点上并不相同——升级它或改它前先看清。
 前端 `AdminPanelBar.tsx` 的 `parseSemver` 只取 `x.y.z` 三段并要求严格递增，
 所以带后缀的 tag（如 `0.0.1-fix1`）**永远不会**被判为"可更新"。
@@ -60,7 +60,7 @@
 ## 2.1 仓库自检（一条命令跑完机械检查）
 
 ```bash
-./scripts/check-repo.sh          # 秒级：第 1-8 项 + 第 12-14 项（版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门、自检自测、compose 事故护栏、部署路径唯一）
+./scripts/check-repo.sh          # 秒级：第 1-8 项 + 第 12-14 项（版本字面量、文档路径/锚点、脚本与工作流语法、脏文件、密钥扫描、产物哈希、无克隆上游、Trellis 流程闸门、自检自测、事故护栏、部署路径唯一）
 ./scripts/check-repo.sh --full   # 追加第 9-11 项：go build/vet/test、离线构建、agent 三道门禁；并跑第 14 项的深度检查
 ```
 
@@ -223,16 +223,24 @@ tag 与 `KOMARI_VERSION` 必须一致（`install-komari.sh` 默认按 `KOMARI_TA
 > `tag 0.0.1 exists locally but has not been pushed to komari-monitor/komari`。
 > 发布时给 `gh` 显式加 `-R zhemed/komari`。
 
-### 3.4.1 唯一的部署/升级路径（2026-09-19 用户验收后定稿）
+### 3.4.1 部署口径（2026-09-19 用户定稿）
 
-**用户定调：「我们还是用这样的部署命令吧，别用其他的了」。** 从此：
+**主方案是 Docker 镜像**（README 第一条命令）：
 
-- **部署与升级都只用 `install-komari.sh`**（systemd 形态，装到 `/opt/komari`）。
-- **不要**再引入 compose / 容器安装脚本 / 第三方部署方式；需要容器形态时按 README 的
-  "替代方案"自行维护，且不得再往仓库里加第二套部署自动化。
-- 面板的"有新版本"一键升级在 systemd 形态仍然可用，但**命令行菜单升级是验收过的那条**。
+```bash
+docker run -d --name komari --restart always \
+  --network host \
+  -v ./data:/app/data \
+  ghcr.io/zhemed/komari:latest
+```
 
-**验收过的升级步骤（2026-09-19 实测 0.0.17 → 0.0.18）**：
+- 数据在宿主 `./data`（SQLite）：换 tag 重建容器不丢数据。
+- 升级走**面板「有新版本」**：容器里零配置——在容器内下载新版本、校验 `komari-SHA256SUMS`、
+  替换二进制并原地重启（不需要挂载、不需要 socket）。
+- 想固定镜像版本：`docker pull ghcr.io/zhemed/komari:<tag>` 后按同样命令重建容器，
+  或直接改上面命令里的 tag 重跑。
+
+**备选：二进制 + systemd**（`install-komari.sh`，装到 `/opt/komari`）：
 
 ```bash
 KOMARI_TAG=<目标版本> bash install-komari.sh      # 主菜单选「2 升级 Komari」→ 通道 stable
@@ -241,15 +249,21 @@ KOMARI_TAG=<目标版本> bash install-komari.sh      # 主菜单选「2 升级 
 它按顺序做：停服务 → 备份当前二进制到 `/opt/komari/komari.backup.<时间戳>` → 下载目标版本 →
 校验 `komari-SHA256SUMS` → 替换 → 启动 → 数据侧由程序自己备份到 `data/backup/upgrade-<时间戳>.zip`。
 
-**验收清单（每次升级后照着核一遍）**：
+**compose 一律不用（用户 2026-09-19 明确要求剔除）**：compose 相关的东西已从文档与代码里移除，
+仓库里**不允许**再出现 compose 部署方式或第二套部署自动化（自检第 13/14 项会拦）。
+原因与完整因果见 [事故案例：compose 全自动升级](../.trellis/spec/guides/incident-compose-autosync.md)——
+那是本仓库最严重的一次失误，别再碰。
+
+**验收清单（每次换镜像/升级后照着核一遍）**：
 
 ```bash
-curl -s http://127.0.0.1:25774/api/version           # version 与 hash 是否为目标版本
-sha256sum /opt/komari/komari                          # 与 release 资产 digest 比对
-systemctl is-active komari && journalctl -u komari --since '10 min ago' | grep -ciE 'error|fail|panic'
+curl -s http://127.0.0.1:25774/api/version    # version 与 hash 是否为目标版本（容器形态同样可用）
+docker ps --filter name=komari --format '{{.Image}} {{.Status}}'
+docker logs --tail 50 komari | grep -ciE 'error|fail|panic'
 ```
 
-再加一眼面板：节点在、agent 显示 online、最近流量在涨。
+systemd 形态则用 `systemctl is-active komari` 与 `journalctl -u komari --since '10 min ago'`。
+无论哪种形态，再看一眼面板：节点在、agent 显示 online、最近流量在涨。
 
 **非交互执行时的三个坑（2026-09-19 全踩过，记以免重犯）**：
 
@@ -732,21 +746,11 @@ WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没
 
 ### 14.2 支持矩阵（写实，不假装都支持）
 
-> **先读这条（2026-09-19）**：容器 + `network_mode: host` + 挂 socket 时，上表第 3 行的
-> "重建容器"**不成立**——自身容器识别在 host 网络下静默失效，实际会落到第 2 行的容器内替换，
-> 于是镜像不变、compose 文件 tag 落后，下次重建/`up -d`/宿主重启把版本拉回去。
-> 这是本仓库最严重一次失误的根因，完整因果与硬规则见
-> [事故案例：compose 全自动升级](../.trellis/spec/guides/incident-compose-autosync.md)
-> 与 [server-upgrade 规范 §5 已知遗留](../.trellis/spec/backend/server-upgrade.md)。
-
-| 部署形态 | 行为 |
-|---|---|
-| linux/amd64、linux/arm64 + systemd + 目录可写 | ✅ 下载 → 校验 → 自检 → 备份 + 原子替换 → 退出交 systemd 拉起 |
-| 容器（默认，不挂任何东西） | ✅ 容器内下载 → 校验 → 自检 → 替换二进制 → 原地重执行（0.0.13 起；版本可能与镜像不一致） |
-| 容器 + 挂 `/var/run/docker.sock`（**可选**增强） | ✅ 拉镜像 + helper 容器重建自身容器，版本与镜像完全一致（见 §14.6） |
-| 容器 + 只读 rootfs | ⚠️ 无法替换：仅返回 `docker pull ghcr.io/zhemed/komari:<tag>` 供复制 |
-| 无 systemd（前台裸跑） | ⚠️ 仅下载到 `<二进制目录>/upgrades/`（不可写则退到 `$TMPDIR/komari-upgrades`），不退出不替换 |
-| darwin / windows / 其它架构 | ❌ 没有发布资产，接口直接拒绝 |
+> **先读这条（2026-09-19）**：host 网络 + 挂 `/var/run/docker.sock` 的容器部署，"重建容器"
+> 这条路径在本仓库**已停用**——自身容器识别在 host 网络下会静默失效，实际会落到"容器内替换"，
+> 于是镜像不变、tag 落后，下次重建容器/宿主重启把版本拉回去。**主方案（Docker + 面板一键升级）
+> 走的是"容器内替换"，不受此影响**；根因与完整因果见
+> [事故案例](../.trellis/spec/guides/incident-compose-autosync.md)。
 
 ### 14.3 不变量（改这块代码必须保持）
 
@@ -837,7 +841,7 @@ helper 一启动就退出；当时 helper 还配了 `AutoRemove`，现场被一�
 
 ### 14.4.2 容器部署怎么升级（实测于 2026-09-17）
 
-容器有两种升级方式：
+容器升级按下面两种方式（**面板一键升级是主路径**）：
 
 1. **面板一键升级（推荐，0.0.11 起，0.0.13 起零配置可用）**：容器里点一下即可。两种底层方式：
    - **不挂 socket（默认，0.0.13 起）**：容器内下载 release 资产 → 校验 `komari-SHA256SUMS` →
@@ -854,14 +858,14 @@ docker run -d --name komari --restart always --network host \
   -v ./data:/app/data ghcr.io/zhemed/komari:latest
 ```
 
-- `docker restart` / `docker compose restart` **不会**升级（还是旧镜像），必须是 pull + 重建；
-  compose 用户用 `docker compose pull && docker compose up -d`；
+- `docker restart` **不会**升级（还是旧镜像），必须 pull + 重建容器（`docker rm` 后按同一条
+  `docker run` 重跑）；
 - 数据在数据卷里（`-v ./data:/app/data`），重建容器不影响；
 - 升级前后对比实测（0.0.5 → 0.0.9，用生产库副本）：节点数、累计流量、metric rollups 全部保留；
 - 服务端在版本变化前会自己备份：`./data/backup/upgrade-<时间>.zip`
   （日志行 `[upgrade-backup] … before upgrade`）；
 - 建议固定版本号（`:0.0.9`）而不是 `:latest`，便于回滚与复现；
-- 默认形态（二进制 + systemd，或容器内替换）就能面板一键升级；只有**只读 rootfs** 等
+- 主方案（Docker 容器内替换）与备选（二进制 + systemd）都能面板一键升级；只有**只读 rootfs** 等
   无法写入二进制的场景才需要按上面手工重建容器（挂 socket 的重建模式是另一条可选路径）。
 
 ### 14.5 安全边界（诚实写明）

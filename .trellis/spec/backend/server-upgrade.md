@@ -72,35 +72,33 @@ DB 路径在 `cmd` 包里，导入会成环；升级本来就要写二进制目�
 
 ---
 
-## 5. 已知遗留：host 网络下容器模式会静默失效（2026-09-19 记录，未修）
+## 5. 已知遗留与部署口径（2026-09-19 定稿）
 
-**症状（可在装出来的实例上复核）**：容器 + `network_mode: host` + 挂了 socket 时，
-"自身容器识别"依赖的两条线索都会失效——hostname 是**宿主名**、cgroup v2 只有 `0::/`；
-`dockerSocketReady`（`internal/upgrade/docker.go:32`）因此拿不到 ID，`Prepare` 落到
-`Mode=container-replace`（`internal/upgrade/upgrade.go:181`）。
+**部署口径（用户 2026-09-19 定稿，只有两条）**：
 
-**后果**：升级当次看起来成功，但**镜像不变**；compose 文件里的 `image:` tag 也不会跟着变，
-于是下一次容器重建 / `docker compose up -d` / 宿主重启会把版本**拉回**文件里的旧 tag。
+- **主方案：Docker 镜像**（`docker run -d --name komari --restart always --network host
+  -v ./data:/app/data ghcr.io/zhemed/komari:latest`）——升级走面板「有新版本」，容器内下载→校验→
+  替换二进制→原地重启（零配置，不需要挂 socket）。
+- **备选：二进制 + systemd**（`install-komari.sh`）。
+- **compose 不用**：已被用户明确要求剔除，仓库里不允许再出现 compose 部署方式或第二套部署自动化。
 
-**为什么记在这里**：这是一次真实失误的根因（详见
-[事故案例：compose 全自动升级](../guides/incident-compose-autosync.md)）。0.0.18 曾修掉它
-（加第三条线索：`/proc/self/mountinfo` 的 bind 挂载比对）并额外做"tag 自动同步"，随后整条弧线
-按用户指令从 **源码** 回滚；**但用户 2026-09-19 明确保留 0.0.18 并按发布版部署**——生产
-`/opt/komari/komari` 现为 0.0.18（sha256 `b5b024ac…` = 已发布资产；面板 `/api/version` 报
-`version=0.0.18`、`hash=4479580f9b61…`；systemd 形态，非 compose）。
+**已知遗留：host 网络容器里的"重建容器"模式不可用（未修，且已停用）**。
 
-**由此产生的一条重要区分**：仓库 `main` 的**源码**是回滚后的 0.0.17 状态，
-而**已发布/正在跑的二进制**是 0.0.18——即"分支源码 vs 发行物"存在差异。改 upgrade 代码前
-先确认你要改的是哪一面：改源码不会影响已在跑的 0.0.18，除非重新发版。
+**症状**：容器 + `network_mode: host` + 挂 socket 时，"自身容器识别"依赖的两条线索都会失效——
+hostname 是**宿主名**、cgroup v2 只有 `0::/`；`dockerSocketReady`（`internal/upgrade/docker.go:32`）
+因此拿不到 ID，`Prepare` 落到 `Mode=container-replace`（`internal/upgrade/upgrade.go:181`）。
 
-**现状与选择**（针对 host 网络 + compose + socket 的部署形态）：
-① 用 `Mode=container-replace`（二进制会新，镜像 tag 旧，重建即回退）；
-② 不用 host 网络（bridge + 端口映射），让 hostname/cgroup 两条线索继续有效；
-③ 用 0.0.18 及以后（含 mountinfo 第三条线索 + tag 自动同步）。
-**注意 ③ 只在容器/compose 形态下有意义**：本仓库生产是 systemd 形态，升降级走
-systemd 分支，与本节无关。
+**后果**：升级当次看起来成功，但**镜像不变**；之后任何一次容器重建（`docker rm` + 同命令重跑）
+都会把版本退回镜像版本。
 
----
+**为什么保留在文档里**：这是一次真实失误的根因（详见
+[事故记录](../guides/incident-compose-autosync.md)）。0.0.18 曾修掉它并额外做了"镜像 tag 自动同步"，
+随后整条弧线按用户指令从**源码**回滚；用户保留 0.0.18 的发行物并按其部署过生产
+（`/opt/komari/komari` = `b5b024ac…`、`version=0.0.18`）。
+
+**对使用者的实际结论**：主方案（Docker + 面板升级）用的是"容器内替换"，**不受这个遗留影响**；
+需要"镜像与版本永远一致"就用固定 tag 重建容器（见 `docs/MAINTAINING.md` §3.4.1）。
+不要为此再引入 compose 或容器 label 检测——那是被拦掉的机制。
 
 ## 6. 测试要求
 

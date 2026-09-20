@@ -30,10 +30,11 @@
 
 其它后端改动，按对应规范文件执行；`.trellis/spec/guides/` 下是跨包思考指引。
 
-**改动部署形态、容器/compose 集成或"版本落地"机制前，先读
-[事故案例：compose 全自动升级](../guides/incident-compose-autosync.md)**（2026-09-19，本仓库最严重
-一次失误）与 [Server Upgrade](./server-upgrade.md) §5 已知遗留：那两处写清了哪些机制已被证明会
-**静默**破坏"已发布 = 正在跑"，以及 `scripts/check-repo.sh` 第 13 项会挡住什么。
+**改动部署形态、容器集成或"版本落地"机制前，先读
+[事故案例：容器自动升级事故记录](../guides/incident-compose-autosync.md)**（2026-09-19，本仓库最严重
+一次失误）与 [Server Upgrade](./server-upgrade.md) §5：那两处写清了哪些机制已被证明会**静默**破坏
+"已发布 = 正在跑"。部署口径只有两条：**主方案 Docker 镜像**（面板一键升级）、备选二进制 + systemd
+（`install-komari.sh`）；`scripts/check-repo.sh` 第 13/14 项会拦住第二套部署自动化与容器 label 依赖。
 
 **写出任何"原因/已定位/已知问题"结论前，先读
 [Evidence & Claims Guide](../guides/evidence-and-claims-guide.md)**（2026-09-17 事故后新增）：

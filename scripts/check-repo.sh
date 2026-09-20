@@ -243,11 +243,12 @@ else
   bad "判别性验证失败：硬规则对历史提交 dd0486a 无告警，等于永远为绿（护栏失效）"
 fi
 
-# ---------- 14. 部署路径唯一（2026-09-19 用户定调后加的守卫） ----------
-# 用户验收 install-komari.sh 后定调：「我们还是用这样的部署命令吧，别用其他的了」。
-# 这条守卫防的不是"容器不能用"，而是**部署自动化在仓库里分叉**：
-# 多一套安装/升级脚本 = 多一条必须在生产上验证的路径，而上一套就是这么出事的。
-head_ "14. 部署路径唯一（install-komari.sh 是唯一部署/升级入口）"
+# ---------- 14. 部署口径（2026-09-19 用户纠偏后重写） ----------
+# 用户定稿：**主方案 = Docker 镜像**（docker run … ghcr.io/zhemed/komari:latest + 面板一键升级），
+# 备选 = 二进制 + systemd（install-komari.sh）；**compose 已明确要求剔除**。
+# 这条守卫防的是"部署口径漂移/再分叉"：多一套部署自动化 = 多一条必须在生产上验证的路径，
+# 而上一套（compose）就是这么出事的。
+head_ "14. 部署口径（Docker 主 + systemd 备；compose 已剔除）"
 # 判据：仓库根（含 scripts/）里带 `deploy-entry:` 标记的只有三个文件——服务器的 install-komari.sh
 # 与 agent 的 install-agent.sh/.ps1。新增任何第二个部署自动化都不该带这个标记，于是被挡下。
 DEPLOY_ALLOWED='install-komari.sh|install-agent.sh|install-agent.ps1'
@@ -271,18 +272,30 @@ grep -q '^BINARY_PATH="\$INSTALL_DIR/komari"$' install-komari.sh \
 grep -q '^WorkingDirectory=\${DATA_DIR}$' install-komari.sh \
   || { bad "install-komari.sh 的 systemd 单元不再以 \${DATA_DIR} 为工作目录（数据路径口径变了）"; DEPLOY_OK=0; }
 if [ "${DEPLOY_OK}" = 1 ]; then
-  ok "唯一部署入口就位：install-komari.sh（含 upgrade_komari 菜单）+ agent 的 install-agent.sh/.ps1；默认 tag = ${VER}"
+  ok "部署口径就位：Docker 主方案 + systemd 备选（install-komari.sh，默认 tag = ${VER}）+ agent 安装脚本；部署自动化未分叉"
 fi
 if [ "${FULL}" = 1 ]; then
   grep -q '^upgrade_komari()' install-komari.sh \
     || { bad "install-komari.sh 里没有 upgrade_komari()——唯一升级路径不能丢"; DEPLOY_OK=0; }
   grep -q 'whiptail\|dialog' install-komari.sh \
     || { bad "install-komari.sh 的 TUI 改成别的实现了（MAINTAINING §3.4.1 的驱动要点会失效，需同步更新）"; DEPLOY_OK=0; }
-  if [ -f README.md ] && ! grep -q '唯一主推的部署路径' README.md; then
-    bad "README 不再声明 install-komari.sh 是唯一主推路径（部署口径被改动了）"; DEPLOY_OK=0
+  # 主方案口径：README 必须以 Docker 镜像为第一条部署命令（用户 2026-09-19 定稿）
+  grep -q 'docker run -d --name komari --restart always' README.md \
+    || { bad "README 不再以 Docker 镜像作为主部署命令（部署口径被改动了）"; DEPLOY_OK=0; }
+  grep -q 'ghcr.io/zhemed/komari:latest' README.md \
+    || { bad "README 缺少 ghcr.io/zhemed/komari:latest 镜像地址"; DEPLOY_OK=0; }
+  grep -q '3\.4\.1 部署口径' docs/MAINTAINING.md \
+    || { bad "MAINTAINING 缺少 §3.4.1「部署口径」"; DEPLOY_OK=0; }
+  # 剔除 compose（用户 2026-09-19 明确要求）：用户面文档与运行代码里都不许再出现。
+  # 必须排除本脚本自身——它得写着这条模式才能查别人（首版没排除，把自己抓了）。
+  COMPOSE_PAT='docker compose|docker-compose|compose\.ya?ml'
+  if git grep -qE "${COMPOSE_PAT}" -- README.md install-komari.sh 'scripts/*.sh' internal/ cmd/ \
+       ':(exclude)scripts/check-repo.sh' 2>/dev/null; then
+    bad "README/安装脚本/运行代码里重新出现 compose——用户已明确要求剔除"
+    git grep -nE "${COMPOSE_PAT}" -- README.md install-komari.sh 'scripts/*.sh' internal/ cmd/ \
+      ':(exclude)scripts/check-repo.sh' | head -5 | sed 's/^/      /'
+    DEPLOY_OK=0
   fi
-  grep -q '3\.4\.1 唯一的部署/升级路径' docs/MAINTAINING.md \
-    || { bad "MAINTAINING 缺少 §3.4.1「唯一的部署/升级路径」"; DEPLOY_OK=0; }
   # 判别性验证：**真的**造一个 install-compose.sh（带 deploy-entry 标记）到仓库根，
   # 守卫必须报出"第二个部署入口"；验证完立刻删掉（trap 保证异常也会清）。
   GUARD_TMP="${REPO_ROOT}/install-compose.sh"
