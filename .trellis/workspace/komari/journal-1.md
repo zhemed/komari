@@ -1707,3 +1707,41 @@
 ### Next Steps
 
 - 若用户要更短可继续压到 ~60 行；compose 事故记录文件是否删除等用户决定
+
+
+## Session 51: 文档精简到极限（README 36 行 / MAINTAINING 98 行）
+<!-- trellis-session: v=2 fp=e8f5b263c375f0c7 -->
+
+**Date**: 2026-09-20
+**Task**: 文档精简到极限（README 36 行 / MAINTAINING 98 行）
+**Branch**: `main`
+
+### Summary
+
+用户：太罗嗦，自用自维护，精简到极限。README 145→36 行、MAINTAINING 877→98 行、删冗余清理报告；并修掉精简造成的 9 处悬空章节引用，把 check-repo 两处判据从'绑定章节号'改成'断言内容'。
+
+### Main Changes
+
+- README：只留 Docker 部署命令（主方案）、agent 两条命令、自检一条、指路一行
+- MAINTAINING：只留操作口径（版本/构建/发版/部署/数据与回滚/agent/自检/本地产物）；叙事与历史留给 .trellis/spec/
+- 删除 docs/CLEANUP-2026-09-19.md（已被 purge-manifest 与 journal 覆盖）
+- check-repo 判据解耦章节号：第 1 项改正则匹配'当前 <版本>'；第 14 项改断言'主方案：Docker 镜像'与'compose 一律不用'
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c2a55bf` | chore(task): archive 09-20-docs-minimal |
+
+### Testing
+
+- [OK] 悬空引用复查：grep 'MAINTAINING.md §[0-9]' = 0
+- [OK] check-repo.sh --full 14 项全绿（含两条判别性验证）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- compose 事故记录文件是否删除，仍等用户决定
