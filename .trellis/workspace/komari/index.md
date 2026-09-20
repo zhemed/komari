@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 57
+- **Total Sessions**: 58
 - **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1856 | Active |
+| `journal-1.md` | ~1891 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 58 | 2026-09-20 | 写入全局规则：给选项必须用交互式提问组件 | `8e634cd` | `main` |
 | 57 | 2026-09-20 | 彻底移除 2FA 并发布 0.0.19（含生产升级） | `275cd50` | `main` |
 | 56 | 2026-09-20 | 走 C：重发干净版 0.0.18（release/镜像/生产全线替换） | `9b7a693` | `main` |
 | 55 | 2026-09-20 | README 重新精简到 36 行 | `5ebc24d` | `main` |

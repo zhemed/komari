@@ -1854,3 +1854,38 @@
 ### Next Steps
 
 - 可选：加一条自检护栏防止 2FA 被重新引入；清理 /opt/komari 历史备份
+
+
+## Session 58: 写入全局规则：给选项必须用交互式提问组件
+<!-- trellis-session: v=2 fp=a64ad496bbc3be42 -->
+
+**Date**: 2026-09-20
+**Task**: 写入全局规则：给选项必须用交互式提问组件
+**Branch**: `main`
+
+### Summary
+
+用户指出我在正文里用文字列选项属偷懒，要求写进 DSH 全局规则。已在全局 ~/.dsh/AGENTS.md 与本仓库 AGENTS.md 各追加 ASK-WIDGET 强制块（托管块之外），要点：多候选/二选一/授权/可选附加动作一律用交互式提问组件，候选带影响说明与推荐标注，判断点当轮就问。
+
+### Main Changes
+
+- 全局 ~/.dsh/AGENTS.md 追加 ASK-WIDGET 段（所有项目生效，系统已重新加载）
+- 本仓库 AGENTS.md 追加同段规则
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e634cd` | docs(rules): 强制规则——给选项必须用交互式提问组件 [task:global-rule-use-question-widget] |
+
+### Testing
+
+- [OK] check-repo.sh 全部通过（文档路径校验不受影响）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用组件再问一次 2FA 自检护栏是否要加
