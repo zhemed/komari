@@ -1671,3 +1671,39 @@
 
 - README 若要更短（用户说'一大段'）可继续压到 ~60 行，等用户反馈
 - compose 事故记录文件（.trellis/spec/guides/incident-compose-autosync.md）是否也一并删除，需用户决定
+
+
+## Session 50: 修：README 删减未落盘（被自己的验证动作覆盖）
+<!-- trellis-session: v=2 fp=1b367b97612c9a72 -->
+
+**Date**: 2026-09-20
+**Task**: 修：README 删减未落盘（被自己的验证动作覆盖）
+**Branch**: `main`
+
+### Summary
+
+发现 9fb8a86 其实没带上 README：我为了验证 compose 守卫，先 cp 备份、截断 README、再 cp 还原，把删减版本覆盖成了 145 行旧版，用户看到的还是旧 README。重做删减并确认落盘，验证改用临时副本，不再对真文件做截断/还原。
+
+### Main Changes
+
+- README 真正落盘：94 行（原 145），Docker 镜像为唯一主方案，compose 零命中
+- 验证方法修正：判别性验证不再碰真文件（用临时副本 / 由自检脚本自身造删临时文件）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b6a0c68` | docs(readme): 真的落盘版——Docker 为唯一主方案、compose 零出现、145→94 行 [task:readme-trim-actually-landed] |
+
+### Testing
+
+- [OK] 落盘确认：git show HEAD:README.md | wc -l = 94；grep -ci compose README.md = 0
+- [OK] check-repo.sh --full 14 项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 若用户要更短可继续压到 ~60 行；compose 事故记录文件是否删除等用户决定
