@@ -1,64 +1,10 @@
 # Komari
 
 自用服务器监控：单个 Go 二进制 + 内嵌 Web 前端，被监控节点装一个轻量 agent 上报指标。
+本仓库由 [zhemed](https://github.com/zhemed) 独立维护，版本线 `0.0.x`，代码源自上游
+[komari](https://github.com/komari-monitor/komari) 1.4.3——**不是上游官方发行版**。
 
-## 特性
-
-- **实时监控**：CPU、内存、磁盘、网络、负载、进程数的实时指标与历史曲线
-- **多节点管理**：分组、标签、隐藏节点、权重与到期/账单信息、卡片/表格两种视图
-- **远程运维**：Web 终端（WebSSH）、远程执行、登录会话管理
-- **延迟监测**：HTTP/TCP/ICMP 定时探测与可用性统计
-- **流量统计**：上下行流量、月重置、流量限额；**累计流量跨重启（含机器重启）不丢**
-- **访问控制**：多用户、两步验证（2FA）、OAuth/OIDC 单点登录、全局 API Key
-- **网络信息**：GeoIP 地区识别、IPv4/IPv6 双栈、网卡与挂载点过滤
-- **主题系统**：内置主题 + 主题市场，可换肤；界面多语言
-- **运维能力**：数据备份与恢复、审计日志、性能分析（pprof）
-- **节点自治**：agent 覆盖 linux/darwin/windows/freebsd 共 14 个平台，支持自动发现注册
-
-## 这个版本与上游的差异
-
-本仓库由 [zhemed](https://github.com/zhemed) 独立维护，版本线 `0.0.x`。代码源自上游
-[komari](https://github.com/komari-monitor/komari) 1.4.3，但此后与上游各走各的路：
-**不是上游官方发行版**，服务端、面板与 agent 的源码都在本仓库内，上游库只作为历史来源。
-
-- **没有插件系统**：插件市场、运行时、上传安装全都不存在；
-- **没有通知系统**：离线/负载/流量/到期/登录通知与 Telegram、Bark、Webhook 等渠道已整体移除——
-  需要告警请自己接外部方案（数据都在本地 SQLite 与 HTTP 接口里）；
-- **默认不自动更新**：服务器与 agent 都不会自己去拉新版本（agent 要跟随发布需显式
-  `--enable-auto-update`）；
-- **agent 也停在 1.4.3 同期**（不跟上游 agent 1.5.x），与服务器同一条血统；
-- **源码全在仓库内**：面板前端（`frontend/`）与 agent（`agent/`）的源码都是本仓库的快照，
-  构建时**不克隆上游、不打补丁**；整套东西可以离线构建（只改后端时连 Node 都不需要）；
-- 主题系统与主题市场保留；仓库历史只包含我们自己的提交。
-
-完整说明见 [docs/MAINTAINING.md](./docs/MAINTAINING.md)。
-
-## 部署
-
-### 环境要求
-
-- Linux（amd64/arm64），systemd 或 Docker
-- 默认端口 **25774**；数据默认放在工作目录的 `./data`（SQLite）
-
-### 一键安装 / 升级（systemd，推荐）
-
-这是**本仓库唯一主推的部署路径**（我们自己的生产就用它，升级也只用它）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhemed/komari/main/install-komari.sh -o install-komari.sh
-sudo bash install-komari.sh
-```
-
-交互式菜单提供安装 / 升级 / 卸载 / 查看状态 / 查看日志 / 重启 / 停止 / 清理升级备份；
-默认装到 `/opt/komari`，创建 `komari.service`（`Restart=always`）。
-
-- **升级也走同一条命令**：再跑一次，菜单里选「2 升级 Komari」（2026-09-19 已验收）；
-  面板的"有新版本"一键升级在 systemd 形态同样可用，但**命令行菜单升级是验收过的那条**。
-- 数据在 `/opt/komari/data/`（SQLite）；升级前自动留二进制备份与数据备份，可回滚。
-
-### 替代方案：Docker 镜像（无需源码）
-
-> **非主推路径**，自行维护即可；需要 compose 时也归在这里，不要再分叉出别的部署方式。
+## 部署（Docker 镜像，唯一主方案）
 
 ```bash
 docker run -d --name komari --restart always \
@@ -67,36 +13,26 @@ docker run -d --name komari --restart always \
   ghcr.io/zhemed/komari:latest
 ```
 
-- 多架构镜像（amd64/arm64），数据保存在宿主机的 `./data`
-- 启动后访问 `http://localhost:25774` 完成初始化
-- **网页一键升级在容器里开箱可用**：面板会在容器内下载新版本、校验、替换二进制并原地重启
-  （不需要任何挂载或额外配置）。
-- 可选：把 `/var/run/docker.sock` 挂进来则改用"拉镜像 + 重建容器"模式——版本与镜像完全一致，
-  但等于把**宿主机 root 等价权限**交给该容器，请自行权衡；
-  不挂 socket 时，**重建容器**（`docker rm + run` / `compose up`）会把二进制退回镜像版本。
-- **host 网络 + 挂 socket 的注意**：0.0.17 及更早在该形态下会静默退回"容器内替换"，
-  镜像 tag 落后、下次重建容器把版本拉回去（0.0.18 修掉了，见 `docs/MAINTAINING.md` §14.2）。
-- 不想用 host 网络时，把 `--network host` 换成 `-p 25774:25774`
+- 多架构镜像（amd64/arm64）；数据在宿主机的 `./data`（SQLite），换镜像/重建容器都不丢
+- 启动后访问 `http://localhost:25774` 完成初始化（首次是安装向导）
+- 不想用 host 网络：把 `--network host` 换成 `-p 25774:25774`
 
-### 方式二：源码构建
+**升级**：管理端「有新版本」弹窗点一下即可——容器里零配置：在容器内下载新版本、校验
+`komari-SHA256SUMS`、替换二进制并原地重启。想固定镜像版本时换 tag 重跑上面那条命令
+（数据在宿主目录，不受影响）。
+
+### 备选：二进制 + systemd
 
 ```bash
-git clone https://github.com/zhemed/komari.git
-cd komari
-
-./scripts/build-komari.sh        # 开发用：动态链接，需 Go ≥1.25 + gcc；前端产物已随仓库下发
-./bin/komari server              # 默认监听 0.0.0.0:25774
-
-# 改了面板前端（frontend/）或 agent（agent/）时
-./scripts/build-frontend.sh      # 需 Node + 网络（npm ci）；重建 web/public/defaultTheme/
-./scripts/build-agent.sh         # 纯 Go 交叉编译，14 个平台
-
-# 发布形态（静态链接，需 zig）与自建镜像
-KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
-./scripts/build-server-image.sh --push
+curl -fsSL https://raw.githubusercontent.com/zhemed/komari/main/install-komari.sh -o install-komari.sh
+sudo bash install-komari.sh        # 交互菜单：安装 / 升级 / 卸载 / 状态 / 日志 / 重启 / 停 / 清理备份
 ```
 
-### 节点安装 agent
+装到 `/opt/komari`（数据 `data/`），创建 `komari.service`（`Restart=always`）；
+升级重跑同一条命令、菜单选「2 升级 Komari」。口径与验收步骤见
+[docs/MAINTAINING.md](./docs/MAINTAINING.md) §3.4.1。
+
+### 节点 agent
 
 面板「节点 → 添加」里生成的就是同款命令（自带自动发现密钥，不必事先建节点）：
 
@@ -110,36 +46,49 @@ docker run -d --name komari-agent --restart always \
   ghcr.io/zhemed/komari-agent:latest -e <面板地址> -t <节点Token>
 ```
 
-- **面板内一键升级服务器**：管理端"有新版本"弹窗里可直接升级或安装指定版本（= 回滚）。
-  二进制 + systemd 形态：下载后校验 `komari-SHA256SUMS`、替换前自检版本行、保留旧二进制备份；
-  容器形态默认就是零配置：在容器内替换二进制并原地重启（不需要挂载、不需要 restart 策略）；
-  可选把 `/var/run/docker.sock` 挂进来改用"拉镜像 + 重建容器"模式（版本与镜像完全一致，
-  等于把宿主 root 等价权限交给该容器，请自行确认）。
-- agent 由本仓库发布（与服务器同一条 `0.0.x` 线、同一个 release），**默认不自动升级**；
-  要跟随发布加 `--enable-auto-update`（或环境变量 `AGENT_ENABLE_AUTO_UPDATE=1`）
-- Windows 用 `install-agent.ps1`；全部平台/架构见 release 资产列表
-- 容器里 agent 会跳过二进制自更新，升级请换镜像
+agent 默认**不自动升级**；要跟随发布加 `--enable-auto-update`（或 `AGENT_ENABLE_AUTO_UPDATE=1`）。
+Windows 用 `install-agent.ps1`；全部平台见 release 资产列表（14 个平台）。
+
+## 源码构建
+
+服务端、面板前端（`frontend/`）与 agent（`agent/`）源码都在本仓库内，构建**不克隆上游**、可离线：
+
+```bash
+./scripts/build-komari.sh      # 本机二进制（需 Go；前端产物已随仓库下发）
+./scripts/build-agent.sh       # agent 全 14 平台
+./scripts/build-frontend.sh    # 仅改了 frontend/ 时需要（需 Node）
+```
+
+## 特性
+
+- **实时监控**：CPU、内存、磁盘、网络、负载、进程数，历史曲线与聚合查询
+- **多节点管理**：分组、标签、隐藏、权重、到期/账单、卡片与表格视图
+- **流量统计**：上下行、月重置、限额；累计流量跨重启不丢
+- **延迟监测**：HTTP/TCP/ICMP 定时探测与可用性统计
+- **远程运维**：Web 终端（WebSSH）、远程执行、会话管理
+- **访问控制**：多用户、2FA、OAuth/OIDC 单点登录、全局 API Key
+- **其它**：GeoIP 地区识别、IPv4/IPv6 双栈、主题与主题市场、多语言、备份恢复、审计日志
+
+### 与上游的差异
+
+- **没有插件系统**（插件市场/运行时/上传安装均不存在）
+- **没有通知系统**（离线/负载/流量/到期/登录通知与各渠道已整体移除；需要告警请接外部方案）
+- **默认不自动更新**（服务器与 agent 都只在显式要求时更新）
+- agent 与服务器同一条血统（停在 1.4.3 同期），不跟上游 agent 1.5.x
 
 ## 构建与维护
 
-维护者视角的内容都在 [docs/MAINTAINING.md](./docs/MAINTAINING.md)：构建契约与版本固定、
-前后端与 agent 源码（都在本仓库内）、发布清单、agent 发行线、容器镜像、数据目录与备份、回滚方式。
-提交前自检（一条命令，含版本口径/文档锚点/产物哈希/Trellis 流程闸门）：
+维护者文档：[docs/MAINTAINING.md](./docs/MAINTAINING.md)（构建契约、发布清单、agent 发行线、
+容器镜像、数据与备份、回滚方式、部署口径）。提交前自检：
 
 ```bash
 ./scripts/check-repo.sh          # 秒级；发版前用 --full 追加 Go 门禁、离线构建、agent 门禁
 ```
 
-想单独跑 Go 三件套也行：`go build ./... && go vet ./... && go test ./...`
-
 ## 维护与许可
 
-本项目由 [zhemed](https://github.com/zhemed) 维护，版本线 `0.0.x`（发版递增 patch 位）。
 以 MIT 许可发布，见 [LICENSE](./LICENSE)；第三方组件归属见 [NOTICE](./NOTICE)。
-
-历史来源（仅作来源说明，不代表本仓库与上游同步）：服务端与面板源自
-[komari-monitor/komari](https://github.com/komari-monitor/komari) `1.4.3`（commit `bf6b45ec`）与
-[komari-monitor/komari-web](https://github.com/komari-monitor/komari-web) `1.4.3`
-（commit `4a74e8a8`），agent 源自
-[komari-monitor/komari-agent](https://github.com/komari-monitor/komari-agent) 的 1.4.3 同期提交
-（commit `1186aafb`）。上游版权归其作者所有。
+历史来源（仅作来源说明，不代表与上游同步）：服务端与面板源自
+[komari-monitor/komari](https://github.com/komari-monitor/komari) `1.4.3`（`bf6b45ec`）与
+[komari-monitor/komari-web](https://github.com/komari-monitor/komari-web) `1.4.3`（`4a74e8a8`），
+agent 源自 komari-agent 1.4.3 同期（`1186aafb`）。上游版权归其作者所有。
