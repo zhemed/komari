@@ -1631,3 +1631,43 @@
 ### Next Steps
 
 - 等用户决定 /opt/docker/komari 与 /opt/komari 历史备份是否清理
+
+
+## Session 49: 纠正部署口径：Docker 镜像为主方案，README 删减，compose 剔除
+<!-- trellis-session: v=2 fp=17774108923128c5 -->
+
+**Date**: 2026-09-20
+**Task**: 纠正部署口径：Docker 镜像为主方案，README 删减，compose 剔除
+**Branch**: `main`
+
+### Summary
+
+用户纠正我上一轮的读反：主方案是 README 那条 docker run（Docker 镜像），README 要大面积删减，compose 已说过有严重 bug 必须彻底剔除。先用用户原命令做判别性验证（临时容器 + 换端口），再重写 README/MAINTAINING/spec 口径，并把 compose 禁入做成自检第 14 项的判据（含两条判别性验证）。
+
+### Main Changes
+
+- README：Docker 为第一条且标为唯一主方案，systemd 降为备选，compose 零出现；145 → 94 行
+- MAINTAINING §3.4.1 重写为「部署口径」：Docker 主 + systemd 备 + compose 禁止；验收清单含容器/systemd 两套命令
+- spec：server-upgrade §5、backend/index 改为 Docker 主口径；§14.2 警示不再以 compose 为主语
+- check-repo 第 14 项：compose 禁入（扫 README/install/scripts/internal/cmd，排除检查脚本自身，命中即报红并打行号）+ 部署自动化不分叉
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9fb8a86` | docs+check: Docker 镜像定为主方案、README 删减（145→94 行）、compose 彻底剔除 [task:docker-primary-readme-trim] |
+
+### Testing
+
+- [OK] 判别性验证：用户原命令实测起容器成功（镜像 e731121a… = 0.0.18，Created 09-18 14:48），面板 HTTP 200，验完清理
+- [OK] 判别性验证：README 加一行 docker compose up -d → 第 14 项报红并指行号；还原 → 通过
+- [OK] check-repo.sh --full 14 项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- README 若要更短（用户说'一大段'）可继续压到 ~60 行，等用户反馈
+- compose 事故记录文件（.trellis/spec/guides/incident-compose-autosync.md）是否也一并删除，需用户决定

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 48
-- **Last Active**: 2026-09-19
+- **Total Sessions**: 49
+- **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1633 | Active |
+| `journal-1.md` | ~1673 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 49 | 2026-09-20 | 纠正部署口径：Docker 镜像为主方案，README 删减，compose 剔除 | `9fb8a86` | `main` |
 | 48 | 2026-09-19 | 定稿唯一部署路径：install-komari.sh（用户验收后） | `d43ce46` | `main` |
 | 47 | 2026-09-19 | 按用户决定保留 0.0.18，并用仓库部署命令把生产升上去 | `4b24cc2` | `main` |
 | 46 | 2026-09-19 | compose 事故复盘：把最严重的失误写死成规范 | `613c143` | `main` |
