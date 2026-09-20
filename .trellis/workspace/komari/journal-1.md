@@ -1923,3 +1923,41 @@
 ### Next Steps
 
 - 可选：清理 /opt/komari 历史备份与恢复分支 pre-rollback-0.0.19
+
+
+## Session 60: 移除面板「文档」入口并发布 0.0.20（含生产升级）
+<!-- trellis-session: v=2 fp=2b7b0700d3628bc0 -->
+
+**Date**: 2026-09-20
+**Task**: 移除面板「文档」入口并发布 0.0.20（含生产升级）
+**Branch**: `main`
+
+### Summary
+
+用户问面板「文档」能否彻底移除。盘点出 4 处（面板两处 + agent 一处 + 维护文档一处），用户选定只清面板两处并发布 0.0.20。删除菜单项 common.documentation 与设置页「帮助」按钮及其两个 i18n 键，重建前端产物，发版并升级生产；全程先提交后构建。
+
+### Main Changes
+
+- menuConfig.json 删除底部「文档」菜单项；settings/general.tsx 删除「帮助」按钮
+- i18n：删 common.documentation 与 common.help（5 语言包各 2 行）
+- 版本 0.0.20；前端哈希 ea42b1ee…；release 18 资产；镜像 :0.0.20/:latest
+- 生产升级到 0.0.20（备份 komari.backup.20260920_030111）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7f1ec2c` | feat(frontend)!: 移除面板「文档」入口与设置页帮助按钮 → 0.0.20 [task:remove-docs-entry-0-0-20] |
+
+### Testing
+
+- [OK] 生产二进制内 komari-document.pages.dev 0 处；面板 200；agent online (v2)；日志 0 错误
+- [OK] check-repo.sh --full 全绿；release digest 与本地产物逐一一致
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：清理 /opt/komari 历史备份与恢复分支
