@@ -1746,3 +1746,38 @@
 ### Next Steps
 
 - 生产仍 0.0.18，未动；如需与仓库/镜像对齐无需操作
+
+
+## Session 55: README 重新精简到 36 行
+<!-- trellis-session: v=2 fp=0f76f63d5682066e -->
+
+**Date**: 2026-09-20
+**Task**: README 重新精简到 36 行
+**Branch**: `main`
+
+### Summary
+
+回滚后 README 是 94 行；用户要求重新精简，直接从恢复分支 pre-rollback-0.0.19 取回当时那版 36 行稿，体检（compose 0 命中、Docker 主命令在首位、版本声明 0.0.18、自检 14 项全绿）后提交。
+
+### Main Changes
+
+- README 94 → 36 行：只留定位一行、Docker 部署命令、agent 两条命令、自检一条、指路一行
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5ebc24d` | docs(readme): 重新精简到 36 行（取回当时的极限精简稿） [task:readme-trim-again] |
+
+### Testing
+
+- [OK] 自检 --full 14 项全绿（第 14 项守卫与 36 行版兼容）
+- [OK] README 里 compose 0 命中、docker 主命令 1 处、版本声明 0.0.18
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如还需更短可再压（但信息密度已到极限）

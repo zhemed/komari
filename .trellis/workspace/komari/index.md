@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 54
+- **Total Sessions**: 55
 - **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1748 | Active |
+| `journal-1.md` | ~1783 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 55 | 2026-09-20 | README 重新精简到 36 行 | `5ebc24d` | `main` |
 | 54 | 2026-09-20 | 全部回滚：仓库/发布/镜像回到 0.0.18（含 compose 起点定位） | `9c1ff36` | `main` |
 | 50 | 2026-09-20 | 修：README 删减未落盘（被自己的验证动作覆盖） | `b6a0c68` | `main` |
 | 49 | 2026-09-20 | 纠正部署口径：Docker 镜像为主方案，README 删减，compose 剔除 | `9fb8a86` | `main` |
