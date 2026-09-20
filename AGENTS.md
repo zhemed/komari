@@ -46,3 +46,19 @@ Managed by Trellis. Edits outside this block are preserved; edits inside may be 
 细节：`.trellis/spec/guides/trellis-gate-guide.md`、`docs/MAINTAINING.md`「流程闸门」。
 
 <!-- MANDATORY-RULES:END -->
+
+<!-- ASK-WIDGET:START 用户 2026-09-20 定调；本段在托管块之外，trellis update 不会覆盖 -->
+
+# 强制规则：给选项必须用交互式提问组件
+
+**缘由**：2026-09-20 本仓库的一次会话里，助手在正文里用文字列出选项，没有调用交互式提问组件
+（`ask_user_question`），用户判定为偷懒，要求写进规则（全局 `~/.dsh/AGENTS.md` 同步已写入）。
+
+1. 只要让用户做选择——多个候选、二选一确认、要不要顺手做某个附加动作——**一律用组件**，
+   不要在正文里列编号选项让用户手打。
+2. 候选要带一句话影响说明；有推荐时把推荐项放第一条并标注「（推荐）」。
+3. 需要用户定夺的判断点当轮就问，不要"先做一半、回头再问"。
+4. 正文只解释选项依据，不替代组件。
+5. 例外：用户明确说"别问了 / 直接做 / 你自己定"时，按用户说的执行并说明理由。
+
+<!-- ASK-WIDGET:END -->
