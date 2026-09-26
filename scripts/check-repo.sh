@@ -36,7 +36,25 @@ check_literal() {
 check_literal install-komari.sh "REPO_TAG=\"\${KOMARI_TAG:-${VER}}\"" "install-komari.sh REPO_TAG"
 check_literal install-agent.sh "^default_agent_version=\"${VER}\"$" "install-agent.sh default_agent_version"
 check_literal install-agent.ps1 "^\\\$DefaultAgentVersion = \"${VER}\"$" "install-agent.ps1 \$DefaultAgentVersion"
-if grep -qF "**当前版本：\`${VER}\`**" docs/MAINTAINING.md; then ok "MAINTAINING 里声明的当前版本 = ${VER}"; else bad "MAINTAINING 里声明的当前版本不是 ${VER}（应含 **当前版本：\`${VER}\`**）"; fi
+# 当前版本声明必须与 version.env 一致——**两处都查**（2026-09-26 修 README 漂到 0.0.18 时发现：
+# 原来只查 MAINTAINING，README 写死版本号从未被校验，升了几版都没人发现）
+ver_declare_ok=1
+if grep -qF "**当前版本：\`${VER}\`**" docs/MAINTAINING.md; then
+  ok "MAINTAINING 里声明的当前版本 = ${VER}"
+else
+  bad "MAINTAINING 里声明的当前版本不是 ${VER}（应含 **当前版本：\`${VER}\`**）"; ver_declare_ok=0
+fi
+README_VER="$(grep -oE '（当前 0\.0\.[0-9]+）' README.md 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+if [ -z "${README_VER}" ]; then
+  bad "README 里找不到当前版本声明（应含「（当前 ${VER}）」）"; ver_declare_ok=0
+elif [ "${README_VER}" = "${VER}" ]; then
+  ok "README 的当前版本声明 = ${VER}"
+else
+  bad "README 的当前版本声明是 ${README_VER}，与 version.env（${VER}）不一致"; ver_declare_ok=0
+fi
+if [ "${ver_declare_ok}" = 1 ]; then
+  ok "文档版本声明一致（不依赖 scripts/version.env 之外的写死值）"
+fi
 if git describe --tags --exact-match >/dev/null 2>&1; then
   [ "$(git describe --tags --exact-match)" = "${VER}" ] \
     && ok "当前提交正好是 tag ${VER}" \
