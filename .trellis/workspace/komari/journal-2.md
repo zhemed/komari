@@ -43,3 +43,39 @@
 ### Next Steps
 
 - 可选：清掉语言包里已无用的 upgrade.install_version 键；清理历史备份与恢复分支
+
+
+## Session 62: 修 README 过期版本号（0.0.18→0.0.21）+ 自检纳入文档版本声明
+<!-- trellis-session: v=2 fp=e7e12a356b144cf2 -->
+
+**Date**: 2026-09-26
+**Task**: 修 README 过期版本号（0.0.18→0.0.21）+ 自检纳入文档版本声明
+**Branch**: `main`
+
+### Summary
+
+用户问 README 里的「当前 0.0.18」是否最新——核查真源全是 0.0.21，README 是陈旧文案（三次升版漏同步）。根因是自检第 1 项只查 MAINTAINING、从不查 README。已修 README，并把两处文档版本声明都纳入自检，带判别性验证。
+
+### Main Changes
+
+- README：「（当前 0.0.18）」→「（当前 0.0.21）」
+- check-repo 第 1 项：MAINTAINING + README 双查，任一与 version.env 不一致即报红
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dd653ce` | chore(task): archive 09-26-fix-readme-stale-version |
+
+### Testing
+
+- [OK] 判别性验证：README 改回 0.0.18 → 报红并指出不一致；还原 → 通过
+- [OK] check-repo.sh --full 全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：语言包里 upgrade.install_version 已无用键；清理历史备份与恢复分支

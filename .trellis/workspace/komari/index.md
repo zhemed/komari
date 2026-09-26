@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 61
-- **Last Active**: 2026-09-20
+- **Total Sessions**: 62
+- **Last Active**: 2026-09-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~45 | Active |
+| `journal-2.md` | ~81 | Active |
 | `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 62 | 2026-09-26 | 修 README 过期版本号（0.0.18→0.0.21）+ 自检纳入文档版本声明 | `dd653ce` | `main` |
 | 61 | 2026-09-20 | 升级弹窗按钮去重并发布 0.0.21（含生产升级） | `3977f5a` | `main` |
 | 60 | 2026-09-20 | 移除面板「文档」入口并发布 0.0.20（含生产升级） | `7f1ec2c` | `main` |
 | 59 | 2026-09-20 | 自检第 15 项：2FA 护栏（防重新引入） | `ef66141` | `main` |
