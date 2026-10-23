@@ -115,3 +115,39 @@
 ### Next Steps
 
 - 实现方案 B：新建任务，写 design.md + implement.md（节点级重置日 + 时区；agent 回单调计数器；面板不动）
+
+
+## Session 64: 实现方案 B：服务端算流量周期（阶段 1-3）
+<!-- trellis-session: v=2 fp=5b9700eb5b344517 -->
+
+**Date**: 2026-10-23
+**Task**: 实现方案 B：服务端算流量周期（阶段 1-3）
+**Branch**: `main`
+
+### Summary
+
+按用户裁决实现方案 B：节点级重置日+时区、服务端周期边界与周期累计，累计语义与面板口径不变。两条写入线并行（代码 = worker-core，文档 = worker-docs），Lead 复核后两次打回：① 既有行首次启用会把 period_started_at 写成零值⇒下轮产生虚假重置事件（已修 + 红绿测试）；② 库里非法配置会清空周期值（改三态：invalid 保留现值 + WARN）。附带 tzdata 兜底 import。
+
+### Main Changes
+
+- models/period.go/traffic.go/period_config.go/client.go/admin.client.go/common.go/main.go + 文档两处
+- 输出追加 net_period_up/down（net_total_* 未动，面板不改）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `323f907` | feat(traffic): 服务端计算流量周期（节点级重置日 + 时区）[task:traffic-period-server-side] |
+
+### Testing
+
+- [OK] database/clients 20 用例 + jsonrpc 契约用例全绿；两条新用例先在旧行为上 FAIL 再 PASS
+- [OK] go build/vet/test 全绿；check-repo.sh --full 15 项全绿；Lead 复跑关键 3 条测试
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 阶段 5：无 tzdata 容器验证 + 跨真实重置日观察（需授权起本地实例）；决定是否发版
