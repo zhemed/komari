@@ -1,5 +1,7 @@
 # Komari
 
+> **独立维护**：本仓是我们自维护的唯一权威来源，**内核与主题均不再跟随任何上游** —— 规则见 [ops-docs/INDEPENDENCE.md](ops-docs/INDEPENDENCE.md)。
+
 自用服务器监控：单个 Go 二进制 + 内嵌面板，节点装轻量 agent 上报。版本线 `0.0.x`（当前 0.0.24）。
 
 ## 部署
