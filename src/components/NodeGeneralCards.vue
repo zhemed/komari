@@ -19,6 +19,7 @@ import {
   getExpiryDays,
   getHighLoadMetrics,
   getRealtimeTotalSpeed,
+  getTrafficUsage,
   getTrafficUsed,
   getTrafficUsedPercentage,
   isExpiringNode,
@@ -339,9 +340,17 @@ const onlineStats = computed<OnlineStats>(() => {
 
 const totalSpeed = computed(() => onlineStats.value.totalSpeed)
 
+/** 概览「流量」汇总：与节点卡片同源的口径解析（周期优先、未配置/未开始回落累计） */
 const totalTraffic = computed(() => {
-  const up = summaryNodes.value.reduce((sum, node) => sum + (node.net_total_up || 0), 0)
-  const down = summaryNodes.value.reduce((sum, node) => sum + (node.net_total_down || 0), 0)
+  let up = 0
+  let down = 0
+
+  for (const node of summaryNodes.value) {
+    const usage = getTrafficUsage(node)
+    up += usage.usedUp
+    down += usage.usedDown
+  }
+
   return { up, down }
 })
 
@@ -536,7 +545,7 @@ function getCardDefinition(key: GeneralCardKey): GeneralMetricCard {
     case 'totalTraffic':
       return {
         key: 'totalTraffic',
-        label: '累计流量',
+        label: '本周期流量',
         icon: 'tabler:download',
         value: totalTrafficTooltip.value.value,
         unit: totalTrafficTooltip.value.unit,
