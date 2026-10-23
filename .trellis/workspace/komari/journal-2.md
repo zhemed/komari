@@ -79,3 +79,39 @@
 ### Next Steps
 
 - 可选：语言包里 upgrade.install_version 已无用键；清理历史备份与恢复分支
+
+
+## Session 63: 扫描残留 Trellis 任务 + 验证闸门恢复
+<!-- trellis-session: v=2 fp=a31ada065a872bb2 -->
+
+**Date**: 2026-10-23
+**Task**: 扫描残留 Trellis 任务 + 验证闸门恢复
+**Branch**: `main`
+
+### Summary
+
+用户要求扫描项目残留任务并顺便验证修好的 Trellis 闸门。闸门放行侧确认恢复（普通命令/grep/team_task_create/spawn_teammate/task.py start 全部通过，上一轮会被拦）；拦截侧未验证。只读扫描结论：活动区仅 2 个 in_progress 且均未提交、归档区 65 条零坏账、悬空指针 0、孤立目录 0。已按用户裁决提交两个任务目录留痕，归档 traffic 排查任务，本轮 audit 任务收尾归档。
+
+### Main Changes
+
+- 提交 traffic 任务目录（含结论与裁决：方案 B / 面板不改）并归档
+- 提交 audit 任务目录，勾选验收并记录扫描结果与闸门验证表
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c86de3c` | chore(task): 提交残留扫描任务并归档 traffic 排查任务 [task:leftover-task-audit] |
+
+### Testing
+
+- [OK] 闸门：普通命令 / grep / team_task_create / spawn_teammate / task.py start 全部通过（实测）
+- [OK] 扫描：归档 65/65 一致、缺件 0、重复 0、悬空 0（Lead 独立复核归档数、重复 name、未跟踪项）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 实现方案 B：新建任务，写 design.md + implement.md（节点级重置日 + 时区；agent 回单调计数器；面板不动）
