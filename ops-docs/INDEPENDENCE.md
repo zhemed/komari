@@ -153,3 +153,22 @@ cd themes/ink && bun audit          # 本机 bun 1.4.2 已带该子命令
 3. 主题：`cd themes/ink && bun update`（或对上述 7 个包定向升级）→ `bun run lint` + `./build.sh` 验证；
 4. 把"`bun audit` 需切官方源（默认镜像站不支持 advisories 接口）"补进 `ops-docs/BUILD.md`；
 5. 下次自查：**一个月内**或出现重大 CVE 时立即执行，并在本节追加一行结果。
+
+### 6.5 修复结果（2026-10-23，同一轮授权内）
+
+| 项 | 修复前 | 修复后 |
+|---|---|---|
+| 内核 `govulncheck ./...` | 13 项影响调用路径（退出码 3） | **0 项**（退出码 0，`No vulnerabilities found`；另有 2 项在依赖模块中但**不可达**） |
+| Go 工具链 | go1.26.6 | **go1.26.10**（`go mod edit -toolchain=go1.26.10`，由 Go 自动下载；未替换系统 Go） |
+| golang.org/x/net | v0.41.0 | **v0.60.0** |
+| golang.org/x/text | v0.33.0 | **v0.42.0**（x/net v0.60.0 要求 ≥ v0.42.0） |
+| 连带升级 | — | x/crypto v0.57.0、x/sync v0.23.0、x/sys v0.48.0；`go` 指令 1.25.0 → 1.26.0 |
+| 主题 `bun audit` | 20 项（3 critical / 9 high / 7 moderate / 1 low） | **1 项（1 high）**：`braces@3.0.3` |
+| 主题升级 | — | brace-expansion 1.1.21/2.1.7/5.0.12、postcss-selector-parser 7.1.7、shell-quote 1.12.0、source-map-js 1.2.2、vite 7.3.7、tinypool 2.2.0（经 `overrides`） |
+
+**残留 1 项说明（可接受）**：`braces@3.0.3`（GHSA-vfj7-8cjw-p6xm，high，嵌套模式导致栈溢出 DoS）——
+上游**最新发布版就是 3.0.3**，而公告影响范围是 `<=3.0.3` ⇒ **当前不存在可升级到的修复版本**。
+影响面：仅出现在 `chokidar` / `micromatch`（devDependency 链：`vue-router`、`vite-plugin-static-copy`、`fast-glob`），
+且其输入是我们自己的 glob 模式，不来自不可信来源 ⇒ 记为**可接受残留**，下次自查复查（上游一发修复版即可升级）。
+
+**版本**：内核 `0.0.24+own.2`（镜像 `komari-own:0.0.24-own.2`）；主题仍 **0.0.1**（本轮只动 devDependency，线上主题产物无需变更）。
