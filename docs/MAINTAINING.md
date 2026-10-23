@@ -266,7 +266,7 @@ docker logs --tail 50 komari | grep -ciE 'error|fail|panic'
 systemd 形态则用 `systemctl is-active komari` 与 `journalctl -u komari --since '10 min ago'`。
 无论哪种形态，再看一眼面板：节点在、agent 显示 online、最近流量在涨。
 
-**非交互执行时的三个坑（2026-09-19 全踩过，记以免重犯）**：
+**非交互执行时的五个坑（2026-09-19 全踩过；第 4/5 条 2026-10-23 补，记以免重犯）**：
 
 1. 脚本是 **TUI（whiptail）**，要有**控制终端**：`script -qec ...` 不够（日志里会留下
    `[<not executed on terminal>]`，菜单直接取消、**什么都没做也不会报错**）。要用 pty
@@ -274,6 +274,10 @@ systemd 形态则用 `systemctl is-active komari` 与 `journalctl -u komari --si
 2. 菜单用**方向键**选，不是数字键：直接发 `2` 会被当成默认项（安装），得到"已安装"提示。
 3. `pexpect` 默认按 ASCII 解码：中文输出抛 `UnicodeEncodeError`；用 `encoding=None` 走字节匹配，
    且 `expect()` 不收元组（要写成单条正则）。
+4. **TUI 模式下不打印横幅**：别拿 "Komari Monitoring" 之类横幅文本当同步锚点——2026-10-23 实测
+   raw 流里命中数为 0，等待直接超时（等不到）。改用**菜单项文本**做锚点。
+5. 驱动脚本里的 digest / 期望值一律**从 `sha256sum` 与脚本/API 输出直接取**，不要手打：
+   本轮手打的 digest 少 2 个字符 ⇒ 轮询条件永远为假。
 
 **回滚**：把 `/opt/komari/komari` 换回上一个 `komari.backup.<时间戳>` 并 `systemctl restart komari`；
 数据用 `data/backup/upgrade-<时间戳>.zip`（升级前的自动备份）。
@@ -672,6 +676,25 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
   0.0.4 实测：四个 tag 全部匿名可拉，服务器镜像匿名 `docker run` 后 `/install` 200、
   数据落在挂载卷。
 - Dockerfile 里带 `org.opencontainers.image.source` 标签，ghcr 包页面会链回本仓库。
+- **验收必须查"载荷"**：只查平台清单 + 匿名可拉**查不出载荷架构错**——2026-10-23 实测 0.0.4…0.0.21 的
+  arm64 / armv7 腿里装的其实是 amd64 二进制（多轮发布都这样"通过"了验收），真实 ARM 硬件上根本起不来。
+  根因：`Dockerfile` / `Dockerfile.agent` 在 stage 内**带默认值**声明 `ARG TARGETOS=linux` /
+  `ARG TARGETARCH=amd64`，默认值覆盖 buildx 按平台注入的值 ⇒ 每一腿都 COPY amd64 产物；修法（`95085a3`）
+  = stage 内**不带默认值**（现代 `docker build` 即 BuildKit，会自动注入）。**修好后仍要逐平台复核载荷**
+  （按平台 mapping：komari→`dist/komari-linux-amd64|arm64` + `komari-SHA256SUMS`；agent 同目录 `SHA256SUMS`）：
+  ```bash
+  for s in "komari:latest linux/arm64 /app/komari komari-linux-arm64" \
+           "komari-agent:latest linux/arm64 /app/komari-agent komari-agent-linux-arm64" \
+           "komari-agent:latest linux/arm/v7 /app/komari-agent komari-agent-linux-arm"; do
+    set -- $s; id="$(docker create --platform "$2" "ghcr.io/zhemed/$1")"
+    docker cp "$id:$3" /tmp/p && docker rm "$id" >/dev/null
+    ( cd dist && sha256sum -c <(printf '%s  %s\n' "$(sha256sum /tmp/p | cut -d' ' -f1)" "$4") )
+    od -An -tx1 -j18 -N2 /tmp/p   # ELF e_machine：amd64 3e00 / arm64 b700 / armv7 2800（小端 02 80）
+  done
+  ```
+  期望值**只从 dist/ 的清单取**（手打 digest 少 2 字符 ⇒ 轮询永假，见 §3.4.1 坑 5）。
+  跨架构取证要 `tonistiigi/binfmt --install arm64,arm`（特权 + 网络，**需授权**）；`docker cp` 不跑容器，
+  但构建/运行非本机架构仍要 qemu。
 
 ### 11.5 为什么停在 1.4.3 同期 agent（而不是上游最新的 agent）
 
