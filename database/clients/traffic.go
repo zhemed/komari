@@ -37,7 +37,9 @@ var (
 // InitTrafficTotals 把持久累计与周期状态读进内存。写路径（AccumulateTraffic）会同步更新内存，
 // 因此面板读取不需要每次都查库。由 internal/server 在 metric store 就绪后调用。
 //
-// 注意：内存缓存 ⇒ **直接改库不会立刻生效**，必须重启服务端（见 docs/MAINTAINING.md §3.7）。
+// 注意：周期与累计状态在内存里有快照（本函数启动时载入）。直接改库后，**下一次上报会重新读库
+// 并回写快照**，此时面板与库一致；若该节点不再上报，则必须重启服务端才生效
+// （见 docs/MAINTAINING.md §3.7）。
 func InitTrafficTotals() error {
 	db := dbcore.GetDBInstance()
 	var rows []models.ClientTrafficTotal
