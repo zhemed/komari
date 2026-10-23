@@ -95,11 +95,11 @@ func publicGetMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 	}
 	u := meta.User
 	return map[string]any{
-		"username":    u.Username,
-		"logged_in":   true,
-		"uuid":        u.UUID,
-		"sso_type":    u.SSOType,
-		"sso_id":      u.SSOID,
+		"username":  u.Username,
+		"logged_in": true,
+		"uuid":      u.UUID,
+		"sso_type":  u.SSOType,
+		"sso_id":    u.SSOID,
 	}, nil
 }
 

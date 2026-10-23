@@ -20,6 +20,14 @@ CLI 绑定见 `cmd/root.go:39-40`（`--db-type` / `--database`，默认 `./data/
   - 首次见到节点用计数器做**基线**，不重复累加当次增量；
   - 增量可能为 0（计数器没变），此时跳过写库但**不要**把行删掉；
   - 读路径是内存快照（`GetAllTrafficTotals`），重启时由 `InitTrafficTotals()` 重新加载。
+  - **周期字段**（`PeriodUp` / `PeriodDown` / `PeriodStartedAt` / `NeedsRebaseline`，实现中）是**附加**口径，
+    不改变上面的累计语义。改这条链路必须保持的不变量：累计只增不回退；只有跨周期边界才归零周期值，
+    计数器归零（重启/换机）不归零；再基线只更新基线、不加增量；`TrafficResetDay = 0`（禁用）时行为与
+    改动前零差异。窗口计算与非法配置（越界/非法时区）**拒绝保存**的语义见
+    `docs/MAINTAINING.md`「流量周期」。
+  - 测试要求（`go test ./database/... -run Traffic`）：边界计算（UTC / Asia/Shanghai / 小月 31 日 / 跨年）；
+    非法配置（`-1`、`32`、`Not/AZone`）报错且不落库；跨边界累加（周期归零、累计不回退）；
+    计数器归零不归零周期；再基线（切换后首次 `delta = 0`）；禁用配置回归。
 
 ## 1. GORM 模型风格（`database/models/*.go`）
 

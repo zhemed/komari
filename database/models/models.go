@@ -40,8 +40,13 @@ type Client struct {
 	Hidden           bool       `json:"hidden" gorm:"default:false"`
 	TrafficLimit     int64      `json:"traffic_limit" gorm:"type:bigint"`
 	TrafficLimitType string     `json:"traffic_limit_type" gorm:"type:varchar(10);default:'max'"` // 流量阈值类型：sum max min up down
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	// 服务端流量周期（本仓库自有扩展，见 database/clients/traffic.go 与
+	// docs/MAINTAINING.md §3.7）：由服务端按"重置日 + 时区"自行划周期边界，
+	// 面板展示的累计口径不变。
+	TrafficResetDay      int       `json:"traffic_reset_day" gorm:"type:int;not null;default:0"`               // 0 = 禁用；1..31 = 每月重置日
+	TrafficResetTimezone string    `json:"traffic_reset_timezone" gorm:"type:varchar(64);not null;default:''"` // IANA 名称；空 = UTC（不用服务器本地时区）
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // User represents an authenticated user

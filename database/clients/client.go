@@ -233,6 +233,11 @@ func SaveClient(updates map[string]interface{}) error {
 			}
 		}
 	}
+	// 服务端流量周期配置：越界/非法值在这里拒绝，**不落库**（见 period_config.go）。
+	// 校验通过后归一化写回（空时区 ⇒ "UTC"）；只给一个字段时另一个保持库中现值。
+	if err := normalizeTrafficPeriodUpdates(clientUUID, updates); err != nil {
+		return err
+	}
 	if value, exists := updates["expired_at"]; exists {
 		switch typed := value.(type) {
 		case nil:
@@ -263,4 +268,20 @@ func SaveClient(updates map[string]interface{}) error {
 		return err
 	}
 	return nil
+}
+
+// normalizeTrafficPeriodUpdates 校验并归一化 update 里的流量周期字段。
+// 单独包一层是为了在 SaveClient 内部取旧值（只给一个字段时另一个要保持现值）。
+func normalizeTrafficPeriodUpdates(uuid string, updates map[string]interface{}) error {
+	_, dayProvided := updates[TrafficResetDayKey]
+	_, tzProvided := updates[TrafficResetTimezoneKey]
+	if !dayProvided && !tzProvided {
+		return nil
+	}
+	old, err := LoadTrafficPeriodConfig(uuid)
+	if err != nil {
+		return err
+	}
+	_, err = NormalizeTrafficPeriodFields(updates, old.ResetDay, old.Timezone)
+	return err
 }

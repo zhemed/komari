@@ -288,7 +288,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	latest := agent_runtime.GetLatestReport() // map[string]*v1.Report (copy)
 	// 跨重启的流量累计（本仓库自有扩展）：卡片“总流量”与流量阈值进度用它，
 	// 而不是 agent 报的“开机以来计数器”——后者在机器重启后会归零。
-	// 见 database/models/traffic.go 与 docs/MAINTAINING.md §3.6。
+	// 见 database/models/traffic.go 与 docs/MAINTAINING.md §3.7。
 	trafficTotals := clients.GetAllTrafficTotals()
 	onlineUUIDs := agent_runtime.GetAllOnlineUUIDs()
 	onlineSet := make(map[string]bool, len(onlineUUIDs))
@@ -341,6 +341,9 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		NetOut         int64               `json:"net_out"`
 		NetTotalUp     int64               `json:"net_total_up"`
 		NetTotalDown   int64               `json:"net_total_down"`
+		NetPeriodUp    int64               `json:"net_period_up"`
+		NetPeriodDown  int64               `json:"net_period_down"`
+		PeriodStarted  *time.Time          `json:"period_started_at,omitempty"`
 		Process        int                 `json:"process"`
 		Connections    int                 `json:"connections"`
 		ConnectionsUdp int                 `json:"connections_udp"`
@@ -360,9 +363,21 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		}
 		stats := getPingStatsForNode(uuid, pingTasks)
 		// 优先用持久累计；还没有累计行时（该节点刚接入或本次功能刚上线）回退到实时计数器。
+		// net_total_up/down 的语义与取值**不变**（面板继续读它，见 PRD 需求 7）。
 		totalUp, totalDown := rep.Network.TotalUp, rep.Network.TotalDown
 		if t, ok := trafficTotals[uuid]; ok {
 			totalUp, totalDown = t.Up, t.Down
+		}
+		// 附加输出：服务端算出来的本周期用量（节点未配置重置日时为零值）。
+		// 只是新增字段，老客户端忽略即可。
+		var periodUp, periodDown int64
+		var periodStart *time.Time
+		if t, ok := trafficTotals[uuid]; ok {
+			periodUp, periodDown = t.PeriodUp, t.PeriodDown
+			if !t.PeriodStart.IsZero() {
+				start := t.PeriodStart
+				periodStart = &start
+			}
 		}
 		rl := recordLike{
 			Client:         uuid,
@@ -383,6 +398,9 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			NetOut:         rep.Network.Up,
 			NetTotalUp:     totalUp,
 			NetTotalDown:   totalDown,
+			NetPeriodUp:    periodUp,
+			NetPeriodDown:  periodDown,
+			PeriodStarted:  periodStart,
 			Process:        rep.Process,
 			Connections:    rep.Connections.TCP + rep.Connections.UDP,
 			ConnectionsUdp: rep.Connections.UDP,
@@ -418,11 +436,11 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 
 func getMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
 	var resp struct {
-		LoggedIn     bool   `json:"logged_in"`
-		SSOId        string `json:"sso_id"`
-		SSOType      string `json:"sso_type"`
-		Username     string `json:"username"`
-		UUID         string `json:"uuid"`
+		LoggedIn bool   `json:"logged_in"`
+		SSOId    string `json:"sso_id"`
+		SSOType  string `json:"sso_type"`
+		Username string `json:"username"`
+		UUID     string `json:"uuid"`
 	}
 
 	meta := rpc.MetaFromContext(ctx)

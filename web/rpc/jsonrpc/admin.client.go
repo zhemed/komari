@@ -2,12 +2,14 @@ package jsonrpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/records"
 	"github.com/komari-monitor/komari/internal/metricstore"
 	"github.com/komari-monitor/komari/pkg/rpc"
+	logger "github.com/komari-monitor/komari/utils/log"
 	agent_runtime "github.com/komari-monitor/komari/web/agent"
 )
 
@@ -111,12 +113,53 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if uuid == "" {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
 	}
+	// 流量周期配置先校验：非法值必须在这里被拒（InvalidParams），且**不落库**。
+	periodResolved, err := resolveTrafficPeriod(update)
+	if err != nil {
+		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
+	}
 	if err := clients.SaveClient(update); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
 	actor, ip := auditActor(ctx)
-	auditlog.Log(ip, actor, "edit client:"+uuid, "info")
+	if periodResolved != nil {
+		// 保存了周期配置 ⇒ 无条件再基线（design.md §5）：切换 agent 上报口径时
+		// 只要点一次保存，下一次上报就只做基线，不会把"周期值 → 开机计数器"的跳变
+		// 灌进累计。代价是每次保存都会丢掉一次上报的增量（最多一个上报周期）。
+		if err := clients.MarkTrafficRebaseline(uuid); err != nil {
+			// 配置已经保存成功，再基线失败只影响下一个周期，不把整个编辑判为失败。
+			logger.ErrorArgs("clients", "Failed to mark traffic rebaseline:", err)
+		}
+		auditlog.Log(ip, actor,
+			fmt.Sprintf("edit client traffic period:%s %s", uuid, periodResolved.String()), "info")
+	} else {
+		auditlog.Log(ip, actor, "edit client:"+uuid, "info")
+	}
 	return nil, nil
+}
+
+// resolveTrafficPeriod 校验并归一化请求里的流量周期配置。
+//
+//	provided=false ⇒ 请求没带这两个字段，返回 (nil, nil)：不触发再基线，行为与改动前一致。
+//	provided=true  ⇒ 返回最终配置（只给部分字段时按现值补齐）；非法值返回错误。
+func resolveTrafficPeriod(update map[string]interface{}) (*clients.TrafficPeriodConfig, error) {
+	uuid, _ := update["uuid"].(string)
+	old, err := clients.LoadTrafficPeriodConfig(uuid)
+	if err != nil {
+		return nil, err
+	}
+	provided, err := clients.NormalizeTrafficPeriodFields(update, old.ResetDay, old.Timezone)
+	if err != nil {
+		return nil, err
+	}
+	if !provided {
+		return nil, nil
+	}
+	resolved, err := clients.ResolveTrafficPeriodConfig(uuid, update)
+	if err != nil {
+		return nil, err
+	}
+	return &resolved, nil
 }
 
 func adminRemoveClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
