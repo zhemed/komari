@@ -1,0 +1,12 @@
+# 本地构建镜像用（glibc 基础镜像 + 动态链接二进制）
+# 说明：官方发版镜像基于 alpine（需 zig 静态链接）；本仓库日常自用走 glibc 路线，
+# 需要与官方一致的形态时另装 zig 并用 server/scripts/build-komari.sh KOMARI_STATIC=1。
+FROM debian:bookworm-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY komari /app/komari
+ENV GIN_MODE=release
+EXPOSE 25774
+CMD ["/app/komari", "server"]

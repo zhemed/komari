@@ -43,3 +43,10 @@ go.work.sum
 # 本 fork 的本地构建产物与工具链缓存（见 scripts/*.sh）
 /.build/
 /bin/
+
+# ---- 自维护部分（主题源码 / 构建产物），由本仓 ops-docs/VERSION.md 约定 ----
+themes/ink/node_modules/
+themes/ink/dist/
+themes/ink/ink-build-*.zip
+ops-dist/
+.build-image/
