@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "i18n:sync": "node ./script/i18n-sync.mjs",
     "i18n:sync:dry": "node ./script/i18n-sync.mjs --dry-run",
-    "test:period": "node script/period-parity.mjs"
+    "test:period": "node script/period-parity.mjs",
+    "test:period-dom": "node script/period-panel-dom.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

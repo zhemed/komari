@@ -395,6 +395,59 @@ else
   bad "判别性验证失败：规则对含 2FA 的历史提交无告警，等于永远为绿（护栏失效）"
 fi
 
+# ---------- 16. 面板口径回归（逻辑 + 渲染层；零新增依赖） ----------
+# 2026-10-23 加：0.0.24 把面板/限额口径切到服务端周期值，配套两份可复跑回归——
+#   frontend/script/period-parity.mjs    纯逻辑：未配置周期节点与升级前「逐位一致」+ 护栏/单一来源
+#   frontend/script/period-panel-dom.mjs 渲染层：真组件 SSR，断言「本周期流量/累计（历史）/
+#                                        口径已切换/本周期尚未开始/重置时区」真的渲染出来，且无 NaN
+# 跳过策略（**不静默通过、也不判失败**）：Node 缺失或 < 22.18（默认类型擦除的起点）、
+# 脚本不存在、或 DOM 那份缺少 frontend/node_modules（esbuild，退出码 3）⇒ 打印 `·` 行说明未执行。
+# 通过时必须能解析出「N/M 项通过」计数——防止"断言全被注释掉却报绿"。
+head_ "16. 面板口径回归（前端逻辑 + 渲染层断言）"
+period_node_reason=""
+if ! command -v node >/dev/null 2>&1; then
+  period_node_reason="未找到 node"
+else
+  period_node_ver="$(node -p 'process.versions.node' 2>/dev/null || true)"
+  period_node_major="${period_node_ver%%.*}"
+  period_node_rest="${period_node_ver#*.}"
+  period_node_minor="${period_node_rest%%.*}"
+  if ! printf '%s' "${period_node_major}" | grep -qE '^[0-9]+$' || ! printf '%s' "${period_node_minor}" | grep -qE '^[0-9]+$'; then
+    period_node_reason="无法解析 node 版本（${period_node_ver:-空}）"
+  elif [ "${period_node_major}" -gt 22 ] || { [ "${period_node_major}" -eq 22 ] && [ "${period_node_minor}" -ge 18 ]; }; then
+    period_node_reason=""
+  else
+    period_node_reason="node 版本过低（${period_node_ver} < 22.18）"
+  fi
+fi
+if [ -n "${period_node_reason}" ]; then
+  printf '  \033[33m·\033[0m 跳过（%s）：面板口径回归未执行（需 Node >= 22.18，见 frontend/script/period-parity.mjs）\n' "${period_node_reason}"
+else
+  for period_pair in "frontend/script/period-parity.mjs|逻辑" "frontend/script/period-panel-dom.mjs|渲染层"; do
+    period_script="${period_pair%%|*}"; period_label="${period_pair##*|}"
+    if [ ! -f "${period_script}" ]; then
+      printf '  \033[33m·\033[0m 跳过（%s 不存在）：%s口径回归未执行\n' "${period_script}" "${period_label}"
+      continue
+    fi
+    # 本脚本没有 set -e，命令替换的退出码可直接取（不要在这里临时 set -e，会影响后续检查）
+    period_out="$(node "${period_script}" 2>&1)"
+    period_rc=$?
+    period_count="$(printf '%s' "${period_out}" | grep -oE '[0-9]+/[0-9]+ 项通过' | tail -1)"
+    if [ "${period_rc}" = 0 ]; then
+      if [ -n "${period_count}" ]; then
+        ok "${period_label}口径回归通过（${period_count}）"
+      else
+        bad "${period_label}口径回归报绿但解析不出通过计数（疑似断言被清空）：${period_script}"
+      fi
+    elif [ "${period_rc}" = 3 ]; then
+      printf '  \033[33m·\033[0m 跳过（%s 退出码 3：环境不满足，先 cd frontend && npm ci）：%s口径回归未执行\n' "${period_script}" "${period_label}"
+    else
+      bad "${period_label}口径回归失败（${period_script} 退出码 ${period_rc}）"
+      printf '%s\n' "${period_out}" | grep -E 'FAIL|失败：' | head -5 | sed 's/^/      /'
+    fi
+  done
+fi
+
 printf '\n[check-repo] 结论：'
 if [ "${FAIL}" = 0 ]; then
   printf '\033[32m全部通过\033[0m\n'; exit 0
