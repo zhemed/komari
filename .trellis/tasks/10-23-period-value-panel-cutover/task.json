@@ -1,0 +1,29 @@
+{
+  "id": "period-value-panel-cutover",
+  "name": "period-value-panel-cutover",
+  "title": "把面板展示与限额判定切到服务端周期值",
+  "description": "用户任务：面板卡片/详情/进度条改为「本周期已用 / 限额」，限额判定（超额、告警阈值、阻断）也基于周期值；累计值保留为历史统计并明确标注口径；未配置周期的节点保持旧行为不得回归；边界由服务端判定，前端不得自行推算；存量超额节点行为要显式定义；文案区分本周期/累计并标注边界时区。另含子任务：生产累加批处理停摆异常排查与心跳暴露。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "komari",
+  "assignee": "komari",
+  "createdAt": "2026-10-23",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-23-period-panel-frontend",
+    "10-23-accumulate-stall-heartbeat"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
