@@ -226,3 +226,40 @@
 ### Next Steps
 
 - 唯一未做：跨 2026-11-22 00:00Z 边界观察；可选：把 agent 校验和资产 name 规则写进 §3.4
+
+
+## Session 67: 面板/限额口径切到周期值 + 流水线心跳与健壮性 → 0.0.24
+<!-- trellis-session: v=2 fp=db1a9781bb3bbde9 -->
+
+**Date**: 2026-10-23
+**Task**: 面板/限额口径切到周期值 + 流水线心跳与健壮性 → 0.0.24
+**Branch**: `main`
+
+### Summary
+
+把用户可见的用量口径从累计切到服务端周期值（卡片/详情/进度条/表格），累计保留为「累计（历史）」；限额判定同口径；未配置周期节点回落累计并逐位零回归（可复跑 npm run test:period 69/69）。另交付：报告流水线心跳+看门狗（traffic_pipeline，10 字段）、批处理健壮性（限次重试+死信+pending 上限、主库 5s 超时与慢操作日志、读库失败不再误清周期列）、E2a/E2b 判别测试。发布 0.0.24（18 资产、逐平台载荷 5/5）并升级生产与本地测试实例 komari-test。
+
+### Main Changes
+
+- 前端 13 文件 + 产物重建（f672d9f）；口径回归脚本 60ca273；文档 6e1fde7/bcc76af/3c656db
+- 心跳+看门狗 f440b70；健壮性 a34ce8e；发布 e29ba43（tag 0.0.24）
+- 本地长期容器测试实例（komari-test + agent，127.0.0.1 上，数据 /root/komari-test/data）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2330f80` | chore(task): archive 10-23-period-value-panel-cutover |
+
+### Testing
+
+- [OK] npm run test:period 69/69（Lead 复跑）；go build/vet/test 全绿；check-repo --full 全绿
+- [OK] 生产 0.0.24：digest 一致、0 错误、agent online、累计不回退且周期继续增长
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 待验证：跨真实周期边界（2026-11-22 00:00Z）观察周期归零；可选：把渲染层 DOM 断言搬进仓库、把 test:period 接入 check-repo
