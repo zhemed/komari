@@ -8,7 +8,6 @@ import (
 	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
-	logger "github.com/komari-monitor/komari/utils/log"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -102,7 +101,7 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 		// 新建成功 = 这是首次见到该节点，基线已经写入，本次增量不再重复加。
 		// 周期同样只建基线：起点取 max(周期边界, 现在)，本次增量不计入。
 		entry := TrafficTotal{Up: totalUp, Down: totalDown}
-		if _, _, state := periodConfigFor(db, uuid); state == periodConfigEnabled {
+		if _, _, state, _ := periodConfigFor(db, uuid); state == periodConfigEnabled {
 			// PeriodWindow 返回的是"包含 now 的那个周期"的起点，按定义不会晚于 now
 			// （顺延出来的未来边界是 next，不是 start），所以 max(boundary, now) 恒等于 now：
 			// 即"周期从启用时刻起算"。
@@ -127,7 +126,7 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 
 	// 已存在的行：先取配置（启用/禁用/非法三态），再读当前周期状态——
 	// 直接从库里读，避免内存与库不一致时误判边界。
-	resetDay, tzName, periodState := periodConfigFor(db, uuid)
+	resetDay, tzName, periodState, periodCause := periodConfigFor(db, uuid)
 
 	var row models.ClientTrafficTotal
 	if err := db.Where("uuid = ?", uuid).First(&row).Error; err != nil {
@@ -150,9 +149,13 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 	if periodState == periodConfigInvalid {
 		// 库里配置非法（越界重置日/非法时区；正常保存路径会拦住，只可能来自外部改库）：
 		// 本次**只跳过周期记账**：既不返回错误（否则每次上报都会失败、流量不再累加），
-		// 也不清空周期列（外部写坏配置不该销毁已有周期数据），累计照常增长。留 WARN 便于发现。
-		logger.Warn("clients", "invalid traffic period config, period bookkeeping skipped for this report",
-			"uuid", uuid, "reset_day", resetDay, "timezone", tzName)
+		// 也不清空周期列（外部写坏配置不该销毁已有周期数据），累计照常增长。
+		// WARN 按"节点 + 配置指纹"去重，避免每次上报刷屏（见 period_warn.go）。
+		warnInvalidPeriodConfigOnce(uuid, resetDay, tzName, periodCause)
+	} else {
+		// 配置不再非法（合法启用或明确禁用）⇒ 清理去重状态：
+		// 以后若再次被改成非法值，能重新告警一次。
+		clearPeriodWarnState(uuid)
 	}
 	if periodState == periodConfigEnabled {
 		// 判断"是否跨过周期边界"必须拿**已记录的周期起点**去比，不能直接用
@@ -162,8 +165,7 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 		start, _, err := PeriodWindow(now, resetDay, tzName)
 		if err != nil {
 			// 兜底：periodConfigFor 已用同一套校验拦过，正常走不到这里。
-			logger.Warn("clients", "invalid traffic period config, period bookkeeping skipped for this report",
-				"uuid", uuid, "reset_day", resetDay, "timezone", tzName, "error", err)
+			warnInvalidPeriodConfigOnce(uuid, resetDay, tzName, err)
 			periodState = periodConfigInvalid
 		} else if cur.PeriodStart.IsZero() {
 			// 老节点（周期功能上线前就有累计行）刚启用周期配置：行里没有周期起点。
@@ -256,24 +258,24 @@ func effectiveDelta(cur TrafficTotal, deltaUp, deltaDown int64) (int64, int64) {
 //
 //	节点不存在 / TrafficResetDay = 0 ⇒ periodConfigDisabled
 //	配置合法（1..31 + 可加载的时区）⇒ periodConfigEnabled
-//	越界重置日或非法时区（外部改库）⇒ periodConfigInvalid
+//	越界重置日或非法时区（外部改库）⇒ periodConfigInvalid，并回传具体原因供告警使用
 //
 // 每次上报多一条按主键的 SELECT（SQLite 单连接）：不引入新的全局缓存，
 // 因此没有新的可变状态竞争，也不会出现"直接改库后缓存陈旧"的问题。
-func periodConfigFor(db *gorm.DB, uuid string) (resetDay int, tzName string, state periodConfigState) {
+func periodConfigFor(db *gorm.DB, uuid string) (resetDay int, tzName string, state periodConfigState, cause error) {
 	var client models.Client
 	if err := db.Select("traffic_reset_day", "traffic_reset_timezone").
 		Where("uuid = ?", uuid).First(&client).Error; err != nil {
-		return 0, "", periodConfigDisabled
+		return 0, "", periodConfigDisabled, nil
 	}
 	normalizedTZ, err := ValidatePeriodConfig(client.TrafficResetDay, client.TrafficResetTimezone)
 	if err != nil {
-		return client.TrafficResetDay, client.TrafficResetTimezone, periodConfigInvalid
+		return client.TrafficResetDay, client.TrafficResetTimezone, periodConfigInvalid, err
 	}
 	if client.TrafficResetDay == 0 {
-		return 0, "", periodConfigDisabled
+		return 0, "", periodConfigDisabled, nil
 	}
-	return client.TrafficResetDay, normalizedTZ, periodConfigEnabled
+	return client.TrafficResetDay, normalizedTZ, periodConfigEnabled, nil
 }
 
 // periodTimezoneLabel 是审计日志里展示用的时区名（空 ⇒ 显式标出实际生效的 UTC）。
@@ -335,7 +337,8 @@ func MarkTrafficRebaseline(uuid string) error {
 	return nil
 }
 
-// DeleteTrafficTotal 在删除节点时清掉它的累计流量（避免残留孤儿行）。
+// DeleteTrafficTotal 在删除节点时清掉它的累计流量（避免残留孤儿行），
+// 并一并清理该节点的"非法配置告警"去重状态（否则条目会随节点增删泄漏）。
 func DeleteTrafficTotal(uuid string) error {
 	if uuid == "" {
 		return nil
@@ -346,5 +349,6 @@ func DeleteTrafficTotal(uuid string) error {
 	trafficMu.Lock()
 	delete(trafficTotals, uuid)
 	trafficMu.Unlock()
+	clearPeriodWarnState(uuid)
 	return nil
 }

@@ -509,6 +509,12 @@ func TestAccumulateTrafficEnablingPeriodOnExistingRowSeedsBoundaryWithoutReset(t
 	}
 }
 
+// warnEntry 是一条被捕获的 WARN：消息 + 结构化字段。
+type warnEntry struct {
+	message string
+	attrs   map[string]string
+}
+
 // warnRecorder 捕获经 utils/log 写出的 WARN 及以上记录。
 //
 // utils/log 在未调用 Setup 时走 slog.Default()（utils/log/log.go 的 logger()），
@@ -516,7 +522,7 @@ func TestAccumulateTrafficEnablingPeriodOnExistingRowSeedsBoundaryWithoutReset(t
 // 的既有手法一致（见 .trellis/spec/backend/quality-guidelines.md §4.7）。
 type warnRecorder struct {
 	mu      sync.Mutex
-	records []string
+	records []warnEntry
 }
 
 func (w *warnRecorder) Enabled(_ context.Context, level slog.Level) bool {
@@ -524,9 +530,14 @@ func (w *warnRecorder) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 func (w *warnRecorder) Handle(_ context.Context, record slog.Record) error {
+	entry := warnEntry{message: record.Message, attrs: make(map[string]string, record.NumAttrs())}
+	record.Attrs(func(attr slog.Attr) bool {
+		entry.attrs[attr.Key] = attr.Value.String()
+		return true
+	})
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.records = append(w.records, record.Message)
+	w.records = append(w.records, entry)
 	return nil
 }
 
@@ -534,14 +545,32 @@ func (w *warnRecorder) WithAttrs([]slog.Attr) slog.Handler { return w }
 func (w *warnRecorder) WithGroup(string) slog.Handler      { return w }
 
 func (w *warnRecorder) hasMessage(substr string) bool {
+	return w.countMessage(substr) > 0
+}
+
+// countMessage 统计包含该子串的 WARN 条数（去重断言用）。
+func (w *warnRecorder) countMessage(substr string) int {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for _, message := range w.records {
-		if strings.Contains(message, substr) {
-			return true
+	count := 0
+	for _, entry := range w.records {
+		if strings.Contains(entry.message, substr) {
+			count++
 		}
 	}
-	return false
+	return count
+}
+
+// lastMessage 返回最后一条包含该子串的 WARN（断言字段用）；没有则返回 false。
+func (w *warnRecorder) lastMessage(substr string) (warnEntry, bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for i := len(w.records) - 1; i >= 0; i-- {
+		if strings.Contains(w.records[i].message, substr) {
+			return w.records[i], true
+		}
+	}
+	return warnEntry{}, false
 }
 
 func installWarnRecorder(t *testing.T) *warnRecorder {
