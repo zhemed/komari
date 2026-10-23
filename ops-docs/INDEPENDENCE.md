@@ -172,3 +172,42 @@ cd themes/ink && bun audit          # 本机 bun 1.4.2 已带该子命令
 且其输入是我们自己的 glob 模式，不来自不可信来源 ⇒ 记为**可接受残留**，下次自查复查（上游一发修复版即可升级）。
 
 **版本**：内核 `0.0.24+own.2`（镜像 `komari-own:0.0.24-own.2`）；主题仍 **0.0.1**（本轮只动 devDependency，线上主题产物无需变更）。
+
+### 6.6 覆盖补齐（2026-10-23，trivy + frontend + agent）
+
+**新增工具**：`trivy v0.76.1`（GitHub release 二进制 → `/usr/local/bin/trivy`）；既有 `go1.26.10`、`govulncheck v1.9.0`、`bun 1.4.2`、`npm`。
+未装 `grype`/`syft`（trivy 已覆盖同类能力，避免重复）；未装 `zig`（本机走 glibc 构建路径，不需要 alpine 静态构建）。
+
+#### a) frontend（内核自带 React 管理端，npm 生态）
+
+| 步骤 | 结果 |
+|---|---|
+| `npm audit`（官方源）修复前 | 14 项（11 high / 2 moderate / 1 low）；**运行期 `--omit=dev` 8 项 high**：`braces`、`follow-redirects`、`http-proxy-middleware`、`micromatch`、`nanoid`、`postcss`、`source-map-js`、`vite` |
+| `npm audit fix --package-lock-only` | **0 vulnerabilities**（运行期也 0） |
+| `npm ci` + `npm run build` | 通过（8.05 s，`dist` 6.5 MB，PWA 426 条预缓存） |
+| 入库内容 | 仅 `frontend/package-lock.json`；**未重新生成内嵌的前端产物**（见"未完成"） |
+
+#### b) agent 模块（Go）
+
+| 步骤 | 结果 |
+|---|---|
+| `go mod verify` | `all modules verified` |
+| `go list -m -u all` | 36 个可升级 |
+| `govulncheck ./...` 修复前 | **14 项影响调用路径**（标准库 5、`x/net` 6、`x/text` 1、`x/crypto` 1、`ulikunitz/xz` 1） |
+| 最小升级 | toolchain `go1.26.10`、go 指令 1.26.0；`x/net` v0.38.0→**v0.60.0**、`x/text` v0.26.0→**v0.42.0**、`x/crypto` v0.39.0→v0.57.0、`xz` v0.5.9→**v0.5.15** |
+| `govulncheck ./...` 修复后 | **1 项**：GO-2026-5932 `golang.org/x/crypto/openpgp`（该包已停止维护，**无修复版本 N/A**）——依赖链遗留，我们未使用其业务逻辑 |
+| `go build ./...` | 通过 |
+
+#### c) 容器镜像（`trivy image --severity HIGH,CRITICAL`）
+
+| 镜像 | 合计 | Go 依赖项 | OS 包项 | 有修复版本 |
+|---|---|---|---|---|
+| 官方 `ghcr.io/zhemed/komari:0.0.24`（alpine 3.21.7） | 38 | **24**（`x/crypto`/`x/net`/`stdlib` 均为旧版） | 14 | 24 |
+| 自建 `own.2`（debian 12.15） | 60 | **1**（`klauspost/compress` v1.17.11） | 59 | 1 |
+| 自建 **`own.3`**（本次修复后） | **59** | **0** | 59 | **0** |
+| 裸 `debian:bookworm-slim`（对照） | 57 | — | 57 | 0 |
+| 裸 `debian:trixie-slim`（对照） | 43 | — | 43 | 0 |
+
+**结论**：①我们镜像的 **Go 依赖漏洞已清零**（对照官方 24 项）；②剩余 59 项**全部是 Debian OS 包且 Debian 未发布修复版本**（含 1 项 CRITICAL `zlib1g` CVE-2023-45853，Debian 长期 wontfix），**裸镜像本身就有 57 项** ⇒ 与我们的 Dockerfile/构建方式无关；③换 `trixie-slim` 只能降到 43 项，且属于变更基础镜像版本 ⇒ **按约束先回报，本轮未换**；④`trivy fs`（仓库扫描）只有 **2 项**：`braces@3.0.3`（CVE-2026-93687，HIGH，**无修复版**），分别来自 `frontend/package-lock.json` 与 `themes/ink/bun.lock`。
+
+**最小修复与部署**：内核 `klauspost/compress v1.17.11 → v1.18.7` ⇒ 重建镜像 **own.3** 并部署（备份 DB/inspect/旧脚本 → `docker save | ssh docker load` → 新版本化脚本 `deploy/komari-v0.0.24-own.3-listen-local.sh` 重建 → 核对通过）；标签 `server/v0.0.24-own.3`。
