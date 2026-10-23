@@ -63,11 +63,11 @@ if [ "$SKIP_THEME" = "0" ]; then
   bun run build >/dev/null
   ZIP="$(ls ink-build-*.zip | head -1)"
   [ -n "$ZIP" ] || { echo "主题构建未产出 zip" >&2; exit 1; }
-  ZIP_PATH="$ROOT/ops-ops-dist/theme/$ZIP"
+  ZIP_PATH="$ROOT/ops-dist/theme/$ZIP"
   cp "$ZIP" "$ZIP_PATH"
   ( cd "$ROOT/ops-dist/theme" && sha256sum "$ZIP" > "$ZIP.sha256" )
   # 产物内 manifest 版本必须与仓库一致
-  INNER_VER="$(python3 - "$ROOT/ops-ops-dist/theme/$ZIP" <<'PY'
+  INNER_VER="$(python3 - "$ROOT/ops-dist/theme/$ZIP" <<'PY'
 import sys, zipfile
 z = zipfile.ZipFile(sys.argv[1])
 import json
@@ -75,8 +75,8 @@ print(json.loads(z.read('komari-theme.json'))['version'])
 PY
 )"
   [ "$INNER_VER" = "$THEME_VERSION" ] || { echo "包内 manifest 版本 ${INNER_VER} != ${THEME_VERSION}" >&2; exit 1; }
-  echo "   产物: ops-ops-dist/theme/$ZIP"
-  echo "   sha256: $(awk '{print $1}' "$ROOT/ops-ops-dist/theme/$ZIP.sha256")"
+  echo "   产物: ops-dist/theme/$ZIP"
+  echo "   sha256: $(awk '{print $1}' "$ROOT/ops-dist/theme/$ZIP.sha256")"
   cd "$ROOT"
 fi
 
