@@ -32,7 +32,8 @@ m = re.search(r'KOMARI_VERSION=.*?([0-9]+\.[0-9]+\.[0-9]+)', s)
 print(m.group(1) if m else '')" )"
 fi
 [ -n "$SERVER_VERSION" ] || { echo "无法从 server/scripts/version.env 解析版本" >&2; exit 1; }
-OWN_SUFFIX="${OWN_SUFFIX:-own.1}"
+# 默认取 scripts/version.env 的 KOMARI_OWN_SUFFIX（可用环境变量覆盖）
+OWN_SUFFIX="${OWN_SUFFIX:-$(bash -c 'unset KOMARI_OWN_SUFFIX; . scripts/version.env >/dev/null 2>&1; printf %s "${KOMARI_OWN_SUFFIX:-own.1}"')}"
 SEMA_TAG="${SERVER_VERSION}+${OWN_SUFFIX}"       # 语义版本（+ 元数据）
 IMAGE_TAG="komari-own:${SERVER_VERSION}-${OWN_SUFFIX}"  # docker tag 不允许 '+'
 THEME_VERSION="$(python3 -c "import json;print(json.load(open('themes/ink/komari-theme.json'))['version'])")"
