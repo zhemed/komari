@@ -35,19 +35,23 @@ var reportTrafficStates sync.Map
 
 // trafficAccumulator 由上层（internal/server）注册：把重置感知的流量增量交给持久累计。
 // metricstore 刻意不 import database/*，保持分层；未注册时（例如单元测试）什么也不做。
+//
+// 回调返回 error 只是为了**计数**（心跳里的 accumulate_errors_total）：
+// "累加全都在报错"与"累加根本没被调用（静默停摆）"是两种故障，必须能分开看。
+// 日志仍由注册方（internal/server）负责，这里不重复记录。
 var (
 	trafficAccumulatorMu sync.RWMutex
-	trafficAccumulator   func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64)
+	trafficAccumulator   func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) error
 )
 
 // SetTrafficAccumulator 注册流量累计回调；传 nil 注销。
-func SetTrafficAccumulator(fn func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64)) {
+func SetTrafficAccumulator(fn func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) error) {
 	trafficAccumulatorMu.Lock()
 	trafficAccumulator = fn
 	trafficAccumulatorMu.Unlock()
 }
 
-func currentTrafficAccumulator() func(string, int64, int64, int64, int64) {
+func currentTrafficAccumulator() func(string, int64, int64, int64, int64) error {
 	trafficAccumulatorMu.RLock()
 	defer trafficAccumulatorMu.RUnlock()
 	return trafficAccumulator
@@ -102,6 +106,8 @@ func StartReportBatcher() {
 	}
 	reportBatcher = worker
 	go worker.run()
+	// 看门狗与 worker 同生命周期：只在批处理真的跑着的时候才有"停摆"可言。
+	startAccumulateWatchdog(time.Now().UTC())
 }
 
 // StopReportBatcher stops the report writer after flushing all queued reports.
@@ -131,6 +137,8 @@ func StopReportBatcher(ctx context.Context) error {
 			reportBatcher = nil
 		}
 		reportBatcherMu.Unlock()
+		// worker 已退出 ⇒ 不存在"批处理停摆"可言，看门狗一并停掉，避免停机期间误报。
+		stopAccumulateWatchdog()
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
@@ -331,6 +339,9 @@ func writePendingReports(ctx context.Context, pending *[]v1.Report) error {
 		_, err := writeReportBatch(writeCtx, (*pending)[:batchSize])
 		cancel()
 		if err != nil {
+			// 批处理失败统一在这里计数：无论失败来自信号量等待、store 缺失还是写库，
+			// 都算一次"批次没完成"，与"累计回调报错"分开统计。
+			recordBatchError(err)
 			return err
 		}
 		*pending = (*pending)[batchSize:]
@@ -455,10 +466,22 @@ func writeReportBatch(ctx context.Context, reports []v1.Report) ([]v1.Report, er
 	if err := s.WriteBatch(ctx, points); err != nil {
 		return nil, err
 	}
+	recordBatchSuccess(time.Now().UTC())
 	// 指标写成功之后再把增量交给持久累计（写失败就不该计流量）。
 	if accumulate := currentTrafficAccumulator(); accumulate != nil {
+		accumulated := 0
 		for _, a := range accumulations {
-			accumulate(a.uuid, a.totalUp, a.totalDown, a.deltaUp, a.deltaDown)
+			if err := accumulate(a.uuid, a.totalUp, a.totalDown, a.deltaUp, a.deltaDown); err != nil {
+				// 只计数，不在这里记日志（注册方 internal/server 已经记过，避免重复刷屏）。
+				recordAccumulateError()
+				continue
+			}
+			accumulated++
+		}
+		// 至少一次成功才算"累加心跳"：全是错误时心跳应当保持陈旧，
+		// 由看门狗按"队列积压 + 心跳陈旧"报停摆，错误计数另行解释原因。
+		if accumulated > 0 {
+			recordAccumulateSuccess(time.Now().UTC())
 		}
 	}
 	for state, values := range pendingStates {

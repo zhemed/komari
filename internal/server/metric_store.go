@@ -87,10 +87,14 @@ func (a *App) InitStores() error {
 	if err := clients.InitTrafficTotals(); err != nil {
 		logger.Warn("server", "Failed to load persisted traffic totals", "error", err)
 	}
-	metricstore.SetTrafficAccumulator(func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) {
+	// 回调返回 error：metricstore 用它统计 accumulate_errors_total（心跳需要把
+	// "累加在报错"与"累加根本没被调用"分开）；日志仍只在这里记一次，避免重复刷屏。
+	metricstore.SetTrafficAccumulator(func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) error {
 		if err := clients.AccumulateTraffic(uuid, totalUp, totalDown, deltaUp, deltaDown); err != nil {
 			logger.ErrorArgs("server", "Failed to persist traffic total:", err)
+			return err
 		}
+		return nil
 	})
 	metricstore.StartReportBatcher()
 	a.addCleanup("metric-report-batcher", metricstore.StopReportBatcher)

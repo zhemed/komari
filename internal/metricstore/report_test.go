@@ -493,8 +493,9 @@ func TestWriteReportFeedsTrafficAccumulator(t *testing.T) {
 		deltaUp, deltaDown int64
 	}
 	var calls []call
-	SetTrafficAccumulator(func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) {
+	SetTrafficAccumulator(func(uuid string, totalUp, totalDown, deltaUp, deltaDown int64) error {
 		calls = append(calls, call{uuid, totalUp, totalDown, deltaUp, deltaDown})
+		return nil
 	})
 	t.Cleanup(func() { SetTrafficAccumulator(nil) })
 

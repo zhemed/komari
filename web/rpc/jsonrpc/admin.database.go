@@ -34,6 +34,23 @@ type databaseStatusResponse struct {
 	Main       databaseStorageStatus `json:"main"`
 	Monitoring databaseStorageStatus `json:"monitoring"`
 	LocalTotal *int64                `json:"local_total"`
+	// TrafficPipeline 是报告写入流水线的心跳（本仓库自有扩展）：把"没人上报（正常空闲）"
+	// 与"队列有积压但累计不动（停摆）"分开，见
+	// .trellis/tasks/10-23-accumulate-stall-heartbeat/prd.md。
+	TrafficPipeline trafficPipelineStatus `json:"traffic_pipeline"`
+}
+
+// trafficPipelineStatus 是心跳的对外契约，字段与
+// metricstore.TrafficPipelineHeartbeat 一一对应（新字段只追加，老客户端忽略即可）。
+type trafficPipelineStatus struct {
+	LastBatchSuccessUnix      int64  `json:"last_batch_success_unix"`
+	LastAccumulateSuccessUnix int64  `json:"last_accumulate_success_unix"`
+	BatchErrorsTotal          uint64 `json:"batch_errors_total"`
+	AccumulateErrorsTotal     uint64 `json:"accumulate_errors_total"`
+	QueueLen                  int    `json:"queue_len"`
+	WorkerAlive               bool   `json:"worker_alive"`
+	StallEventsTotal          uint64 `json:"stall_events_total"`
+	LastBatchError            string `json:"last_batch_error,omitempty"`
 }
 
 type databaseMaintenanceResult struct {
@@ -72,12 +89,27 @@ func adminGetDatabaseSize(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc
 	}
 
 	return databaseStatusResponse{
-		Type:       main.Driver,
-		Size:       legacySize,
-		Main:       main,
-		Monitoring: monitoring,
-		LocalTotal: localDatabaseTotal(main, monitoring),
+		Type:            main.Driver,
+		Size:            legacySize,
+		Main:            main,
+		Monitoring:      monitoring,
+		LocalTotal:      localDatabaseTotal(main, monitoring),
+		TrafficPipeline: trafficPipelineStatusFrom(metricstore.TrafficPipelineStatus()),
 	}, nil
+}
+
+// trafficPipelineStatusFrom 把 metricstore 的心跳快照映射成 RPC 契约。
+func trafficPipelineStatusFrom(heartbeat metricstore.TrafficPipelineHeartbeat) trafficPipelineStatus {
+	return trafficPipelineStatus{
+		LastBatchSuccessUnix:      heartbeat.LastBatchSuccessUnix,
+		LastAccumulateSuccessUnix: heartbeat.LastAccumulateSuccessUnix,
+		BatchErrorsTotal:          heartbeat.BatchErrorsTotal,
+		AccumulateErrorsTotal:     heartbeat.AccumulateErrorsTotal,
+		QueueLen:                  heartbeat.QueueLen,
+		WorkerAlive:               heartbeat.WorkerAlive,
+		StallEventsTotal:          heartbeat.StallEventsTotal,
+		LastBatchError:            heartbeat.LastBatchError,
+	}
 }
 
 func adminVacuumDatabase(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
