@@ -1,4 +1,4 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.21）
+# 维护本仓库（komari 自维护版 · 当前 0.0.22）
 
 本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.20**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
@@ -16,11 +16,11 @@
 
 ## 1. 版本与固定点
 
-**当前版本：`0.0.21`**（唯一默认值在 `scripts/version.env`；发版时同步下表三处字面量）。
+**当前版本：`0.0.22`**（唯一默认值在 `scripts/version.env`；发版时同步下表三处字面量）。
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.21`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.22`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -37,7 +37,7 @@
 **发版本规则**：递增三段中的 patch 位（`0.0.2`、`0.0.3`…）。
 
 > **发版前先查"这个号发过没有"**：已发布 `0.0.1`…`0.0.18`（0.0.18 是 2026-09-20 重新构建的
-> 无 compose 版，生产在用）；**本次发 `0.0.21`**（升级弹窗按钮去重）。直接重发一个已存在的号会与线上
+> 无 compose 版，生产在用）；**本次发 `0.0.22`**（服务端算流量周期）。直接重发一个已存在的号会与线上
 > tag/release 撞号或产出与已发布资产不一致的内容。
 > 查法：`gh release list -R zhemed/komari --limit 5` 与 `git tag --list | tail`。
 > 另注：已发布的 0.0.18 用的是**当时的** `install-komari.sh`（含后来被回滚的那套容器安装脚本与
