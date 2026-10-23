@@ -251,3 +251,16 @@ cd themes/ink && bun audit          # 本机 bun 1.4.2 已带该子命令
 容器 `running`、`Restarts=0`、`/api/version` hash `fb9f973d…`（= 我方 HEAD）、端口 `127.0.0.1:25774`、
 nginx `/` 与 `/admin` 双次 200、**`/admin` 入口已变为 `entry-index-Cuh5tdrm.js`**、主题入口仍 `index-08OsQRET.js`、
 三处「本周期流量」不变、DB 周期增长且累计不回退、日志无异常。
+
+### §6.8 安全基线（用户 2026-10-23 决定：接受并记为基线）
+
+- **基线口径**：镜像以 `trivy image --severity HIGH,CRITICAL` 的结果为准；**"有修复版"的项必须为 0**；
+- **当前基线（own.4，`debian:trixie-slim` 钉 digest）**：HIGH 43 ｜ CRITICAL **0** ｜ Go 依赖 **0** ｜ 有修复版 **0**；
+  这 43 项与**空白 `debian:trixie-slim` 镜像的 43 项完全同源同数**、`FixedVersion` 全空
+  ⇒ 全部是 **Debian 尚未发布修复**的 OS 包，**不属于我们的代码或配置问题**；
+- **复查方式**：`trivy image --severity HIGH,CRITICAL --ignore-unfixed <image>` 应输出 0 项；
+  待 Debian 发布修复后重建镜像即可自然下降；
+- **已知上游无修复版残留**（记录在案，不阻塞）：
+  - `braces@3.0.3`（CVE-2026-93687，dev/构建锁文件，`frontend/package-lock.json` + `themes/ink/bun.lock`）；
+  - agent `x/crypto/openpgp`（GO-2026-5932，包已停维）；
+- **决策记录**：不再为继续压 OS 项而更换发行版家族（alpine 静态构建需 zig）——如日后重启该议题，走本文档 §3 的授权流程。
