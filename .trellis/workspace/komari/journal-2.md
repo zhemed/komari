@@ -151,3 +151,41 @@
 ### Next Steps
 
 - 阶段 5：无 tzdata 容器验证 + 跨真实重置日观察（需授权起本地实例）；决定是否发版
+
+
+## Session 65: 方案 B 上线 0.0.22：发布、镜像缺陷修复、生产切换、WARN 去重
+<!-- trellis-session: v=2 fp=5ddb249ec3c2ec36 -->
+
+**Date**: 2026-10-23
+**Task**: 方案 B 上线 0.0.22：发布、镜像缺陷修复、生产切换、WARN 去重
+**Branch**: `main`
+
+### Summary
+
+整条弧线完成：① 方案 B（服务端算流量周期）实现 + 两轮打回 + 阶段 5 验证（tzdata 判别性 + 跨边界 L1 e2e + 再基线 + 非法配置降级）→ 发 0.0.22 并升级生产；② 发版中发现并修复严重既存缺陷：多架构镜像 arm64/armv7 腿装的是 amd64 二进制（ARG 默认值覆盖 buildx 注入，0.0.21 及更早都中招），修好后逐平台载荷 5/5 与 release 资产一致；③ 生产切换：重置日 22/UTC + agent 显式钉 --month-rotate 0；期间踩到 WAL 孤儿化（外部 sqlite 写库引发），按文档 §7 优雅重启解决，累计无回退；④ WARN 去重（节点+指纹，有界并发安全）。
+
+### Main Changes
+
+- 0.0.22 发布：tag=39c5860、18 资产、镜像 :0.0.22/:latest 已重推为正确载荷
+- Dockerfile/Dockerfile.agent 去 ARG 默认值（95085a3）；文档补 §12 载荷验收与 §3.4.1 两坑（137ae29）
+- WARN 去重（5521d62，database/clients 4 文件）
+- 生产：clients 两列 22/UTC、agent unit 钉 --month-rotate 0、服务端优雅重启一次
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7e4be68` | chore(task): archive 10-23-traffic-period-verify-release |
+
+### Testing
+
+- [OK] 生产验收：period_started_at=2026-10-22T00:00:00Z、period 随上报增长、累计单调不回退（64.98GB→65.06GB）、0 错误、agent online
+- [OK] 镜像逐平台载荷 5/5 == release 资产（负例对照旧 index 全红）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 跨 2026-11-22 00:00Z 边界观察一次周期归零（唯一未做验证）；决定是否发 0.0.23 带上 WARN 去重、是否升级 0.0.7 的 agent
