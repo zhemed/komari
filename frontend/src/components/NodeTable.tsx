@@ -15,6 +15,10 @@ import type { NodeBasicInfo } from "@/contexts/NodeListContext";
 import type { LiveData, Record } from "../types/LiveData";
 import { formatUptime } from "./Node";
 import { formatBytes } from "@/utils/unitHelper";
+import {
+  hasTrafficPeriod,
+  resolveTrafficUsage,
+} from "@/utils/trafficPeriod";
 import UsageBar from "./UsageBar";
 import Flag from "./Flag";
 import PriceTags from "./PriceTags";
@@ -40,6 +44,8 @@ type SortField =
   | "price"
   | "networkUp"
   | "networkDown"
+  | "periodUp"
+  | "periodDown"
   | "totalUp"
   | "totalDown";
 type SortOrder = "asc" | "desc" | "default";
@@ -55,7 +61,15 @@ const DEFAULT_TABLE_LIVE = {
   swap: { used: 0 },
   load: { load1: 0, load5: 0, load15: 0 },
   disk: { used: 0 },
-  network: { up: 0, down: 0, totalUp: 0, totalDown: 0 },
+  network: {
+    up: 0,
+    down: 0,
+    totalUp: 0,
+    totalDown: 0,
+    periodUp: 0,
+    periodDown: 0,
+    periodStartedAt: null,
+  },
   connections: { tcp: 0, udp: 0 },
   uptime: 0,
   process: 0,
@@ -73,6 +87,12 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
     field: null,
     order: "default",
   });
+  // 列表里只要有一个节点配置了周期，就展示「本周期」列并把旧列标注为「累计（历史）」；
+  // 全都没配置周期时（例如未启用该功能的部署）表格与升级前逐项一致。
+  const hasAnyPeriod = useMemo(
+    () => nodes.some((node) => hasTrafficPeriod(node)),
+    [nodes],
+  );
 
   const toggleRowExpansion = useCallback((uuid: string) => {
     setExpandedRows((prev) => {
@@ -196,6 +216,18 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
         comparison = aData.network.down - bData.network.down;
         break;
       }
+      case "periodUp": {
+        comparison =
+          resolveTrafficUsage(a, aData.network).usedUp -
+          resolveTrafficUsage(b, bData.network).usedUp;
+        break;
+      }
+      case "periodDown": {
+        comparison =
+          resolveTrafficUsage(a, aData.network).usedDown -
+          resolveTrafficUsage(b, bData.network).usedDown;
+        break;
+      }
       case "totalUp": {
         comparison = aData.network.totalUp - bData.network.totalUp;
         break;
@@ -307,6 +339,30 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
                 {getSortIcon("networkDown")}
               </Flex>
             </TableHead>
+            {hasAnyPeriod && (
+              <>
+                <TableHead
+                  className="cursor-pointer hover:bg-accent-2 select-none text-center min-w-[80px]"
+                  onClick={handleSort("periodUp")}
+                  title={t("nodeCard.sortTooltip")}
+                >
+                  <Flex align="center" gap="1" justify="center">
+                    {t("nodeCard.periodUpload")}
+                    {getSortIcon("periodUp")}
+                  </Flex>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-accent-2 select-none text-center min-w-[80px]"
+                  onClick={handleSort("periodDown")}
+                  title={t("nodeCard.sortTooltip")}
+                >
+                  <Flex align="center" gap="1" justify="center">
+                    {t("nodeCard.periodDownload")}
+                    {getSortIcon("periodDown")}
+                  </Flex>
+                </TableHead>
+              </>
+            )}
             <TableHead
               className="cursor-pointer hover:bg-accent-2 select-none text-center min-w-[80px]"
               onClick={handleSort("totalUp")}
@@ -314,6 +370,11 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
             >
               <Flex align="center" gap="1" justify="center">
                 {t("nodeCard.totalUpload")}
+                {hasAnyPeriod && (
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {t("nodeCard.cumulativeHistory")}
+                  </span>
+                )}
                 {getSortIcon("totalUp")}
               </Flex>
             </TableHead>
@@ -324,6 +385,11 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
             >
               <Flex align="center" gap="1" justify="center">
                 {t("nodeCard.totalDownload")}
+                {hasAnyPeriod && (
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {t("nodeCard.cumulativeHistory")}
+                  </span>
+                )}
                 {getSortIcon("totalDown")}
               </Flex>
             </TableHead>
@@ -341,6 +407,8 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
             const diskUsagePercent = node.disk_total
               ? (nodeData.disk.used / node.disk_total) * 100
               : 0;
+            // 口径单一来源，与卡片/详情一致
+            const nodeTraffic = resolveTrafficUsage(node, nodeData.network);
 
             return (
               <React.Fragment key={node.uuid}>
@@ -453,6 +521,24 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
                   <TableCell className="text-center min-w-[80px]">
                     <label>↓{formatBytes(nodeData.network.down)}/s</label>
                   </TableCell>
+                  {hasAnyPeriod && (
+                    <>
+                      <TableCell className="text-center min-w-[80px]">
+                        <label>
+                          {nodeTraffic.periodMode && nodeTraffic.periodStarted
+                            ? `↑${formatBytes(nodeTraffic.usedUp)}`
+                            : "-"}
+                        </label>
+                      </TableCell>
+                      <TableCell className="text-center min-w-[80px]">
+                        <label>
+                          {nodeTraffic.periodMode && nodeTraffic.periodStarted
+                            ? `↓${formatBytes(nodeTraffic.usedDown)}`
+                            : "-"}
+                        </label>
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-center min-w-[80px]">
                     <label>↑{formatBytes(nodeData.network.totalUp)}</label>
                   </TableCell>
@@ -464,7 +550,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
                 {/* 展开的详细信息行 */}
                 {isExpanded && (
                   <TableRow className="expanded-row">
-                    <TableCell colSpan={12} className="bg-accent-1">
+                    <TableCell colSpan={hasAnyPeriod ? 14 : 12} className="bg-accent-1">
                       <div className="expand-content">
                         <ExpandedNodeDetails node={node} nodeData={nodeData} />
                       </div>

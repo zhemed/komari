@@ -45,6 +45,10 @@ export type NodeBasicInfo = {
   traffic_limit: number;
   /** 流量阈值类型 */
   traffic_limit_type: undefined | "sum" | "max" | "min" | "up" | "down";
+  /** 流量重置日：0 = 未配置周期；1..31 = 每月重置日（周期边界由服务端计算） */
+  traffic_reset_day: number;
+  /** 重置边界时区（IANA 名；空 = UTC，与后端一致）；仅供 UI 说明，前端不据此推算边界 */
+  traffic_reset_timezone: string;
   /** 过期时间 */
   expired_at: string;
   /** 创建时间 */
@@ -133,6 +137,8 @@ export const NodeListProvider: React.FC<{ children: React.ReactNode }> = ({
           group: n.group ?? "",
           traffic_limit: n.traffic_limit ?? 0,
           traffic_limit_type: n.traffic_limit_type,
+          traffic_reset_day: n.traffic_reset_day ?? 0,
+          traffic_reset_timezone: n.traffic_reset_timezone ?? "",
           expired_at: n.expired_at ?? "",
           created_at: n.created_at ?? "",
           updated_at: n.updated_at ?? "",

@@ -26,6 +26,11 @@ export type Record = {
     down: number;
     totalUp: number;
     totalDown: number;
+    /** 服务端给出的本周期已用（节点未配置重置日时恒为 0）；展示口径见 utils/trafficPeriod.ts */
+    periodUp: number;
+    periodDown: number;
+    /** 本周期起点（RFC3339）；null = 服务端未给出周期起点（本周期尚未开始） */
+    periodStartedAt: string | null;
   };
   connections: {
     tcp: number;

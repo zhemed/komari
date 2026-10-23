@@ -7,6 +7,7 @@ import {
 import { useLiveData } from "@/contexts/LiveDataContext";
 import { formatUptime } from "./Node";
 import { formatBytes } from "@/utils/unitHelper";
+import { resolveTrafficUsage } from "@/utils/trafficPeriod";
 import { Flex, Text, Card } from "@radix-ui/themes";
 import type { Record as LiveRecord } from "@/types/LiveData";
 
@@ -34,6 +35,22 @@ export const DetailsGrid = ({
   const node =
     nodeProp ?? nodeListContext?.nodeList?.find((n) => n.uuid === uuid);
   const currentRecord = liveRecord ?? live_data?.data.data[uuid ?? ""];
+  // 口径单一来源，与卡片/表格一致：本周期（服务端字段）/ 累计（未配置周期时沿用旧行为）
+  const traffic = resolveTrafficUsage(node, currentRecord?.network);
+  const cumulativeTrafficText = `↑
+          ${formatBytes(currentRecord?.network.totalUp || 0)}
+          ↓
+          ${formatBytes(currentRecord?.network.totalDown || 0)}`;
+  const periodTrafficText = traffic.periodStarted
+    ? `↑
+          ${formatBytes(traffic.usedUp)}
+          ↓
+          ${formatBytes(traffic.usedDown)}${
+            traffic.limitBytes > 0
+              ? ` / ${t("nodeCard.limitLabel")} ${formatBytes(traffic.limitBytes)}`
+              : ""
+          }`
+    : t("nodeCard.periodNotStarted");
 
   const Container: any = box ? Card : 'div';
 
@@ -76,19 +93,29 @@ export const DetailsGrid = ({
             currentRecord?.network.down || 0
           )}/s`}
         />
-        <UpDownStack
-          up={t("nodeCard.totalTraffic")}
-          align={align === "center" ? "end" : "start"}
-          className="km-details-item flex-[0_0_calc(50%-0.5rem)]"
-            down={`↑
-          ${formatBytes(
-              currentRecord?.network.totalUp || 0
-            )}
-          ↓
-          ${formatBytes(
-              currentRecord?.network.totalDown || 0
-            )}`}
-        />
+        {traffic.periodMode ? (
+          <>
+            <UpDownStack
+              up={t("nodeCard.periodTraffic")}
+              align={align === "center" ? "end" : "start"}
+              className="km-details-item flex-[0_0_calc(50%-0.5rem)]"
+              down={periodTrafficText}
+            />
+            <UpDownStack
+              up={t("nodeCard.cumulativeHistory")}
+              align={align === "center" ? "end" : "start"}
+              className="km-details-item flex-[0_0_calc(50%-0.5rem)]"
+              down={cumulativeTrafficText}
+            />
+          </>
+        ) : (
+          <UpDownStack
+            up={t("nodeCard.totalTraffic")}
+            align={align === "center" ? "end" : "start"}
+            className="km-details-item flex-[0_0_calc(50%-0.5rem)]"
+            down={cumulativeTrafficText}
+          />
+        )}
         <UpDownStack
           className="km-details-item md:w-70 w-full flex-[0_0_calc(50%-0.5rem)]"
           up={t("nodeCard.ram")}

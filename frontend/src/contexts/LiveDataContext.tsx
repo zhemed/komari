@@ -31,6 +31,9 @@ const sameLiveRecord = (left: LiveRecord, right: LiveRecord) =>
   left.network.down === right.network.down &&
   left.network.totalUp === right.network.totalUp &&
   left.network.totalDown === right.network.totalDown &&
+  left.network.periodUp === right.network.periodUp &&
+  left.network.periodDown === right.network.periodDown &&
+  left.network.periodStartedAt === right.network.periodStartedAt &&
   left.connections.tcp === right.connections.tcp &&
   left.connections.udp === right.connections.udp &&
   left.gpu?.average_usage === right.gpu?.average_usage &&
@@ -72,6 +75,13 @@ const mergeLiveData = (
         down: record.net_in ?? 0,
         totalUp: record.net_total_out ?? record.net_total_up ?? 0,
         totalDown: record.net_total_in ?? record.net_total_down ?? 0,
+        // 服务端周期值（只读展示，见 utils/trafficPeriod.ts）；老服务端没有这些字段时取 0 / null。
+        periodUp: record.net_period_up ?? 0,
+        periodDown: record.net_period_down ?? 0,
+        periodStartedAt:
+          typeof record.period_started_at === "string"
+            ? record.period_started_at
+            : null,
       },
       connections: {
         tcp: record.connections ?? 0,

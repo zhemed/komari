@@ -14,6 +14,10 @@ import { useTranslation } from "react-i18next";
 import Tips from "./ui/tips";
 
 import { formatBytes } from "@/utils/unitHelper";
+import {
+  resolveTrafficUsage,
+  type TrafficUsage,
+} from "@/utils/trafficPeriod";
 
 /** 格式化秒*/
 export function formatUptime(seconds: number, t: TFunction): string {
@@ -43,13 +47,56 @@ const DEFAULT_NODE_LIVE = {
   swap: { used: 0 },
   load: { load1: 0, load5: 0, load15: 0 },
   disk: { used: 0 },
-  network: { up: 0, down: 0, totalUp: 0, totalDown: 0 },
+  network: {
+    up: 0,
+    down: 0,
+    totalUp: 0,
+    totalDown: 0,
+    periodUp: 0,
+    periodDown: 0,
+    periodStartedAt: null,
+  },
   connections: { tcp: 0, udp: 0 },
   uptime: 0,
   process: 0,
   message: "",
   updated_at: "",
 } as Record;
+
+/**
+ * 周期口径附加说明：累计（历史）+ 重置边界（时区名来自节点配置）+ 存量超额节点的「口径已切换」标注。
+ * 未配置周期的节点（traffic_reset_day = 0）不渲染任何内容 ⇒ 与升级前逐项一致。
+ */
+const TrafficPeriodNotes = React.memo(
+  ({ traffic }: { traffic: TrafficUsage }) => {
+    const [t] = useTranslation();
+    if (!traffic.periodMode) return null;
+    return (
+      <Flex direction="column" gap="0" className="km-traffic-period-notes">
+        <Text size="1" color="gray">
+          {t("nodeCard.cumulativeHistory")}: ↑{" "}
+          {formatBytes(traffic.totalUp)} ↓ {formatBytes(traffic.totalDown)}
+        </Text>
+        <Text size="1" color="gray">
+          {t("nodeCard.periodResetNote", {
+            day: traffic.resetDay,
+            timezone: traffic.resetTimezone,
+          })}
+        </Text>
+        {traffic.basisSwitched && (
+          <Flex align="center" gap="1" className="km-traffic-basis-switched">
+            <Badge color="amber" variant="soft" size="1">
+              {t("nodeCard.basisSwitched")}
+            </Badge>
+            <Tips ariaLabel={t("nodeCard.basisSwitched")}>
+              <Text size="1">{t("nodeCard.basisSwitchedTip")}</Text>
+            </Tips>
+          </Flex>
+        )}
+      </Flex>
+    );
+  },
+);
 
 const Node = React.memo(
   ({ basic, live, online, isMobile, showIpTagsInCard }: NodeProps) => {
@@ -70,6 +117,19 @@ const Node = React.memo(
   const totalUpload = formatBytes(liveData.network.totalUp);
   const totalDownload = formatBytes(liveData.network.totalDown);
   //const totalTraffic = formatBytes(liveData.network.totalUp + liveData.network.totalDown);
+  // 口径单一来源：本周期（服务端字段）/ 累计（未配置周期时沿用旧行为），见 utils/trafficPeriod.ts
+  const traffic = resolveTrafficUsage(basic, liveData.network);
+  const periodUpload = formatBytes(traffic.usedUp);
+  const periodDownload = formatBytes(traffic.usedDown);
+  const trafficLabel = traffic.periodMode
+    ? t("nodeCard.periodTraffic")
+    : t("nodeCard.totalTraffic");
+  const trafficValueText = traffic.periodMode
+    ? traffic.periodStarted
+      ? `↑ ${periodUpload} ↓ ${periodDownload}`
+      : t("nodeCard.periodNotStarted")
+    : `↑ ${totalUpload} ↓ ${totalDownload}`;
+  const trafficLimitText = `${traffic.limitTypeLabel}(${formatBytes(basic.traffic_limit)})`;
   return (
     <Card
       style={{
@@ -193,35 +253,29 @@ const Node = React.memo(
           {basic.traffic_limit > 0 ? (
             <Flex justify="between" hidden={isMobile} direction="column">
               <UsageBar
-                label={t("nodeCard.totalTraffic")}
-                value={getTrafficPercentage(
-                  liveData.network.totalUp,
-                  liveData.network.totalDown,
-                  basic.traffic_limit,
-                  basic.traffic_limit_type ?? "sum",
-                )}
+                label={trafficLabel}
+                value={traffic.percentage}
                 max={Infinity}
               />
               <Flex wrap="nowrap" justify="between">
                 <Text size="1" className="md:block hidden" color="gray">
-                  ↑ {totalUpload} ↓ {totalDownload}
+                  {trafficValueText}
                 </Text>
                 <Text size="1" className="md:block hidden" color="gray">
-                  {basic.traffic_limit_type &&
-                    basic.traffic_limit_type.charAt(0).toUpperCase() +
-                      basic.traffic_limit_type.slice(1)}
-                  ({formatBytes(basic.traffic_limit)})
+                  {trafficLimitText}
                 </Text>
               </Flex>
+              <TrafficPeriodNotes traffic={traffic} />
             </Flex>
           ) : (
-            <Flex justify="between" hidden={isMobile}>
-              <Text size="2" color="gray">
-                {t("nodeCard.totalTraffic")}
-              </Text>
-              <Text size="2">
-                ↑ {totalUpload} ↓ {totalDownload}
-              </Text>
+            <Flex justify="between" hidden={isMobile} direction="column">
+              <Flex justify="between">
+                <Text size="2" color="gray">
+                  {trafficLabel}
+                </Text>
+                <Text size="2">{trafficValueText}</Text>
+              </Flex>
+              <TrafficPeriodNotes traffic={traffic} />
             </Flex>
           )}
 
@@ -241,23 +295,17 @@ const Node = React.memo(
             </Text>
           </Flex>
           <Flex justify="between" gap="2" hidden={!isMobile}>
-            <Text size="2">{t("nodeCard.totalTraffic")}</Text>
+            <Text size="2">{trafficLabel}</Text>
             <Flex direction="column">
-              <Text size="2">
-                ↑ {totalUpload} ↓ {totalDownload}
-              </Text>
+              <Text size="2">{trafficValueText}</Text>
+              <TrafficPeriodNotes traffic={traffic} />
             </Flex>
           </Flex>
           {basic.traffic_limit > 0 && isMobile && (
             <UsageBar
-              label={`${basic.traffic_limit_type && basic.traffic_limit_type.charAt(0).toUpperCase() + basic.traffic_limit_type.slice(1)}(${formatBytes(basic.traffic_limit)})`}
+              label={trafficLimitText}
               max={Infinity}
-              value={getTrafficPercentage(
-                liveData.network.totalUp,
-                liveData.network.totalDown,
-                basic.traffic_limit,
-                basic.traffic_limit_type ?? "sum",
-              )}
+              value={traffic.percentage}
             />
           )}
           <Flex justify="between" hidden={isMobile}>
@@ -358,25 +406,3 @@ export const NodeGrid = ({ nodes, liveData, onlineSet }: NodeGridProps) => {
   );
 };
 
-function getTrafficPercentage(
-  totalUp: number,
-  totalDown: number,
-  limit: number,
-  type: "max" | "min" | "sum" | "up" | "down",
-) {
-  if (limit === 0) return 0;
-  switch (type) {
-    case "max":
-      return (Math.max(totalUp, totalDown) / limit) * 100;
-    case "min":
-      return (Math.min(totalUp, totalDown) / limit) * 100;
-    case "sum":
-      return ((totalUp + totalDown) / limit) * 100;
-    case "up":
-      return (totalUp / limit) * 100;
-    case "down":
-      return (totalDown / limit) * 100;
-    default:
-      return 0;
-  }
-}
