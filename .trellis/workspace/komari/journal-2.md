@@ -263,3 +263,38 @@
 ### Next Steps
 
 - 待验证：跨真实周期边界（2026-11-22 00:00Z）观察周期归零；可选：把渲染层 DOM 断言搬进仓库、把 test:period 接入 check-repo
+
+
+## Session 68: 面板口径加固：渲染层断言入库 + 接入自检第 16 项
+<!-- trellis-session: v=2 fp=fc50e88d88de3cf4 -->
+
+**Date**: 2026-10-23
+**Task**: 面板口径加固：渲染层断言入库 + 接入自检第 16 项
+**Branch**: `main`
+
+### Summary
+
+用户批准两项：① 把渲染层 SSR/DOM 断言从 /tmp 搬进仓库（frontend/script/period-panel-dom.mjs，渲染真组件 Node.tsx，89 项断言，零新依赖——用 vite 既有 esbuild 打包到临时目录）；② 把口径回归接入 scripts/check-repo.sh 新增第 16 项（逻辑 69 + 渲染 89，解析不出计数即报红；node 缺失/过旧/缺 esbuild 时打印跳过行、不判失败不静默通过）。红→绿判别性验证两次（逻辑与渲染各改坏一条断言 ⇒ 自检报红，还原后 byte-identical 且全绿）；跳过语义三种情况均实测。
+
+### Main Changes
+
+- frontend/script/period-panel-dom.mjs（+397）+ period-panel-dom-entry.tsx（+68）+ package.json script
+- scripts/check-repo.sh 第 16 项（+53）+ docs/MAINTAINING.md 一行
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `edc174e` | chore(task): archive 10-23-period-panel-hardening |
+
+### Testing
+
+- [OK] npm run test:period-dom 89/89；npm run test:period 69/69；check-repo.sh 与 --full、selftest 全绿（Lead 复跑）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：浏览器交互层（悬停气泡/移动端/暗色）用常驻 bw 做一次真实页面快照断言；esbuild 若不再被 vite 依赖需提升为 devDependency 并同步 lock
