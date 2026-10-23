@@ -11,9 +11,13 @@ LABEL org.opencontainers.image.source="https://github.com/zhemed/komari" \
 WORKDIR /app
 
 # 需要**静态链接**的二进制（见 docs/MAINTAINING.md：KOMARI_STATIC=1 构建）。
-# 默认值让普通 `docker build` 也能工作，不必依赖 buildx 注入平台参数。
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+# **不要**给这两个 ARG 默认值：stage 内带默认值的 ARG 会**覆盖** buildx 按目标平台注入的值，
+# 于是多架构构建的每一腿都 COPY 同一份 amd64 产物（2026-10-23 实测：arm64 腿里装的是 x86-64
+# 二进制；`docker manifest inspect` 与匿名可拉**查不出**这类载荷错误，见 docs/MAINTAINING.md §12）。
+# 现代 `docker build` 本身就是 BuildKit、会自动注入 TARGETOS/TARGETARCH；只有 `DOCKER_BUILDKIT=0`
+# 的旧式构建才需要显式 `--build-arg TARGETOS=linux --build-arg TARGETARCH=<arch>`。
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN apk add --no-cache ca-certificates curl tzdata
 

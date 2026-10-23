@@ -3,7 +3,10 @@
 # 来源：上游 komari-monitor/komari-agent 的 Dockerfile
 #       commit 9e532e0429cd049571e35cf344654181879b33c7（2026-09-15）
 # 改动：
-#   1) ARG 给了默认值（与仓库根 Dockerfile 同口径），普通 docker build 也能跑
+#   1) ARG **不给默认值**（与仓库根 Dockerfile 同口径）：stage 内带默认值的 ARG 会覆盖
+#      buildx 按目标平台注入的值，导致每一腿都 COPY 同一份 amd64 产物（2026-10-23 实测缺陷：
+#      arm64/armv7 腿里装的是 x86-64 二进制）。现代 `docker build` 就是 BuildKit、会自动注入
+#      TARGETOS/TARGETARCH；只有 `DOCKER_BUILDKIT=0` 的旧式构建才需要显式 `--build-arg`。
 #   2) **刻意不写任何 RUN**：只有 COPY。多架构构建（arm64 / armv7）在没有 QEMU/binfmt
 #      的机器上也能完成——上游的 `RUN touch` 与 `RUN apk add` 都需要能执行目标架构的
 #      容器，本机没有模拟器时直接 `exec format error`。
@@ -25,9 +28,9 @@ LABEL org.opencontainers.image.source="https://github.com/zhemed/komari" \
 
 WORKDIR /app
 
-# Docker buildx 会在构建时自动填充这些变量；默认值让普通 docker build 也能工作
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+# buildx / 现代 docker build 会在构建时自动填充这两个变量；**不要给默认值**（理由见文件头第 1 条）
+ARG TARGETOS
+ARG TARGETARCH
 
 COPY --chmod=755 komari-agent-${TARGETOS}-${TARGETARCH} /app/komari-agent
 COPY --chmod=644 komari-agent-container /.komari-agent-container
