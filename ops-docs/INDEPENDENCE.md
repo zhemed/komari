@@ -88,3 +88,68 @@ cd themes/ink && bun audit          # 本机 bun 1.4.2 已带该子命令
 - 谁决策：内核代码改动、新增/升级依赖、部署与标签 **均需明确授权**；
 - 怎么留痕：每个动作建 Trellis 任务（`.trellis/tasks/`），提交信息带 `[task:<slug>]`（闸门要求，见 `ops-docs/BUILD.md`「运维经验」）；
 - 怎么回滚：主题与内核都保留"先备份再替换"的路径（`ops-docs/ROLLBACK.md`）。
+
+## 6. 最近一次依赖安全自查
+
+- **时间（UTC）**：2026-10-23T13:59:36Z
+- **执行人**：我们（自维护；命令与原始输出见提交说明，摘要如下）
+- **环境**：Go `go1.26.6` ｜ `govulncheck v1.9.0`（本次安装）｜ Bun `1.4.2` ｜ 默认 npm 源为镜像站（`bun audit` 需切官方源，见 §4.1 备注）
+- **本轮未做任何升级**：仅记录，升级动作另行授权。
+
+### 6.1 命令与关键输出
+
+| 命令 | 结果 |
+|---|---|
+| `go mod verify` | `all modules verified`（本地模块缓存无损坏） |
+| `go list -m -u all` | 73 行模块；**45 个有可升级版本**（例：`gin v1.10.0 → v1.12.0`、`klauspost/compress v1.17.11 → v1.20.3`、`jackc/pgx/v5 v5.10.0 → v5.11.0`、`validator/v10 v10.26.0 → v10.30.5`） |
+| `govulncheck ./...` | 退出码 3：**13 项漏洞影响我们的调用路径**；另有 12 项在导入包、23 项在依赖模块中，判定为不可达 |
+| `cd themes/ink && bun audit`（`npm_config_registry=https://registry.npmjs.org`） | **20 项**：3 critical ／ 9 high ／ 7 moderate ／ 1 low，涉及 **7 个包**（全部位于 devDependency / 构建工具链） |
+
+### 6.2 内核：13 项可达漏洞
+
+| # | ID | 模块 | 当前 | 修复版本 | 轨迹数 |
+|---|---|---|---|---|---|
+| 1 | GO-2026-6809 | crypto/x509（标准库） | go1.26.6 | go1.26.10 | 1 |
+| 2 | GO-2026-6629 | golang.org/x/text | v0.33.0 | v0.41.0 | 1 |
+| 3 | GO-2026-6617 | golang.org/x/net（HTTP/2） | v0.41.0 | v0.60.0 | 177 |
+| 4 | GO-2026-6613 | net/http（标准库） | go1.26.6 | go1.26.9 | 51 |
+| 5 | GO-2026-6612 | golang.org/x/net（HTTP/2） | v0.41.0 | v0.60.0 | 177 |
+| 6 | GO-2026-6611 | golang.org/x/net（HTTP/2） | v0.41.0 | v0.60.0 | 177 |
+| 7 | GO-2026-6610 | golang.org/x/net（HTTP/2） | v0.41.0 | v0.60.0 | 6 |
+| 8 | GO-2026-6609 | net/http（Range 头） | go1.26.6 | go1.26.9 | 2 |
+| 9 | GO-2026-6608 | net/textproto（MIME） | go1.26.6 | go1.26.9 | 2 |
+| 10 | GO-2026-6607 | crypto/tls（ECH） | go1.26.6 | go1.26.9 | 5 |
+| 11 | GO-2026-6605 | net/http（CONNECT） | go1.26.6 | go1.26.9 | 3 |
+| 12 | GO-2026-6603 | golang.org/x/net（HTTP/2 Trailer） | v0.41.0 | v0.60.0 | 177 |
+| 13 | GO-2026-5970 | golang.org/x/text | v0.33.0 | v0.39.0 | 3 |
+
+修复路径：**升级 Go 工具链到 ≥ go1.26.10**（覆盖 6 项标准库问题）＋ **`golang.org/x/net` ≥ v0.60.0**（5 项）＋ **`golang.org/x/text` ≥ v0.41.0**（2 项）。
+
+**影响面判断**：13 项里 10 项属 HTTP/2 服务端 / TLS / x509 路径；我们的部署形态是 nginx 终止 TLS、
+回源 HTTP/1.1 到 loopback（见 `ops-docs/DEPLOY.md`），**未对公网直接暴露 Go 的 HTTP/2 服务端**【推断】，
+因此实际可利用性低于"公网直连"场景；但 ① x509 证书校验（GO-2026-6809，出网抓取 GeoIP 库时用到）
+② net/http 的 Range/CONNECT 解析问题仍应尽快修。
+
+### 6.3 主题：7 个受影响包（全部在构建/测试工具链）
+
+| 包 | 最高级别 | 代表公告 | 链条性质 |
+|---|---|---|---|
+| shell-quote@1.10.0 | **critical** | GHSA-pqg4-j6r4-53mv（`quote()` 命令注入） | `npm-run-all2`（构建脚本编排） |
+| tinypool@2.1.0 | **critical** | GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr（原型污染 → RCE） | vitest 测试池 |
+| brace-expansion（1.1.18 / 2.1.4 / 5.0.9） | high | GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（递归 DoS） | eslint / archiver / minimatch 链 |
+| braces@3.0.3 | high | GHSA-vfj7-8cjw-p6xm（嵌套模式栈溢出 DoS） | chokidar / micromatch 链 |
+| source-map-js@1.2.1 | high | GHSA-68fv-2mgg-jv7q（source-map 段索引 DoS） | vue 编译器 / tailwind 链 |
+| vite@7.3.6 | high（含 moderate/low） | GHSA-587h-7wmj-h5pm、GHSA-9jrq-w75r-8gcw、GHSA-rq7h-c2jc-7f22 等 | 构建/开发服务器（含 launch-editor） |
+| postcss-selector-parser@7.1.5 | moderate | GHSA-rj75-hqrm-r3gf（选择器解析 CPU 耗尽） | PostCSS/Tailwind 链 |
+
+**影响面判断**：主题的**运行期依赖**（`vue`、`pinia`、`echarts`、`reka-ui`、`vue-router` 等）**未出现公告**；
+上述 7 个包只在我们**构建/检查/测试**时加载 ⇒ 生产站点不受直接影响；但在构建机或 CI 上处理不可信输入时需谨慎
+（两个 critical 都在这一层）。
+
+### 6.4 待办（本轮不执行，需授权后按 §4.3 三步走）
+
+1. 升级 Go 工具链到 **≥ go1.26.10**（本地、构建脚本与将来的 CI 一起改）；
+2. `go get golang.org/x/net@v0.60.0 golang.org/x/text@v0.41.0` + `go mod tidy` → `./build.sh` 验证 → 按 `ops-docs/DEPLOY.md` 部署；
+3. 主题：`cd themes/ink && bun update`（或对上述 7 个包定向升级）→ `bun run lint` + `./build.sh` 验证；
+4. 把"`bun audit` 需切官方源（默认镜像站不支持 advisories 接口）"补进 `ops-docs/BUILD.md`；
+5. 下次自查：**一个月内**或出现重大 CVE 时立即执行，并在本节追加一行结果。
