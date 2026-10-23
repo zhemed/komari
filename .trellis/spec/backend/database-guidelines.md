@@ -32,6 +32,13 @@ CLI 绑定见 `cmd/root.go:39-40`（`--db-type` / `--database`，默认 `./data/
   - 测试要求（`go test ./database/... -run Traffic`）：边界计算（UTC / Asia/Shanghai / 小月 31 日 / 跨年）；
     非法配置（`-1`、`32`、`Not/AZone`）报错且不落库；跨边界累加（周期归零、累计不回退）；
     计数器归零不归零周期；再基线（切换后首次 `delta = 0`）；禁用配置回归。
+  - **流水线健壮性与可观测性**（2026-10-23，`0.0.24`）：心跳看门狗判据是
+    `queue_len > 0 && now - last_accumulate_success_unix > 90s`（**同一次停摆只 WARN 一次**，恢复 INFO 一次；
+    空闲不误报）；死信 = 同一队头批次失败 3 次即**丢弃** + 计数 + ERROR；`pending` 上限 `2 × 队列容量`，超限丢最旧；
+    主库调用 5s 超时（超时那次少计一次、不回退）；**读库失败不得当成「未配置」**（否则会误清周期列）。
+    改这些阈值/策略要同步更新测试：`internal/metricstore/*_test.go`（看门狗一次 WARN/一次 INFO、死信丢弃、
+    pending 截断）、`database/clients/traffic_timeout_test.go`（超时/慢操作）、
+    `web/rpc/jsonrpc/admin.database_heartbeat_test.go`（心跳字段齐全）。
 
 ## 1. GORM 模型风格（`database/models/*.go`）
 

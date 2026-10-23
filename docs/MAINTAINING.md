@@ -394,6 +394,24 @@ metricstore 不反向依赖 `database/*`。
   前端只**读** `traffic_reset_day` / `traffic_reset_timezone`。
 - **升级顺序**：`traffic_reset_day >= 1` 的节点若配的是**旧服务端**（不回 `period_*`），面板会显示
   「本周期尚未开始」并按 0 ⇒ **先升服务端、再升前端产物**。
+- **口径回归命令**：`cd frontend && npm run test:period`（69 项；0 = 全绿 / 1 = 断言失败 / 2 = 环境不满足，需 Node >= 22.18）—— 未配置周期节点与升级前逐位一致的可复跑证据。
+
+###### 报告流水线心跳与看门狗
+
+- 心跳字段在 `admin:getDatabaseSize`（`GET /api/admin/database/size`，**admin-only**）的 `traffic_pipeline`：
+  `last_batch_success_unix`、`last_accumulate_success_unix`、`batch_errors_total`、`accumulate_errors_total`、
+  `queue_len`、`pending_len`、`worker_alive`、`stall_events_total`、`dropped_batches_total`、`dropped_reports_total`、
+  `last_batch_error`（截断 200B；`queue_len` / `worker_alive` / `pending_len` 取实时值）。
+- 判据：`queue_len > 0` **且** `now - last_accumulate_success_unix > 90s` ⇒ WARN **一次**（同一次停摆只告一次）+
+  `stall_events_total` 计数；恢复 ⇒ INFO 一次；空闲（队列 0）不误报；启动宽限期以看门狗启动时刻为基线（首次巡检不误报）。
+  注意 `last_batch_success_unix` 只证明"指标在写"，不证明累计在跑（判停摆只看 `last_accumulate_success_unix`）。
+
+###### 报告流水线健壮性（运维可见取舍）
+
+- 同一队头批次连续失败 **3 次** ⇒ 进**死信 = 丢弃**（计数 + ERROR，摘要含条数/节点数/时间窗/uuid 样本）：
+  取舍是**宁可丢一批、不让毒丸永久堵住后面所有报告**。`pending` 上限 = **2 × 队列容量**，超限**丢最旧** + 计数 + WARN。
+- 主库调用 **5s 超时**（`mainDBOperationTimeout`），慢操作（>= 1s）也写 WARN；**超时那次少计一次增量、不回退、不写坏**。
+- **读库失败不再被当成「未配置」**（不会再误清周期列）：读不到就整次跳过。这些只**暴露与收敛**停摆，不改累计语义。
 
 ## 4. 与上游的解耦点
 
