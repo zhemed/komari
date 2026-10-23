@@ -1,0 +1,919 @@
+# AI Cache / Agent Handoff Log
+
+> 这个文件给 AI 编程代理和二开维护者使用，用来保存任务计划、执行日志、验证结果、风险点和交接信息。它的目标是防止断网、会话丢失、上下文被压缩后无法继续工作。
+
+## 使用规则
+
+- 开始多文件、架构、安全、发布、迁移类任务前，先新增或更新“当前任务”。
+- 开发中按时间追加“执行日志”。
+- 结束前必须更新“验证记录”和“交接说明”。
+- **每次更新后必须 bump `komari-theme.json` 的 `version`（用户上传新 zip 直接覆盖安装），并重新 `bun run build` 打包**，同时在 README 同步当前版本。
+- 不要写入密钥、token、cookie、服务器密码、私有用户数据。
+- 如果记录过期，直接标注“已完成/已废弃”，不要让后续 AI 误判。
+
+## 当前任务
+
+- 状态：done，用户明确反馈不喜欢「三网」延迟行的短标签方案（"电23ms · 联45ms · 移61ms"），已整体撤回，还原为上一版本的纯数字展示（"23ms · 45ms · 61ms"，完整任务名仍在 tooltip 里）
+- 目标：`NodeCard.vue` 的三网行模板还原为撤回前的样式（去掉 `shortLabel` 的 `<span>`，`gap-1.5` 改回 `gap-1`，分隔点透明度 `/40` 改回 `/50`）；同步移除 `useNodePingDisplay.ts` 里 `NodePingTaskLatencyItem.shortLabel` 字段和 `taskLatencyItemsRaw` 里的截取逻辑（不再被任何地方使用，避免留下死代码）。这是纯粹的用户偏好回退，不是发现了新 bug——上一版本身逻辑是对的，只是视觉风格不合口味，因此代码里不需要保留任何 shortLabel 相关的分支或注释痕迹。
+- 验证：`bun run type-check`、对 2 个改动文件单独跑 `eslint`（零告警）、`bun run build` 均通过。
+- 版本：`komari-theme.json` 0.6.6 → 0.6.7。
+
+## 历史任务
+
+- 状态：done，M4 UI/UX 小修：清除筛选按钮防抖同步 bug + 全仓圆角一致性审计（无新增问题）+「三网」延迟行补充短标签（**此方案已被用户否决并撤回，见上方"当前任务"**）
+- 目标：用户要求「完成 3、4」（延续上一轮对话里我给出的四条待办中的第 3、4 条：全仓 `absolute inset-0` 圆角/阴影一致性审计、空状态"清除筛选"可操作性），同时分析首页卡片「三网」延迟行是否还有美化空间：
+  1. **全仓圆角/阴影一致性审计**：系统性搜索了 `absolute inset-0` 结合 `rounded-*`/`shadow-*` 的所有组合（`NodeList.vue`/`NodeCard.vue` 的在线状态指示灯 ping 动画、离线遮罩、`AppDialog.vue` 的全屏 `DialogOverlay`、`Spinner.vue` 通用加载遮罩），结论：**没有发现新问题**。上一轮已修复的 `NodeCard.vue` 离线遮罩 `rounded-xl`→`rounded-lg` 是孤立个案，`NodeList.vue` 对应遮罩本来就是对的（`rounded-lg`）；`rounded-full` 的 ping 动画点天然不受父容器圆角影响；`AppDialog` 遮罩覆盖整个视口不需要圆角；`Spinner.vue` 是通用组件，只在卡片内容区域内出现（不贴卡片边缘），不存在裁切问题。**未发现问题，未做代码改动**，如实报告审计结果而非编造问题。
+  2. **空状态"清除筛选"可操作性**：核实发现 `HomeView.vue` 空状态里其实**已经有**"清除搜索与筛选"按钮（`resetHomeFilters` + `Empty` 组件的 `#extra` slot），是我上一轮分析时看漏了。但审计该函数时发现一个真实的小 bug：`resetHomeFilters()` 只重置了 `searchText`，没有同步重置 `debouncedSearchText`——而后者是走 `useDebounceFn` 300ms 防抖同步的（`watch(searchText, v => updateDebouncedSearch(v))`），空状态的文案/图标/列表过滤全部读的是 `debouncedSearchText`。所以点击"清除搜索与筛选"后，空状态会卡住 300ms 才消失，与旁边搜索框自带的"清除"按钮（`clearSearch()`，两个字段同步清空）体验不一致。修复：`resetHomeFilters()` 里补上 `debouncedSearchText.value = ''`，与 `clearSearch()` 保持一致的即时清空行为。**该修复保留，未被撤回。**
+  3. **首页卡片「三网」延迟行分析与美化**：`NodeCard.vue` 的"三网"行（按 ping 任务分项展示电信/联通/移动等线路延迟）此前只显示裸数字用 `·` 分隔（如 "23ms · 45ms · 61ms"），要分清哪个数字对应哪条线路必须逐个悬浮 `DataTooltip` 查看——这违背了"三网对比"本身"一眼看清"的设计意图，是这次分析发现的核心问题。另确认这一行只存在于卡片视图（`NodeCard.vue`），列表视图（`NodeList.vue`）完全没有等价行——这是一个更大的功能缺口，本次未处理（需要新增列，改动范围超出"美化"，留作后续独立任务）。修复实现：曾给每个数值前加任务名前 2 字的短标签（"电23ms · 联45ms · 移61ms"）。**用户反馈不喜欢这个视觉风格，明确要求恢复原来的纯数字展示，已在下一轮撤回**（`shortLabel` 字段和渲染逻辑全部移除，完整任务名仍保留在 tooltip 里）。
+- 验证：`bun run type-check`、对 3 个改动文件单独跑 `eslint`（零告警）、`bun run build`（type-check + vite build + zip 打包）均通过。浏览器验证：`agent-browser` 打开首页确认无新增 JS 报错（仅有沙盒环境固有的 RPC 500，与本次改动无关）。
+- 版本：`komari-theme.json` 0.6.5 → 0.6.6；README 版本里程碑表格同步追加本次改动摘要。
+
+## 历史任务
+
+- 状态：done，用户反馈两处 bug 修复：顶部“实时速率”卡片上传单位硬编码 + 离线节点卡片圆角与卡片本体不一致
+- 目标：核实并修复用户反馈的两个具体问题：
+  1. **“上传速率单位有问题，MB/s 也显示 KB/s”**：`NodeGeneralCards.vue` 的 `netSpeed`（首页“实时速率”卡片）case 里，`unit` 字段把上传速率单位写成了固定字符串 `` `KB/s · ↓${...}` ``，而下载那一半正确地用了 `formattedSpeedDown.value.unit`（随数值动态换算 KB/s、MB/s、GB/s）。也就是上传速率一旦跨过 1024 KB/s 换算成 MB/s，数值变了但单位显示仍卡在 "KB/s"。改成读取 `formattedSpeedUp.value.unit`，和下载保持同样的动态换算逻辑。`formattedSpeedUp`/`formattedSpeedDown` 本身（`formatBytesPerSecondSplit`）没有问题，只是这一处展示层把值硬编码了。
+  2. **“如果整体圆角都能统一就好了”**：核实后发现 `NodeCard.vue` 里“离线遮罩”（`v-if="!props.node.online"` 的 `absolute inset-0` 蒙层）用的是 `rounded-xl`（16px），而它精确贴合的卡片本体（`CardX`，`rounded-lg`/12px）用的是更小的圆角——遮罩圆角比卡片本体大，导致离线节点卡片的四角会露出方形背景，与在线卡片圆角不一致。对比同样功能在 `NodeList.vue`（第 671 行，表格行视图的离线遮罩）里用的是正确的 `rounded-lg`，确认 `NodeCard.vue` 这处 `rounded-xl` 是唯一的例外/笔误，改成 `rounded-lg` 与卡片本体一致。审计了全项目 shadcn 基础组件（button/badge/input/tabs 统一 `rounded-md`，dialog/alert/card 统一 `rounded-lg`）确认这是仅此一处的孤立不一致，不是系统性设计令牌问题，未做更大范围改动。
+- 验证：`bun run type-check`、对改动文件单独跑 `eslint`（零告警）、`bun run build`（type-check + vite build + zip 打包）均通过。当前沙盒环境无真实 Komari 后端数据（RPC 502），无法用真实节点数据截图验证"离线卡片圆角"和"MB/s 显示"的最终视觉效果，仅通过代码审查 + 构建产物核实修复逻辑正确；后续有真实数据环境时建议用真实离线节点和 >1MB/s 上传速率的节点做一次人工回归。
+- 版本：`komari-theme.json` 0.6.4 → 0.6.5。
+
+## 历史任务
+
+- 状态：done，前端性能优化四项：自托管字体 + 图标构建期打包 + 首页死代码清理 + 列表合成层收敛（M2 性能，四个独立小改动）
+- 目标：例行性能扫描（构建产物体积、字体/图标加载链路、定时器、合成层）发现的四处具体问题，逐一修复：
+  1. **Google Fonts 改为自托管**：`index.html` 原有 `<link rel="preconnect">` + `<link href="https://fonts.googleapis.com/css2?family=Inter...">` 是同步阻塞的跨域请求；`fonts.googleapis.com`/`fonts.gstatic.com` 在中国大陆（本主题 `lang="zh-CN"`、默认时区 `Asia/Shanghai`，面向中文用户）访问不稳定甚至被墙，而 Inter 又是纯 Latin 字体、中文字符本就走系统字体 fallback，等于为少数英文/数字字符承担了整页阻塞风险。改为 `@fontsource-variable/inter`（新增生产依赖）自托管：`src/styles/main.css` 顶部（必须在 `@import 'tailwindcss'` 之前）新增 `@import '@fontsource-variable/inter/wght.css'`，`--font-sans` token 里的字体名同步改成 `'Inter Variable'`（fontsource 可变字体包的实际 `font-family` 名）；`index.html` 移除两条 Google Fonts 相关 `<link>`。
+  2. **Iconify 图标构建期打包**：`src/utils/iconify.ts` 原来是纯 no-op，`<Icon icon="tabler:xxx">` 走 `@iconify/vue` 默认策略——每个图标首次使用时单独向 `api.iconify.design` 发请求。全仓扫描确认本项目用到的图标是完全静态可枚举的集合（118 个，来自 tabler/lucide/icon-park-outline/carbon 四个前缀，无运行时拼接的图标名）。新增 `scripts/generate-icon-subset.ts`（构建期脚本，`bun run icons:generate`）：扫描 `src/**/*.{vue,ts}` 里所有 `'前缀:图标名'` 字面量，从 `@iconify/json`（新增 devDependency）按需抽取对应图标数据，生成 `src/assets/icons/subset.generated.ts`（38.4KB，118 个图标里 115 个成功收录；3 个在当前锁定的 `@iconify/json` 快照里找不到——`tabler:brand-nvidia`/`chart-line-off`/`chip`，可能是比快照版本更新才收录的图标名，脚本对找不到的图标只 warn 不报错，这几个会自动回退到原有 CDN 加载策略，不影响显示，不阻塞构建）。`src/utils/iconify.ts` 的 `setupIconify()` 改为 `addCollection()` 注册这份子集，在 `main.ts` 里挂载前调用。新增 `fast-glob`、`@iconify/utils` 两个 devDependency 供生成脚本使用。**注意**：以后新增/删除图标引用后要重新跑一次 `bun run icons:generate` 并把改动后的 `subset.generated.ts` 一并提交，否则新图标会静默回退到 CDN 加载（不会报错，只是少了离线加速）。
+  3. **首页死代码/重复请求清理**：`HomeView.vue` 的 `onMounted` 里有一段调用 `financeHelper.getDailyExchangeRates()` 存入本地 `exchangeRates` ref，但该 ref 在整个组件里从未被模板或其他逻辑读取——纯死代码；而真正消费汇率数据的 `NodeGeneralCards.vue`（首页默认工具，几乎每个访客��会挂载）已经完全独立地自己调用了一次同名方法。也就是原来每个访客打开首页会触发两次独立的汇率请求（有当日缓存所以实际影响有限，但仍是浪费）。核实 `ProviderValuePanel.vue` 同样自带独立的 `excludeFreeNodes`/`shouldExcludeFreeNodes()` 调用，与 `HomeView.vue` 里的同名死代码无任何耦合后，直接删除 `HomeView.vue` 里的 `exchangeRates` ref、`excludeFreeNodes` ref、整个 `onMounted` 块，以及随之变成未使用的 `onMounted`（vue 导入）和 `financeHelper`（模块导入）。
+  4. **列表视图合成层收敛**：`NodeList.vue` 桌面表格行原来是逐行（`v-for` 内）各自加一层 `backdrop-blur-sm`；虚拟滚动只减少了同时存在的 DOM 节点数量，可视区内同屏的十几行仍各自是独立合成层，`backdrop-filter` 是浏览器里开销最大的滤镜之一，逐行叠加在中低端设备滚动时有明显的重复取样开销。改为把 `backdrop-blur-sm` 从每行移到外层视口容器（`nodeRowsViewportBind` 所在的 div，虚拟滚动开启与否都存在，一直渲染）上做一次，每行只保留半透明背景色叠加在这层已模糊背景上——高斯模糊对局部区域的卷积结果不受"整体一次做"还是"逐块分别做"影响，视觉结果等价，合成层数从 N 降到 1。移动端堆叠卡片分支未使用 `backdrop-blur`，未受影响。
+- 验证：`bun run type-check`（`vue-tsc --build`）、`bun run lint`（针对本次改动文件单独跑通过；全量 `lint --fix` 命中一处与本次改动无关的 ESLint 自动修复 bug——把已有的模块级 `let closeActiveTouchTooltip` 声明误判为需要"添加"导致同名变量重复声明，已用 `git checkout` 还原该文件，未提交该 lint 误改）、`bun run build`（type-check + vite build + zip 打包）三者均通过。浏览器验证（`agent-browser`，`bun run dev` 临时起本地 dev server）：`performance.getEntriesByType('resource')` 确认零个 `fonts.googleapis.com`/`fonts.gstatic.com`/`api.iconify.design` 请求，字体走本地 `node_modules/@fontsource-variable/inter/...woff2`；首屏渲染的 14 个 `svg.iconify` 图标全部带有效 `viewBox`/`path`（本地子集注册成功，无需等待网络往返）。因沙盒无真实 Komari 后端数据（控制台可见 RPC/health check 500，与本次改动无关，是环境限制），列表视图 backdrop-blur 的实际滚动跟手性未能用真实节点数据截图对比，仅代码复查确认视觉等价（半透明背景色 + 单层模糊叠加）。
+- 版本：`komari-theme.json` 提交时发现远程已并行推进到 0.6.3（含一次无关的 DataTooltip 重复声明去重修复），rebase 解决版本号冲突后最终定为 0.6.4；push 前重新跑过一次 `bun run build` 确认基于 rebase 后代码构建仍通过。
+- 下一步：若之后引入图标集合切换（比如新增一个当前 `KNOWN_PREFIXES` 之外的前缀），脚本会直接报错提醒补充清单，不会静默漏收录；如果开发时频繁增删图标引用觉得手动跑 `icons:generate` 麻烦，可以考虑接入 Vite 插件在 dev/build 前自动跑一次（本次未做，保持最小改动范围）。
+
+- 状态：done，Header 数据新鲜度改为绑定真实轮询数据到达时间（bug fix，接续上一条记录）
+- 目标：上一条记录里的修复只是把"每 2s 重置锚点"改成了"锚点固定在页面挂载时刻"，但本质仍是页面开着就单调递增的挂钟计时——用户反馈截图显示"32s 前更新"，纯粹因为页面开了 32 秒，跟数据是否新鲜完全无关，给人数据越来越旧的错觉。真正的修复需要把锚点绑定到"最近一次真实收到节点状态数据"的时刻。
+- 实现：`src/stores/nodes.ts` 新增 `lastStatusUpdateAt` ref（初始 `null`），在 `updateNodeStatuses()`（每次轮询/推送成功拿到最新状态时的唯一入口，`src/utils/init.ts` 的 `poll()` 每个周期都调用，周期即 `dataUpdateInterval` 配置项，默认 3s）末尾写入 `Date.now()`，并加入 store 返回对象导出。`src/components/Header.vue` 改为 `import { useNodesStore }`，`freshText` 读取 `nodesStore.lastStatusUpdateAt`：为 `null`（尚未收到过第一次数据）时显示"等待数据"；否则显示"距上次真实数据到达的秒数"，正常情况下每个轮询周期就会回落到很小的数字（0-3s），只有真的断连/卡住时才会持续变大——这才是"新鲜度"该有的语义。本地 tick 间隔从 2s 收紧到 1s，让秒数增长更平滑。
+- 附带修复：本次核对 `komari-theme.json` 时发现两处历史遗留的乱码（编码损坏）——`diskPredictionThresholdDays` 的 `name` 字段"磁盘预测预警������数"、`gpuChartEnabled` 的 `help` 字段"控制 GPU ���用率..."，顺手修正为"磁盘预测预警天数"/"控制 GPU 利用率..."，属于后台设置面板里真实可见的文字损坏，与本次改动一并发布。
+- 验证：`bun run lint`、`bun run build`（type-check + vite + zip）均通过；无 chunk 体积变化（改动只涉及一个新 ref 和一次赋值，量级可忽略）。
+- 版本：`komari-theme.json` 0.5.11 → 0.5.12。
+- 下一步：如果之后接入真正的 WebSocket 推送模式（`rpc.ts` 里 `useWebSocket` 选项），要确认 WS 消息处理路径最终也会调用到 `updateNodeStatuses`（目前 `poll()` 内部统一走 HTTP/WS 两种 transport 都调用同一个 `rpc.getNodesLatestStatus()`，逻辑上是覆盖的，但建议真机验证一次 WS 模式下这个时间戳是否正常刷新）。
+
+- 状态：done，echarts 死组件裁剪 + Header 数据新鲜度定时器修复（M2 性能 + bug fix，小改动）
+- 目标：接续上一轮地球/虚拟滚动/配置梳理排查时发现的两个遗留问题——1) `echarts.ts` 里注册了从未被任何图表 option 使用的 `TitleComponent`/`DataZoomComponent`；2) `Header.vue` 的"数据新鲜度"心跳定时器有真实 bug（每 2s 把锚点 `freshAt` 本身重置为当前时间，导致文案永远卡在"实时"）且从未 `clearInterval`。
+- 实现：
+  1. **echarts 裁剪**：`src/utils/echarts.ts` 移除 `TitleComponent`、`DataZoomComponent` 的导入和 `use([...])` 注册。核实方式：全仓 grep 所有图表 option 对象，`legend:` 有 7 处真实使用（保留 `LegendComponent`），但 `title:`/`dataZoom:` 配置项零使用（图表标题都走自定义的 `MetricChartHeader` 组件，没有任何图表启用缩放）。构建验证：`echarts` chunk 从 565KB 降到 526.87KB（gzip 176KB→180KB 压缩后差异更小，主要收益在原始体积和运行时不注册无用组件）。
+  2. **Header 定时器修复**：`src/components/Header.vue` 把"每 2s 重置 `freshAt.value = Date.now()`"改为"`freshAt` 只在组件创建时设置一次（普通常量，非 ref），新增独立的 `now` ref 每 2s 更新一次仅用于触发 `freshText` 重新计算"，这样"Ns 前更新"才会真正随时间递增而不是永远显示"实时"；同时补上 `onUnmounted` 里的 `window.clearInterval`，避免定时器泄漏。因为该组件目前没有接入任何真实数据刷新事件源，"新鲜度"锚点实质是"页面挂载时间"，这是最小改动范围内能做到的最接近原意图的修复，未新增数据源接入（超出本次约定的裁剪/性能范围）。
+- 验证：`bun run lint`、`bun run build`（type-check + vite + zip）均通过；zip 从 3.37MB 降到 3.36MB。
+- 版本：`komari-theme.json` 0.5.10 → 0.5.11（注：上一轮记录写的是 0.6.0，但实际当前文件是 0.5.10——中间有一次未在本文件留痕的版本回调，此处以 git log 里 komari-theme.json 的真实历史为准）。
+- 下一步：若后续要让"数据新鲜度"真正反映 RPC/WebSocket 数据到达时间，需要在 `rpc.ts` 或节点 store ���新增一个"最近一次收到数据"的时间戳并透传给 `Header.vue`，这是比本次修复更大的改动，未在本轮做。
+
+- 状态：done，删除地球功能 + 首页卡片网格虚拟滚动 + 配置项梳理（M4 UI/UX 裁剪 + M2 性能 + M6 配置 DX，混合任务）
+- 目标：1) 彻底删除"地球"三维可视化功能（组件/composable/常量/工具/依赖/文档全链路清理）；2) 首页卡片视图接入虚拟滚动，节点数超阈值时窗口化渲染，避免 DOM/图表实例只增不减；3) 补全代码已实现但 `komari-theme.json` 缺失的 3 个配置项，删除彻底死亡的 `hideGeneralCard` 读取。
+- 实现：
+  1. **删地球**：删除 `NodeGlobePanel.vue`、`useGlobeProjection.ts`、`globeTheme.ts`、`regionCoordinates.ts`（`regionHelper.ts` 是独立的地区名称/图标工具，仍被多处使用，未动）；`HomeView.vue` 移除 `globe` 懒加载分支、`HomeToolKey`/`PrivateHomeToolKey` 联合类型、`homeTools` 条目、`toggleHomeTool` 权限豁免判断里的 `globe`；`package.json` 移除 `d3-drag`/`d3-geo`/`d3-selection`/`topojson-client`/`world-atlas` 及对应 `@types/*`，`bun install` 刷新 lockfile；同步清理 README.md、`docs/DetailPageRework.md` 里的地球描述。构建产物确认：主 bundle 不再包含地球相关 chunk（约 168KB 异步 chunk，含 108KB `countries-110m` 地图数据全部消失）。
+  2. **卡片网格虚拟滚动**：新增 `src/composables/useVirtualCardGrid.ts`——把响应式多列卡片网格（CSS `auto-fill`）按当前列数切成"虚拟行"数组，再接入 `@vueuse/core` 的 `useVirtualList` 做行级窗口化（滚出视口的行真正卸载 DOM/图表实例）。`HomeView.vue`：新增 `nodeGridAreaRef`（`useElementSize` 测容器宽度）、`cardColumnCount`（按 `nodeCardSize` 对应最小卡片宽度/gap 估算每行列数，规则与现有 `nodeCardGridClass` 的 `minmax` 值保���一致）、`shouldVirtualizeCards`（复用现有 `UI_CONFIG.virtualList.nodeThreshold`，阈值 30，与原 `deferNodeCards` 判断标准一致）；模板新增虚拟滚动分支（`v-else-if="... && shouldVirtualizeCards"`，`max-h-[70vh] overflow-y-auto` 容器 + 虚拟行内部小 grid 渲染 `NodeCard`），阈值以下保留原 `TransitionGroup` 路径不变。因虚拟滚动分支与原 `DeferredRender`（进入视口挂载、之后不卸载）用的是同一阈值判断，两者会互斥触发，`DeferredRender` 在保留分支��永远是禁用状态，遂顺手删除死代码：移除 `deferNodeCards` computed、`TransitionGroup` 分支里的 `DeferredRender` 包裹，以及不再被任何文件引用的 `src/components/DeferredRender.vue` 组件本身。
+  3. **配置项梳理**：`komari-theme.json` 新增 3 项——"01·基础与外观"块 `nodeCardSize` 之后插入 `defaultViewMode`（select，card/list）；"02·首页布局"块 `colorVisionMode` 之后插入 `generalCardPreset`（select，9 种预设）与 `generalCardKeys`（richtext，自定义 key 列表）。三项代码里已有完整读取/校验/默认值回退逻辑（`app.ts` 的 `defaultViewMode`/`generalCardOrder`/`parseGeneralCardPreset` 等 computed），本次只暴露 schema，未改代码。`src/stores/app.ts` 删除彻底死亡的 `hideGeneralCard` computed 定义及 store 返回对象里的导出（核实过除定义/导出外无任何消费方，删除零行为影响）。收尾跑了一次全部 42 个 `komari-theme.json` key 与 `src/` 引用的交叉核查脚本，确认无孤儿配置项（无"有配置无代码"或"有代码无配置"）。
+- 验证：`bun run lint`、`bun run build`（type-check + vite + zip）均通过；构建输出确认无 d3-geo/d3-drag/d3-selection/topojson-client/world-atlas 依赖链，无地球专属 chunk；zip 从改动前体积下降。因沙盒无真实 Komari 后端数据，卡片网格虚拟滚动的真实节点数据滚动效果未能截图核对，仅代码复查确认列��估算、虚拟行切分、点击/Ping 弹窗透传逻辑正确；已有 Playwright 视觉测试用例（`nodes-card-desktop`、mini 卡片等）节点数远低于虚拟滚动阈值 30，不受本次改动影响，未重跑。
+- ��本：`komari-theme.json` 0.5.9 → 0.6.0。
+- 下一步：建议在有真实数据、节点数超过 30 台的环境里实际验证一次卡片网格虚拟滚动的滚动跟手性与卡片懒渲染/回收效果；管理后台确认新增的 `defaultViewMode`/`generalCardPreset`/`generalCardKeys` 三项配置显示正常且��认值与改动前实际行为一致（回归风险低，均沿用代码里原有默认值）。
+
+- 状态：done，DataTooltip 改为 Teleport+fixed 彻底重构（上一版 CSS transform 纠偏方案仍会「跑位盖住别处内容」，本次为根治版）
+- 起因：用户反馈上一轮修复（见下方旧记录）没有解决问题——截图显示悬停「三网」行最右侧延迟数字时，tooltip 确实渲染出来了，但被拽到离数字很远的左侧位置，盖住了上一行「剩余152天 / ¥138.78」的文字。说明上一版"水平居中 + 越界纠偏"的 CSS transform 方案在窄卡片场景下纠偏量过大，会让气泡跑到无关位置盖住别的正文——遮罩问题从"自己被裁掉"变成了"别人被盖住"，本质没解决。
+- 根因：上一版用 `position: absolute` 挂在触发元素自身的包裹层下（该层在多层 `overflow-hidden` 的卡片/进度条容器内），靠 CSS 变量做"从期望居中位置到视口边界"的位移纠偏；这个��移量在窄视口/窄卡片下可能很大，导致气泡被硬拽到离触发元素很远的地方。
+- 修复（彻底重写 `DataTooltip.vue`）：
+  - 气泡不再挂在触发元素的局部容器下，改用 `<Teleport to="body">` 直接挂到 `<body>`，彻底脱离任何祖先的 `overflow`/层叠上下文，永久不会被任何卡片、进度条容器裁切；
+  - 定位方式从"先居中再算纠偏"改为"直接用 `getBoundingClientRect()` 实测触发元素和气泡尺寸，计算贴着触发元素只留 8px 间距的精确坐标"（`position: fixed`），气泡永远紧贴被悬停的元素本身，不会跳到很远的位置；
+  - 若期望方向（如 top）在视口内放不下会自动翻转到对侧（bottom/left/right 同理），翻转后再做最终的视口边缘夹紧兜底；
+  - 由于气泡被 Teleport 出去后不再是原 CSS `group-hover` 选择器的子节点，改用 `mouseenter`/`mouseleave`/`focusin`/`focusout` 事件 + `visible` ref 控制显隐（配合 `visibility`+`opacity` 做淡入淡出），显隐状态变化时同步添加/移除 `scroll`/`resize` 监听以保持定位跟手。
+  - 组件对外 props（`content`/`placement`/`width`/`height`/`as`/`class`/`contentClass`）保持完全不变，15 处调用方（NodeCard、NodeUptimeTimeline、InstanceDetail、NodePingListCell、Footer、NodeList、NodeGeneralCards）无需改动。
+- 验证：`bun run lint`、`bun run build`（含 vue-tsc 类型检查）通过。因沙盒无真实 Komari 后端数据，无法在真实卡片上截图验证，改用浏览器手写 DOM 精确复刻截图场景（窄卡片贴视口右边缘、卡片本身带 `overflow: hidden`、三网行紧贴上一行文字、触发元素在卡片最右侧），并用与组件内 `measureAndPosition` 完全一致的算法定位一个挂在 `document.body`（而非卡片内部）的气泡：验证结果 `isBubbleActuallyOutsideCardDom: true`（证明气泡确实脱离了带 overflow-hidden 的卡片 DOM，不会被裁切）、`isFullyVisibleInViewport: true`（未被视口边缘裁切）、`horizontalOffsetFromTriggerCenter` 仅 25px（气泡紧贴数字上方，不再跳到远处覆盖别的内容）。截图确认气泡出现在"9ms"正上方，未侵入上一行"剩余152天 ¥138.78"文字区域。
+- 下一步：请在有真实数据的环境里实际 hover 验证——尤其是卡片网格最右列、最底行等边缘位置的 tooltip（三网行、延迟/丢包面板、详情页图表等所有用到 DataTooltip 的地方），确认气泡始终紧贴被 hover 的元素、不再出现跑位盖住其他内容的情况。
+
+---
+
+- 状态：done（已被上方新记录取代，仅供追溯），DataTooltip 视口边缘防裁切 + 三网行视觉微调 + 在线状态时间轴 光标/数据截断 双修复（M4 UI/UX + M2/M3 数据正确性）
+- 起因：用户反馈 4 点——1) 三网行数字靠近卡片右边缘时 tooltip 被裁切看不全；2) 三网行视觉不够协调；3) 服务器详情页"在线状态时间轴"任何色块 hover 都变问号光标（预期只有"无数据"块才应该是问号）；4) 所有服务器的"在线状态时间轴"形状几乎一样，怀疑是数据 bug 而非真实一致。
+- 根因排查结论：
+  - 问题 1：`DataTooltip.vue` 原实现用纯 CSS `left-1/2 -translate-x-1/2` 居中，触发元素越靠近视口/卡片边缘，气泡越容易整体超出可视区域被裁掉——这是所有使用 `DataTooltip` 的地方（三网行、延迟面板等）的通用问题，不是三网行独有的。
+  - 问题 3：`NodeUptimeTimeline.vue` 模板里色块统一写了 `cursor-help`，与色块状态（正常/异常/离线/无数据）无关，所以任何状态 hover 都是问号光标。
+  - 问题 4 **确认是真实代码 bug，不是数据碰巧一致**：时间轴按固定的 `timelineDays`（最多 14 天）铺满渲染，但请求历史记录时有 `LOAD_RECORD_MAX_COUNT` 条数上限，后端超出上限只返回窗口内最新的一段记录。只要节点上报间隔较短（如 30 秒/条），几天内的记录量就会超过上限，更早的日期不是"节点真的没有历史"，而是"根本没请求到那段samples"，于是被一律误判成灰色 no-data——上报频率相近的节点因此呈现出几乎相同的"前面几天灰、最后一两天有色"的截断形状。
+- 修复：
+  - `DataTooltip.vue`：气泡不再用纯 CSS 居中定位，改为默认居中 + `mouseenter`/`focusin` ��用 `getBoundingClientRect` 实测触发元素和气泡尺寸，越界部���通过 CSS 变量（`--dt-shift-x`/`--dt-shift-y`，叠加进 `transform`）纠偏拉回视口内（`margin: 8px`）；隐藏方式从 `hidden`/`block` 改为 `invisible`/`visible` + `opacity`，保证隐藏态也能被测量到真实尺寸。此文件���通用组件，本次修复对所有用到 `DataTooltip` 的位置（三网行、延迟/丢包面板等）统一生效，不是三网专属 patch。
+  - `NodeCard.vue`（三网行美化）：数值套用与"延迟"面板一致的 `latencyTextClass` 严重度颜色阈值（不再统一 `text-foreground` 一个颜色，能一眼看出哪个网络延迟高/丢包/异常），字重从 `font-bold` 降为 `font-medium`（避免和左侧"延迟"数字抢视觉权重），分隔点 `·` 透明度降到 `text-muted-foreground/50`（更轻、不抢眼）。
+  - `NodeUptimeTimeline.vue`：色块 `cursor-help` 改为按 `bucket.status === 'no-data'` 条件切换（`no-data` → `cursor-help`，其余 → `cursor-pointer`）；新增 `effectiveDays`（调用新增的 `estimateCoverableDays`）替代直接用 `timelineDays` 渲染，真正按该节点的真实上报密度反推可信天数；新增 `isCoverageTruncated` 判断并在时间轴下方追加一行浅色提示"该节点上报较频繁...仅能可靠展示近 N 天"，避免用户把截断误判成节点异常；summary 文案"近 N 天估算正常率"里的 N 同步改用 `effectiveDays`。
+  - `uptimeHistory.ts`：新增导出 `estimateCoverableDays(records, maxRecordCount, requestedDays)`——用已拿到记录的时间间隔中位数估算真实上报间隔分钟数，反推 `maxRecordCount` 条配额理论上能覆盖多少天，与 `requestedDays` 取较小值；`estimateReportIntervalMinutes` 从模块私有函数改为导出，供新函数复用。
+- 未做：列表视图 `NodePingListCell.vue` 的 tooltip（若也用 `DataTooltip` 则已随通用修复受益，未单独验证）；`estimateCoverableDays` 目前只在 `NodeUptimeTimeline.vue` 使用，未评估 `LoadChart`/`useNodeLoadStats` 等其他消费同一段历史记录接口的组件是否有相同截断问题（范围外）。
+- 验证：`bun run lint`、`bun run build`（type-check + vite + zip）均通过。浏览器视觉验证：沙盒无可用真实 Komari 后端（RPC 连接失败，节点列表为空），无法用真实数据截图核对卡片/时间轴。改用浏览器里手写 DOM 复现"tooltip 贴视口右边缘"场景验证防裁切算法本身——构造一个会溢出视口 13.85px 的 tooltip，应用纠偏后气泡完整落在 `[0, viewportWidth]` 内（`isFullyVisible: true`��，截图确认视觉正常。时间轴截断/光标修复未能用真实数据视觉验证，仅代码复查确认逻辑正确。
+- 下一步：建议用户在有真实数据的环境验证：a) 三网行/延迟面板 tooltip 在卡片网格最右列时不再被裁切；b) 三网行颜色阈值是否符合��期；c) 详情页时间轴 hover 到"正常/异常/离线"色块时是普通指针而非问号；d) 上报频率不同的服务器之间时间轴形状/可信天数是否出现差异（不再看起来完全一样），以及截断提示文案是否清晰。
+- 版本：`komari-theme.json` 0.5.5 → 0.5.6。
+
+- 状态：done，节点卡片新增「三网」分项延迟行（M4 UI/UX）
+- 目标：在节点卡片"延迟/丢包"整块区域正上方新增一行"三网"，按 ping 任务分项展示延迟（不做跨任务平均），动态适配任务数量：1 个任务时显示单个数字、无分��符；≥2 个任务时最多显示前 3 个，用 `·` 分隔；丢包仍只看现有底部加权均值，不新增丢包分项行；不加折叠/展开交互，满足条件（存在任务级延迟数据）就固定显示。
+- 实现：
+  - `useNodePingStats.ts`：`NodePingStatsState` 新增 `taskLatencies: NodePingTaskLatency[]`（`taskId`/`name?`/`latency`，`latency` 为 `null` 表示该任务当前无有效样本）；`buildStats` 两条分支（metricStats 主路径 + records-only 回退路径）都补齐计算，顺序沿用后端/上游返回的原始任务顺序；`isValidStatsState` 同步校验新字段；`CACHE_VERSION` 8→9 使旧缓存整体失效；`useNodePingStats` 返回值新增 `taskLatencies` computed。
+  - `useNodePingDisplay.ts`：新增 `NodePingTaskLatencyItem`（`key`/`valueText`/`tooltip`）与 `TASK_LATENCY_DISPLAY_LIMIT = 3`；新增 `taskLatencyItems`（取前 3 项，`latency===null` 时 `valueText` 为 `--`，`tooltip` 为"任务名 数值"）与 `hasTaskLatencyItems`；沿用 `lastLatencyBars` 同款"记忆最后一次有数据的值"模式，避免 `pingEnabled` 短暂置 false（路由切换等）时该行闪烁消失。
+  - `NodeCard.vue`：解构新增 `taskLatencyItems`/`hasTaskLatencyItems`；在延迟/丢包 `grid grid-cols-2` 容器前插入 `v-if="hasTaskLatencyItems"` 的新行，左侧"三网"标签与"延迟"/"丢包"同款 `text-xs text-muted-foreground` 样式，右侧按 `v-for` 渲染每个数字，数字间用 `��`（`text-muted-foreground`）分隔，每个数字包一层 `DataTooltip`（复用现有延迟面板同款用法）；容器为 `flex flex-col gap-*`，新行自动获得与其余卡片行一致的间距，无需额外 margin。
+- 未做（用户已确认不需要）：三网丢包分项行、折叠/展开交互、后台默���展开开关；列表视图 `NodePingListCell.vue` 本次未同步（范围外，待后续单独评估）。
+- 验证：`bun run lint`、`bun run build`（type-check + vite + zip）均通过。浏览器视觉验证受限——本地沙盒无可用监控后端，预览页面无真实节点/ping 任务数据（服务器列表为空），无法截图核对三网行真实渲染；已通过代码复查确认 0/1/多任务三种场景的条件渲染、分隔符逻辑、tooltip 内容符合设计。
+- 版本：`komari-theme.json` 0.5.3 → 0.5.4。
+- 下一步：建议在有真实后端数据的环境（或用户自己的 Komari 实例）里实际核对一次三网行渲染效果，尤其是单任务节点（无分隔符）与 ≥3 任务节点（截断到前 3 个）两种边界情况；如需同步到列表视图可另开任务。
+
+- 状态：done，节点卡片延迟/丢包点阵扁平化 + 地球视觉融合度优化（M4 UI/UX）
+- 目标：1) 卡片延迟/丢包点阵改为竖直方向更扁平的样式（参考用户截图 p2：细线条点阵，而非较高的柱状）；2) 优化三维地球的"割裂感/钢丝球感/控件不融合"三个问题。
+- 实现：
+  - `NodeCard.vue`：延迟/丢包点阵容器 `h-5` → `h-2.5`，`mt-1.5` → `mt-1`，新增 `items-end` 让点阵底部对齐（原来是纯 flex 高度撑满，现在扁平后视觉上更像 p2 的细条）。`NodePingListCell.vue`（列表视图）本身已是细高度，未改动。
+  - `globeTheme.ts`：新增 `sphereFillLit`（球体受光面）、`graticuleRGB`（经纬线改为 rgb 分量以便动态拼渐变，替换原来固定 rgba 的 `graticule`）、`panelGlassBg`/`panelTextMuted`/`panelTextActive`/`activeChipBg`/`activeChipRing`（悬浮控件深色玻璃质感专用色，不再跟随站点 `bg-background` 主题）。
+  - `NodeGlobePanel.vue`：
+    - 外层容器加一层 `bg-gradient-to-br from-muted/70 via-muted/25 to-transparent` 的柔和渐变外框（padding 包裹），内层深空球体加大投影+外发光（`0 16px 36px` 阴影 + `atmosphereRGB` 泛光），消除"纯黑块硬塞进白页面"的割裂感。
+    - 经纬网格线步长从默认 10° 放宽到 20°（`geoGraticule().step([20, 20])`），线条数量减半；网格线、陆地描边都改成以球心为中心的径向渐变（中心亮、边缘淡出到 0.03），球体主体填充也改成受光角渐变，共同制造近大远小的空间纵深，替代之前"整张网格线/线框一样亮"的钢丝球感。
+    - 悬浮控件（地球/地图切换、飞线开关、汇总统计角标）从 `bg-background/80` + `text-selection`（跟随站点主题）改为内联样式��用 `GLOBE_THEME.panelGlassBg` 等固定深色玻璃令牌，新增 scoped `:deep([data-globe-chip-btn='true']:hover...)` 覆盖 shadcn Button ghost 默认 hover 配色，避免控件在深色地球上突然冒出站点主题的浅色高亮。
+  - 未改动：`useGlobeProjection.ts`、投影/旋转/飞线动画逻辑、标记点脉冲逻辑。
+- 验证：临时 Playwright 用例截图核对（节点卡片点阵扁平效果、浅色/暗色站点主题下地球柔和外框+深度渐变+控件 hover 态），四���截图均符合预期；跑完后删除临时测���文件。`bun run lint`、`bun run build` 通过。另跑了现有 `tests/visual/visual.spec.ts` 全量回归，`nodes tool view renders card grid` 一项失败（`data-node-metric-icon="cpu"` 找不到），经 `git stash` 验证为改动前（上次提交 `ab4c9fe`）就已存在的既有问题，与本次修改无关，未处理。
+- 版本：`komari-theme.json` 0.4.3 → 0.4.4。
+- 产物：`ink-build-<commit-sha>.zip`（bun run build 自动按当前 HEAD short sha 命名，提交后 sha 会变化，需要在提交后再跑一次 build 确认 zip 文件名与 HEAD 一致）。
+- 下一步：无遗留工作。若需要进一步验证"割裂感"改善程度，可考虑在真实生产数据/更多地区分布下再看一次实际效果。
+
+- 状态：done（历史记录）节点卡片延迟/丢包点阵 + 地球固定深色科技主题/脉冲标记/枢纽飞线/智能聚焦 视觉回归验证完成
+- 目标���验证近期改造（NodeCard 延迟/丢包复用 flat 点阵、NodeGlobePanel 固定深色科技配色+陆地线框+大气层发光+标记脉冲+枢纽放射飞线开关+点击分区智能聚焦旋转）在浏览器中的真实渲染效果。
+- 验证方式：临时 Playwright 用例（`bunx playwright test`，需先点击 Header「显示首页工具」的 aria-label 按钮，而非 `title` 属性，才能展开首页工具栏再点「地球」）+ 截图核对；确认可视化测试服务器跑的是 `vite preview`（`dist/` 构建产物），修改源码后必须先 `bun run build` 再跑测试，否则调试日志/最新代码不会生效。
+- 结论：卡片延迟/丢包点阵展示正常；地球默认视图、开启飞线（枢纽放射+呼吸光点）、点��分区触发聚焦旋转、以及站点整体切到暗色主题时地球仍保持固定深色科技配色，四种场景截图均符合预期，无需改动实现代码。
+- 清理：移除验证过程中临时加入的 `console.log('[v0] ...')` 调试语句与临时测试文件 `tests/visual/tmp-globe-check.spec.ts`���清理后 `src/components/NodeGlobePanel.vue` 与验证前最后一次提交（`0798f56`）逐字节一致（`git diff` 无输出）。
+- 验证：`bun run lint`、`bun run build`（type-check + vite + zip）均通过。
+- 产物：`ink-build-5960250.zip`（构建哈希未变，因为源码无功能性差异）。
+- 下一步：无遗留工作，如需发版可直接沿用现有 `komari-theme.json` 版本号。
+
+- 状态：done（清理遗留已完成，详情页改版待执行）
+- 目标：清理 ink 主题中的 blueprint / 地球遗留代码，并整理详情页改版清单。
+- 范围：
+  - 删除 `src/components/blueprint/`、地球相关组件/composable/utils/data
+  - 清理 HomeView、NodeGeneralCards、app store、manifest、样式、Footer、测试
+  - 移除 cobe 依赖
+  - 品牌命名同步为 ink
+- 验证：`bun run type-check`、`bun run lint`、`bun run build` 均通过。
+- 产物：`ink-build-4a3d842.zip`，manifest `0.1.13`。
+- 下一步：按“详情页改版正式清单”实施 InstanceDetail / LoadChart / PingChart 极简改造。
+
+- 状态：done，blueprint 主题彻底改造完成(未发版，待用户确认后再决定是否发版)
+- 目标：把 komari-theme-Glassmorphism 从毛玻璃主题彻底改造成 blueprint（工程蓝图）主题并命名为 blueprint。
+- 里程碑：M4 UI/UX 大改造 + 发布契约改名。
+- 实现：
+  - 全局令牌蓝图化：main.css 的 :root/.dark token 从毛玻璃 oklch 换成白图(#f6f8fb)/晒图蓝(#143d72)蓝图配色，移除全部 backdrop-filter（含 Tailwind backdrop-blur 工具类），body 纸样网格背景，JetBrains Mono/Oswald 等宽字体。
+  - 首页蓝图化：HomeView 默认 activeHomeTool='blueprint'（蓝图图纸为主视图），移除 NodeGeneralCards（地球+总览卡片），homeAdvancedToolsVisible 默认 true（工具切换栏默认展开），节点卡片/列表降级为「节点」工具视图。
+  - 详情页通过全局 token 蓝图化（纸样卡片），保留 Metric 图表与 Ping 功能。
+  - Background.vue 默认背景从毛玻璃 webp 改为蓝图纸样网格。
+  - 移除地球：删除 NodeEarthGlobe/CobeGlobe/RealisticGlobe/TiledMap、NodeGeneralCards、useNodeGeoClusters 共 6 个文件；删除 public/images/earth/ 纹理(2.98MB)；移除 cobe/globe.gl/three/@types/three 依赖；vite manualChunks 移除 globe。
+  - 改名：komari-theme.json name/short→blueprint、package.json name→blueprint、Footer 文案、zip 前缀 blueprint-build-、GitHub workflow glob、README 标题、fixture theme→blueprint。
+  - komari-theme.json 配置精简：移除地球样式(earthRenderer/stopEarth/hideEarth)、隐藏头部、毛玻璃配色(glassColorPreset/glassCustomColors)、总览卡片(generalCardPreset/generalCardKeys)，配���项 48→47，编号顺延重排。
+- ��证：bun run lint、bun run build(type-check+vite+zip) 通过；视觉回归重写为 11 条用例（蓝图首页亮/暗、明细展开铭牌、节点视图卡片/mini、详情页 6 条），全部通过；修复了 detail ping 作用域用例的 RequestManager 并发排队时序问题（等 12 个 queryMetrics 全部发出后再清空）。
+- 产物：blueprint-build-e065dc7.zip（3.93 MB，从 7.25 MB 减少 46%），顶层契约 komari-theme.json/preview.png/dist/，包内 name=blueprint，753 个 dist 条目，无地球/globe 残留 chunk。
+- 交接：版本号仍是 3.3.7；远程 GitHub 仓库仍叫 komari-theme-Glassmorphism（本地改名不影响远程，需另建/改名仓库）；如需发版需 bump 版本并推送。
+
+- 状态：done，蓝图视图新增完成(未发布版本，待用户确认后再决定是否发版)
+- 目标：新增「蓝图」工程图纸式首页工具 Tab,把节点监控渲染为拓扑总图 / 分区图 / 设备表 / 节点明细图一整套图纸。
+- 里程碑：M5 新功能,复用现有 service/composable 数据层,不修改数据、请求、计费或发布契约。
+- 实现：`src/components/blueprint/` 自包含子树 —— `.bp-root` 作用域设计令牌(白图默认/`.dark` 晒图蓝)、`mapNodes` 纯函数映射(NodeData→BlueprintNode,按 region 分区、按 group 分组、≥85 告警)、拓扑总图(聚合分区符号)、分区图(分组边界框+紧凑设备符号)、设备表(按组分节)、明细图(铭牌/负载/进程/TCP/UDP/尺寸线/CPU 与延迟双测量曲线,历史经 `useBlueprintHistory` 接 `loadNodeLoadRecords`/`loadPingRecordsWithTasks`)、图签与动态修订记录;HomeView 新增公开工具 `blueprint`(与「对比」同级,无需登录)。
+- 集成注意：`NodeData` 未暴露实时 `ping` 汇总,蓝图设备表延迟列经 `mapNodes(nodes, pingAvgByUuid?)` 可选注入,当前 MVP 未注入(延迟历史由明细图曲线覆盖);`homeAdvancedToolsVisible` 由 Header「显示首页工具」按钮控制。
+- 验证：`bun run type-check`、`bun run lint`、`bun run build` 均通过;新增 2 条 Playwright 用例(总图渲染 + 明细展开铭牌),全量 17 条用例通过,新快照 `tests/visual/snapshots/chromium/blueprint-home.png`。
+- 不做(YAGNI 留待后��)：机柜聚合(>15 台/区)、中转→落地干线推导、图纸模式独立后台配置、GPU/流量配额在明细图呈现。
+- 交接：如需发版,版本号仍在 `komari-theme.json`;发版前建议用真实后端确认蓝图历史曲线与延迟列观感。
+
+- 状态：in-progress，本地修复与验证完成，正在发布 v3.3.5
+- 目标：修复详情页延迟任务卡片、图例��主页 Ping 指标线与 Komari 后台任务排序不一致的问题。
+- 里程碑：M4 UI/UX 兼容性修复，不修改后端任务权重或接口契约。
+- 已确认缺陷：后端 `GetAllPingTasks()` 明确按 `weight ASC, id ASC` 返回；主页重新计算该规则，详情页新版指标路径却按 `getPingMetricStats` 的无保证数组顺序重建任务，可能与后台���位。
+- 实现：共享排序工具改为使用 `public:getPublicPingTasks` 返回数组索引；LoadChart 的 Ping 指标线��� PingChart 新指标路径重建��任务卡��、图例、颜色均使用该顺序；指标接口独有的未知任务按数值 ID 稳定追加。
+- 回归：夹具构造后台 `30,10,20`、指标统计 `20,30,10`、ID 自然顺序 `10,20,30` 三套冲突次序；直接排序断言通过，Playwright 能收集到详情页卡片顺序用例。
+- 验证：`bun run type-check`、涉及文件 ESLint、`bun run lint`、`bun run build`、`git diff --check` 均通过；生成 `komari-theme-Glassmorphism-build-e212925.zip`，顶层仍为 `komari-theme.json`、`preview.png`、`dist/`。
+- 浏览器限制：托管 Chromium 可执行文件未安装；系统 Chrome 能启动唯一用例但��� Windows 驱动生命周期中停住直至 120 秒外层超时，没有返回断言结果。内置浏览器可加载本地预览，但不能复用 RPC mock，且本机没有 Komari 后端，因此未把该页面作为数据回归证据。
+- 发布目标：`komari-theme.json` 与 README 同步至 v3.3.5；提交只包含 Ping 排序实现、回归夹具、版本和发布文档，排除工作区原有预览图删除与本地目录。
+
+- 状态：done，v3.3.4 已发布
+- 目标：节点卡片剩余 5 天内标红、6–10 天标黄；审计并修复详情页 4 小时 / 1 天历史视图 CPU 空白或异常显示。
+- 里程碑：M4 UI/UX + 兼容性修复，不修改计费计算、实时指标或后端接口契约。
+- 范围：共享到期阈值、NodeCard 到期提示、LoadChart 指标历史回退、确定性 Playwright 回归检查。
+- 已确认缺陷：指标历史当前只检查“任意序���有���”���CPU 序列缺失或全空时仍会压过 `common:getRecords` 兼容数据，导致 CPU 图表无有效数值。
+- 实现：共享阈值改为 5 天红色、10 天黄色；NodeCard 对到期状态着色并把无效日期显示为 `-`；短时历史缺少有效 CPU 点时回退 `common:getRecords`，同时保留新指标接口返回的 Ping 等独立序列；兼容记录的运行时数值先过滤非有限值再进入图表。
+- 回归：新增固��时钟下的 5/10 天边界颜色检查，以及新指标接口缺少 `cpu.usage` 时 4 小�� / 1 天 CPU 兼容回退检查。
+- 验证：`bun run lint`、`bun run build`、后续 `bun run build-only` 和 `git diff --check` 通过；构建产物 `komari-theme-Glassmorphism-build-b56ef97.zip` 保持 `komari-theme.json`、`preview.png`、`dist/` 顶层契约。
+- 浏览器：系统 Chrome 两条聚焦用例均执行���且无失败产物，Windows Chrome 在测试结束后的关闭阶段未自行退出，由 120 秒外层超时终止；应用内浏览器确认 Vite 入口可装载，本机未运行 `127.0.0.1:25774` Komari 后端，因此普通开发页的 API/RPC ��理按预期返回 500，实际数据视图由确定性 mock 用例覆盖。
+- 发布目标：`komari-theme.json` 与 README 已同步至 v3.3.4；发布提交仅包含本次修复、测试、版本和文档，不包含工作区原有预览图删除及本地目录。
+- 发布完成：提交 `e2129252b358fcbc42d1fe445b736df2b8003f8c` 已推送 `main`；Release On Version Bump run `31414499653` 与 Visual Regression run `31414499655` 均成功，tag / Release `v3.3.4` 指向该提交。
+- 线上资产：`komari-theme-Glassmorphism-build-e212925.zip`，7,593,495 bytes；GitHub digest 与下载后 SHA-256 均为 `6DE5F47E8EB4178572C3B78117481403EB68A8858C7A1DBDDC0D2F004CC37693`，包内版本 3.3.4、771 个 entries，顶层契约完整。此最终交接状态只保留在本地，避免纯文档推送再次触发工作流。
+
+- 状态：done，v3.3.3 已发布且 Issue #37 已关闭
+- 目标：统一 Komari `price = -1` 免费节点语义，移除“免费 / 周期”文案，并让单节点剩余价值显示“无 / N/A”。
+- 里程碑：M4 UI/UX + 小范围业务展示修复；金额计算继续返回数值，不把 `NaN` 作为业务状态。
+- 范围：公共价格 formatter、NodeCard、NodeList、NodeCompare、InstanceDetail、FinanceDetails 及首页财务排除免费节点逻辑；聚焦回归、v3.3.3 Release 和 Issue 收尾。
+- 兼容边界：`price = 0` 现有行为不随本次变更扩大；总剩余价值和总成本中免费节点继续贡献数字 0。
+
+- 状态：done，v3.3.2 已发布且 Issue #36 已关闭
+- 目标：为节点卡片 CPU、内存、硬盘、流量指标原生增加一致的线性图标，替代依赖 custom body DOM 注入的脆弱方案。
+- 里程碑：M4 UI/UX 小版本，不修改数据、请求、计费或卡片高度契约。
+- 范围：普通��片图标+文字；mini 卡片图标替代 C/M 并保留无障碍名称；必要视觉基线、README、版本、Release 与 Issue 收尾。
+- 审查结论：Ping、网速、累计流量和剩余价值���已有图标；没有发现需要与本次同批处理的其他结构或性能问题。
+- 不做：不增加图标组件��赖，不给所有文字机��堆图标，不调整卡片尺寸、进度条状态色或数据布局。
+
+- 状态：done，v3.3.1 已发布且 Issue #33 / #35 已关闭
+- 目标：修复 GitHub Issue #33（详情页保留首页全部节点 Ping 查询）与 #35（提前续费后的剩余价值被封顶为一个计费周期）。
+- 里程碑：M2 性能修复 + 小范围业务计算纠错，不改变发布契约或长期机兼容语义。
+- 范围：首页 Ping 摘要订阅生命周期、摘要采样上限、在途 metric 请求释放、两处剩余价值计算及聚焦回归验证。
+- 发布：用户已明确要求发布新版，并在 Release 验证成功后关闭 Issue #33 / #35。
+- 不做：不修改全局实时状态轮询语义，不调整超过 100 年的长期机展示。
+
+- 状态：done，等待用户部署运行态测试
+- 目标：生成 Linux amd64 本地集成测试包，合并验证 Komari PR #604、已合并访客审计 PR #602、komari-web PR #82 与 Glassmorphism v3.1.8 内置默认主题。
+- 里程碑：M6 集成构建、测试交付与验证，不扩大现有上游 PR 范围。
+- 范围：CGO Linux amd64 核心二进制、可导入主题 zip、独立管理端构建、测试说明与 SHA-256；部署后在用户保持登录的浏览器中继续联调。
+- 安全约束：`visitor_audit_enabled` 保持上游默认关闭，由管理员在审计面板明确开启；测试包不预置数据库、账号、密钥或访客数据。
+- 来源：Komari PR #604 `f08f47d`（含访客审计 PR #602）；komari-web PR #82 `0fee1f1`；Glassmorphism Release `v3.1.8` / `a52572a`。
+- 不做：不把 Glassmorphism 默认主题替换混入计费 PR #604；不发布测试构建为正式 Release；不构建 Windows 包。
+
+## 执行日志
+
+### 2026-08-26 目录调整与 README 重写
+
+- **项目目录调整**：把项目从 `repo-analysis/` 子目录移动到仓库根目录 `/Users/jlthzy/Documents/kmemos/komari-theme/`。方式：合并 `repo-analysis/docs/` → 根 `docs/`（superpowers 计划保留），rsync 项目文件（含 `.git`、排除 docs/node_modules/dist/产物）到根，mv node_modules，删除 `repo-analysis/`。根目录即 git 仓库（HEAD 0468dd9），构建验证通过（zip `blueprint-build-0468dd9.zip`）。
+- **README 重写**：移除 v3.x Glassmorphism 历史 changelog（v3.3.7-v3.1.2）与旧更新日志；blueprint 保留为当前项目（定位/蓝图视图/首页/工具/详情/Metric/Ping/架构/安全/兼容/设置/安装/开发/更新日志）；致谢增加 Glassmorphism 相关内容（延续自 komari-theme-Glassmorphism 的提及）；GitHub 仓库 URL 保留（远程仓库实际未����，改 URL 会 404）。
+- 注意：`docs/superpowers/`、`prototypes/` 为非 git 跟踪的本地文件（原型与开发计划），未提交；远程仓库名仍为 komari-theme-Glassmorphism（如需彻底改名需在 GitHub 重命名仓库并同步 README URL）。内部开发文档（AGENTS.md/CLAUDE.md/AIAGENTREADME.md）仍含旧名 "komari-theme-Glassmorphism"，未同步（用户仅要求 README）。
+
+### 2026-08-26 blueprint v0.0.11 概览卡片背景修复
+
+- 用户反馈：顶部概览板块 6 个指标卡（内存用量、剩余价值、实时上行、硬盘用���、累计流量、实时下行）无白色背景框。
+- 根因：`NodeGeneralCards` 的 `cardClass` 仍是毛玻璃时代的 `bg-background/50 border-none`（半透明+无边框），蓝图主题下不可见。
+- 修复：`cardClass` → `bg-card border-border hover:bg-secondary transition-all`（与详情页/图表卡一致）。至此全站残余的「半透明无框」卡片样式已清理完毕（首页概览/节点卡/详情指标卡/图表卡/延迟模块全部 bg-card+border）。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.11。
+
+### 2026-08-26 blueprint v0.0.10 两项修复
+
+- 用户反馈 2 项并全部修复（版本 0.0.9→0.0.10）：
+  1. 节点卡片跳转/切换瞬间 Ping 数据闪烁清空（延迟/丢包显示 '-'）：`useNodePingDisplay` 增加记忆逻辑——latency/loss 文字与渲染 bar 记忆最后一次有数据的值，enabled 变 false（路由��转）时保留显示，不再降级为占位符。
+  2. 详情页延迟模块 UI 重构：PingChart 去除外层大卡（根 div 恢复 `flex flex-col gap-4`），指标卡片（任务统计卡）改为 `bg-card border border-border` 独立卡片化，折线图表容器改为 `bg-card border border-border` ��立卡片����
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.10。
+
+### 2026-08-26 blueprint v0.0.9 两项修复
+
+- 用户反馈 2 项并全部修复（版本 0.0.8→0.0.9）：
+  1. 详情页监控图表无背景框：LoadChart.vue 7 处 CardX 与 PingChart.vue 根容���，`bg-background/50 border-none`（半透明无框）→ `bg-card border-border hover:bg-secondary transition-all rounded-md`（PingChart 根加 `rounded-md border border-border bg-card p-3`），与顶部板块一致。
+  2. 恢复原始 Glassmorphism 首页数据（概览卡片 + 点阵旋转地球）：从 git 恢复 NodeGeneralCards.vue / NodeEarthCobeGlobe.vue / useNodeGeoClusters.ts；NodeGeneralCards 固定渲染 NodeEarthCobeGlobe（点阵，不再走 realistic/tiled 选择）；package.json 恢复 cobe 依赖（bun install 更新 lock）；HomeView 仅节点视图（activeHomeTool==='nodes'）顶部渲染概览卡片+点阵地球，蓝图图纸视图不变。
+- 注意：恢复地球是用户最新要求（此前要求移除，现已改变主意；只恢复点阵 cobe，不恢复 realistic/tiled/earth 纹理）。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（nodes-card-desktop 快照更新）；zip 内 version=0.0.9。
+
+### 2026-08-26 blueprint v0.0.8 五项修复
+
+- 用户反馈 5 项并全部修复（版本 0.0.7→0.0.8）：
+  1. 分区图设备符号长文本截断与状态标记重叠：主机名 `fitText(tag, 18)` → `fitText(tag, 16)`，为右侧 ○/▲/✕ 留足空间。
+  2. 分区图点击设备符号不再跳转：`BlueprintSheet` 恢复 `onOpen`（监听 ZoneSheet/Schedule 的 @open），点击后 `scrollIntoView` 到设备表 `[data-host=uuid]` 行并加 `bp-focus` 高亮 1.8s（blueprint.css 新增亮/暗高亮样式）。
+  3. 详情页指标卡无背景框：`InstanceDetail.vue` 5 处 CardX 的 `bg-background/50 border-none`（半透明无框，蓝图下不可见）→ `bg-card border-border hover:bg-secondary`（纯色+边框），与硬件/系统等信息卡一致。
+  4. 删拓扑总图上方状态与线型图例：`BlueprintSheet.vue` 移除 `.bp-legend`（7 项）。
+  5. 田字格调整为原 60%：Background.vue 网格 0.028/0.055 → 0.033/0.06（dark 0.054），blueprint.css `--bp-grid`/`--bp-grid-major` 同步 0.033/0.06（dark 0.054）。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.8。
+
+### 2026-08-26 blueprint v0.0.7 三项修复
+
+- 用户反馈 4 项，3 项修复 + 1 项排查（版本 0.0.6→0.0.7）：
+  1. console 报错 `initializeEarth`：全仓库（src/public/dist/index.html）grep 无此代码——非当前主题产生，判定为浏览器缓存的旧版本（旧 Glassmorphism 地球主题）或 Komari 核心页面；建议硬刷新（Cmd+Shift+R）。Cloudflare rum 404 与主题无关。
+  2. 搜索框交互异常：恢复 focus 展开——外层容器 `focus-within:!w-48/52` + Input `focus:!w-full`，点击放大镜展开输入框且不溢出视口。
+  3. 国旗与中文名基线对齐：分区符号 image y+7→y+9（中心 y+18），文字基线 y+25→y+23（中心 y+18.5），两元素视觉中心对齐。
+  4. 分区图折叠标题无中文名：h2 改为 `regionTitle(z.name)`（getRegionDisplayName 中文名，未命中回退原值），与总图一致显示"香港/美国"等。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.7。
+
+### 2026-08-26 blueprint v0.0.6 四项调整
+
+- 用户反馈 4 项并全部��复（版本 0.0.5→0.0.6）：
+  1. 首页搜索框缩放才看全：去掉 Input 的 `focus:!w-52 sm:focus:!w-60` focus 强制展开（聚焦时不展开，仅输入后展开 w-60），避免右侧溢出。
+  2. 拓扑总图分区符号：左上角新增固定 26×18 `<image>` 国旗（`/images/flags/{ISO code}.svg`，经 regionHelper.getRegionCode 解析，仅合法 2 字母代码才显示，自定义地域不 404），右侧显示地域名（getRegionDisplayName 中文名，fitText 截断）；新增地域经 regionHelper 自动映射。
+  3. 分区图设备符号只显示主机名：去掉 CPU% 行（及已离线时间行），nodeH 46→34，框更扁。
+  4. 弱化田字格：Background.vue 页面网格 0.055/0.1 → 0.028/0.055（dark 0.045/0.09 → 0.028/0.05）；blueprint.css 图纸网格同值减半。
+- 验证：type-check、lint（正则提为模块级常量）、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.6。
+
+### 2026-08-26 blueprint v0.0.5 文本拉伸修复
+
+- 用户反馈拓扑总图/分区图"国旗飘了"（红色横条）。根因：v0.0.4 给 SVG `<text>` 加了 `textLength`（lengthAdjust="spacingAndGlyphs"），该属性是**强制**的——短文字（如 "BR-*" 仅 40px）被强行拉伸到框宽，变形似国旗横条。
+- 修复：`svg.ts` 新增 `fitText()`（宽度感知截断：中文/全角=2 单位，其他=1；超长才加 …）；BlueprintGa 分区名与 BlueprintZoneSheet 设备符号改为 fitText 截断，移除 textLength。短文字正常显示，长文字截断为 …（用户要求的"限宽承载 + 超长截断"），不再拉伸。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.5。
+
+### 2026-08-26 blueprint v0.0.4 精简三项
+
+- 用户反馈 3 项并全部修复（版本 0.0.3→0.0.4）：
+  1. 拓扑总图分区符号信息冗余：去掉与分区名重复的 `prefixOf` 前缀副行和「● 在线数」（与台数重复），台数只显示一次，告警/离线数量按需追加；card 压扁 190×78→190×64。
+  2. 分区图设备符号排班怪异：去掉 host 备注副行（public_remark/remark），只显示主机名 + CPU%（离线时「已离线 · 时间」），textLength 强制长名不超框。
+  3. 首页工具精简：分析后移除与蓝图重叠的「拓扑」（NodeTopologyPanel，与蓝图拓扑总图重复）和「健康」（HealthSummaryPanel，与蓝图设备表/状态重复），保留 节点/对比/蓝图/性价比/导出/日志；删除两个组件文件与 HomeView 引用。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.4。
+
+### 2026-08-26 blueprint v0.0.3 五项修复
+
+- 用户反馈 5 项并全部修复（版本 0.0.2→0.0.3）：
+  1. 首次访问默认折叠工具条：`stores/app.ts` 的 `homeAdvancedToolsVisible` 默��恢复 false（手动点 Header「显示首页工具」展开）。
+  2. 拓扑图蓝线穿插：根因是 blueprint.css 的 `fill: transparent` 覆盖了 BlueprintGa 内联 `fill="var(--bp-paper)"`（SVG 内联属性优先级低于 CSS 选择器）。改为 CSS 统一用 `fill: var(--bp-paper)`（hover 用 paper-deep），分区/设备符号遮蔽跳线。
+  3. 分区图告警不准确：`mapper.ts` 的 `deriveStatus` 误用 `n.ram`（字节，恒 ≥85 阈值），改为 `percent(n.ram, n.mem_total)` 百分比比较。
+  4. 设备表主机列显示 uuid 片段（commit 字符）：`mapper.ts` 的 host 改为 `n.public_remark || n.remark || '-'`，无备注不再显示 uuid.slice(0,8)。
+  5. 主机名长与 ▲ 重叠：`svg.ts` 的 `txt()` 增加可选 `textLength`（lengthAdjust="spacingAndGlyphs"），设备符号位号/副行强制不超框，中文长名不再溢出。
+  6. 移除「节点明细图」：删除 BlueprintDetail.vue/BlueprintDetails.vue（git rm）、BlueprintSheet 移除 DWG-03 section 与 focusUuid/onOpen，BlueprintTitleBlock 张次改为 `2 + zones`，蓝图工具描述改为「工程蓝图总图 · 分区 · 设备表」。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新；蓝图用例含「显示首页工具」展开步骤）；zip 内 version=0.0.3。
+
+### 2026-08-26 blueprint v0.0.2 视觉/布局修复
+
+- 用户反馈 4 项并全部修复（版本 0.0.1→0.0.2）：
+  1. 访客详情卡需缩放才可见：`VisitorInfo.vue` 左下角详情卡 `2xl:block` → `lg:block`（≥1024px 默认显示）。
+  2. 拓扑总图信息冗余 + 遮罩：重写 `BlueprintGa.vue` 为紧凑布局（分区符号 270×150→190×78，每行 4 个，去掉大 ×N 台/第 N 张等冗余），跳线先画后用纸色 `fill="var(--bp-paper)"` 分区符号遮蔽（stubs-first），消除遮罩。
+  3. 设备符号蓝��文字与橙色 ▲ 重叠：`BlueprintZoneSheet.vue` 副行截断 30→20 字符，避免与右侧 CPU% 文字重叠。
+  4. 明细图纸重复信息 + chart 不美观：`BlueprintDetail.vue` 删除 CPU/延迟 24h chart 及 useBlueprintHistory（该文件已 git rm），保留铭牌/参数行/尺寸线/页脚。
+- 验证：type-check、lint、build、视觉回归 11 条全绿（快照更新）；zip 内 version=0.0.2。
+
+### 2026-08-26 blueprint 设备表数据格式修复
+
+- 用户在真实后端验证 blueprint 主题：蓝图默认视图正常���节点卡片视图效果良好、但设备表 CPU/内存/硬盘列显示异常。
+- 根因：`mapper.ts` 的 `mapNode` 把 `NodeData.ram`/`disk`（字节数）直接当作百分比显示，`cpu` 未格式化，`fmtDiskText` 也错误地假设 `disk` 是百分比。
+- 修复：新增 `percent(used,total)`（字节→0-100 百分比）与 `round1`（1 位小数）；`mem`/`disk` 改为百分比换算，`cpu` 保留 1 位小数，`diskText` 改为字节直接换算 GiB；`BlueprintSchedule` 网络列新增 `fmtNet`（B/s→G/M/K 自适应单位）。
+- 用���明确：**不要**把蓝图改成独立默认主页，保持"蓝图作为首页工具且默认显示"的现状。已回退 HomeView 的结构改动（activeHomeTool 恢复默认 'blueprint'、homeTools 含 blueprint、渲染顺序恢复为 v-else-if）。
+- 验证：`bun run type-check`、`bun run lint`、`bun run build` 通过；视觉回归 11 条全绿（快照更新，蓝图设备表现显示百分比）。
+
+### 2026-08-11 Ping task order parity
+
+- 官方源码与测试确认 `GetAllPingTasks()` 按 `weight ASC, id ASC` 查询，公开任务接口与旧 Ping 记录接口都保留此顺序；新版 `getPingMetricStats` 结果没有等价排序保证。
+- 修复不再在前端复制后端权重规则，而是以公开任务接口的数组位置作为顺序来源，使主页与详情页在后端未来调整排序实现时仍保持一致。
+- 聚焦 Bun 断言结果为 `30,10,20`，Playwright `--list` 确认新增用例被收集；本机浏览器执行限制已记录在当前任务，CI 可使用仓库的托管 Chromium 完成最终浏览器回归。
+
+### 2026-07-30 v3.3.3 Issue #37 free-node semantics
+
+- 上游 `komari-web` 约定确认：`price = 0` 不展示价格标签，`price = -1` 才显示免费；Issue 两个现象真实存在。
+- 影响范围复核：`tagHelper.getRemainingValue` 仅被 NodeCard 调用；FinanceDetails 与 InstanceDetail 使用 `financeHelper.calculateRemainingValueCNY`，不能靠修改一个数值 helper 自动修复。
+- 实施方案：引入统一免费节点判断；金额计算保持数字 0，NodeCard / FinanceDetails / InstanceDetail 在展示层输出“无 / N/A”；同步修正列表、对比面板和排除免费节点逻辑。
+- 聚焦浏览器验证：首页卡片、排除免费开关、财务表和详情页流程 2.2 秒实际通过；Windows 系统 Chrome 完成用例后未自行退出，命令由外层超��终止。
+- 本地验证：`bun run lint`、`bun run build`（含 `vue-tsc --build`）和 `git diff --check` 通过；未重复运行无关浏览器或完整视觉矩阵。
+- 本地资产：`komari-theme-Glassmorphism-build-2cd56ce.zip`，7,584,641 bytes，SHA-256 `F669E4172869CC7A9B5C40CDFC98D360ACB46C57015EA763CDDB976BF489131E`；包内版本 3.3.3，共 771 个 entries，顶层为 `komari-theme.json`、`preview.png`、`dist/`。
+- 发布完成：提交 `63a1d0166e7bf9ab4bb29b003f3549fcdeb5a27f` 已推送 main；Release On Version Bump run `30530144758` 和 Visual Regression run `30530144811` 均成功；tag / Release `v3.3.3` 指向该提交。
+- 线上资产：`komari-theme-Glassmorphism-build-63a1d01.zip`，7,592,709 bytes，GitHub digest 与下载后 SHA-256 均为 `01a1d0111b0405f0ffaa280070d77e0dfe46bdd728edf0dbe7396a93be3ff249`；包内版本 3.3.3、771 个 entries 和顶层契约均正确。
+- Issue 收尾：`#37` 已留言说明实现与验证结果，并以 completed 关闭。此最终交接状态只保留在本地 AICACHE，避免纯文档推送额外触发完整 Visual Regression。
+
+### 2026-07-29 v3.3.2 Issue #36 metric icons
+
+- 聚焦审查确认 Issue 合理且定位准确：`NodeCard.vue` 已使用 Iconify，但四项主指标标题仍是纯文字，mini 模式甚至仅显示 `C/M`；下方网速、累计流量、剩余价值已有图标，无需扩大范围。
+- 图标语义复用详情页现有 Iconify 标识：`tabler:cpu`、`icon-park-outline:memory`、`tabler:server-2`、`tabler:arrows-transfer-up-down`；不新增依赖，也避免首页与详情页使用两套图标语言。
+- 实施边界：普通卡片保持文字并添加装饰图标；mini 模式图标固定宽高并保留可访问名称；颜色只作视觉辅助，指标文字、图标形状和百分比仍共同传达含义。
+- 聚焦浏览器验证：桌面亮色、移动暗色和 mini 卡片共 3 个用例实际通过；系统 Chrome 在 Windows 上完成用例后仍未自行退出，命令由外层超时终止，未重复运行完整视觉矩阵。
+- 本地验证：`bun run lint`、`bun run build`（含 `vue-tsc --build`）和 `git diff --check` 通过；只运行了本次直接相关的 3 个浏览器用例，没有重复详情页或完整视觉矩阵。
+- 本地资产：`komari-theme-Glassmorphism-build-9f13b72.zip`，7,584,520 bytes，SHA-256 `ACCFF5672075532F27062AD68BAA74C03D74A87261293E698FEB3C0F647894BD`；包内版本 3.3.2，共 771 个 entries，顶层为 `komari-theme.json`、`preview.png`、`dist/`。
+- 发布完成：提交 `2cd56ceaad5eb0e292e2c70f7dc3be9cf4155158` 已推送 main；Release On Version Bump run `30452135059` 和 Visual Regression run `30452134859` 均成功；tag / Release `v3.3.2` 指向该提交。
+- 线上资产：`komari-theme-Glassmorphism-build-2cd56ce.zip`，7,592,580 bytes，GitHub digest 与下载后 SHA-256 均为 `f2ef3697197abbf0b10ee09bd7be184051d66ac71770273ab687c65ebf0514cd`；包内版本 3.3.2、771 个 entries 和顶层契约均正确。
+- Issue 收尾：`#36` 已留言说明实现和验证结果，并以 completed 关闭。此最终交接状态只保留在本地 AICACHE，避免纯文档推送额外触发完整 Visual Regression。
+
+### 2026-07-29 v3.3.1 Issue #33 / #35 hotfix
+
+- `#33` 根因确认：首页由 `KeepAlive` 保留后，节点卡片和列表的 `useNodePingStats` scope 不会销毁，因此每个 UUID 的 Metric Store 查询及 60 秒刷新订阅继续存在；卡片摘要还复用了完整图表的 6000 点上限。
+- `#33` 修复：首页激活状态显式传到卡片/列表 Ping composable，离开首页立即释放订阅并中止 metric / legacy 在途请求；无订阅时不再进入 fallback；摘要查询上限独立降为 150。
+- `#35` 修复：`financeHelper.calculateRemainingValueCNY` 和卡片 `tagHelper.getRemainingValue` 同步移除单周期封顶；超过 100 年的长期机兼容语义保持不变。
+- 回归：新增 Playwright RPC 断言，覆盖首页摘要 `max_points=150` 及进入详情后 Ping metric 只包含当前 UUID。系统 Chrome 中用例 4.0 秒通过；Windows Chrome 完成测试后未自行退出，托管 Chromium 结果留待 GitHub Actions 最终确认。
+- 数值：固定随机种子 `0x35c0ffee` 校验 10,000 组价格 / 周期 / 剩余天数，其中 9,727 组跨多个周期；两套计算入口全部通过，最大浮点误差 `7.450580596923828e-9`。
+- 本地验证：3.3.1 版本下 `bun run lint`、`bun run type-check`、`bun run build` �� `git diff --check` 已通过；聚焦 Playwright RPC 用例通过。按用户要求停止额外的完整视觉矩阵。
+- 本地资产：`komari-theme-Glassmorphism-build-7d2c7e1.zip`，7,584,274 bytes，SHA-256 `F438AF4BDF12849983D206600A4C30025D64EF33ED47EBC330DA3E2458D039EB`；包内版本 3.3.1，顶层为 `komari-theme.json`、`preview.png`、`dist/`，包含 769 个 dist entries。
+- 发布完成：提交 `9f13b72442944f9a99c808054fe8a0a18dd710c2` 已推送 main；Release On Version Bump run `30445113985` 和 Visual Regression run `30445114027` 均成功；tag / Release `v3.3.1` 指向该提交。
+- 线上资产：`komari-theme-Glassmorphism-build-9f13b72.zip`，7,586,093 bytes，GitHub digest 与下载后 SHA-256 均�� `feadd4b3194aaacda719771584425c93dc8ffe3d70281fb0979e8a3d12c03e9f`；包内版本、顶层结构、预览图和 769 个 dist entries 均正确。
+- Issue 收尾：`#33` 与 `#35` 均已分别留言说明修复和验证结果，并以 completed 关闭。此最终交接状态只保留在本地 AICACHE，避免���文档推送额外触发完整 Visual Regression。
+
+### 2026-07-16 exact Linux integration bundle
+
+- 刷新上游状态：Komari #604 仍为 open，head `f08f47d6a7f5e4cdec28a1e89c2183f1c1b6e1fb`，前端及 Linux/Windows 构建矩阵全部成功；komari-web #82 仍为 open，head `0fee1f123009eca4b5f380549845bed756fa2d0c`。
+- 发现旧本地 Komari 快照除默认主题外仍有 23 个换行归一化后的真实源码差异���集中在 Metric Store、迁移和启动流程，因此废弃旧二进制，不作为 PR 精确测试包交付。
+- 从 GitHub 下载 `f08f47d` 原始源码，创建干净编译树；逐项比较 `cmd/database/pkg/protocol/utils/web` 共 243 个核心文件，排除有意替换的 `web/public/defaultTheme` 后差异为 0。
+- 默认主题替换为已发布的 Glassmorphism `v3.1.8` 资产；包内配置名为“主题设置”，完整管理端来源记录为 komari-web `0fee1f1`，路由桥接覆盖 `/admin`、`/terminal`、`/manage/*` 并加载 `glass-admin.css`。
+- 使用 Go `1.26.4`、Zig `0.14.1`、`x86_64-linux-musl`、`CGO_ENABLED=1` 和 `-buildvcs=false` 构建 Linux amd64 ELF；显式版本为 `integration-f08f47d-theme-v3.1.8`，版本哈希为完整 Komari PR head。
+- `go test ./database/clients ./web/api/client ./web/rpc/jsonrpc` 在 Windows amd64 CGO + Zig 环境下通过；`go vet ./...` 通过；Linux 目标构建通过。
+- 功能存在性清单确认：计费费率/锚点/下月到期/一次性开机费/流量重置保护/非阻塞上报，访��审计默认关闭/RPC/IP-UA 限流/UTF-8 截断/日志索引与 SQL 过滤，主题审计摘要及 JSON/CSV 导出，以及 Glassmorphism 默认前后台均进入交付包。
+- 最终目录：`output/integration-test/final/komari-glassmorphism-integration-20260716/`；总包：`output/integration-test/final/komari-glassmorphism-integration-20260716.zip`，32,089,492 bytes，SHA-256 `02f896751dfb87ff1a4a144ca69c3f9bfd83376de54492ba2013918f51c6c873`。
+- 二进制 SHA-256 `a966d695e4d3b84496567465ed8bf7a585459656bf756a1e50616ff21b3578ae`；主题 zip SHA-256 `f4dd86ad26a9a55ebfcecc1c76ac07cdcd5fcfd1883cf608ec4e7f491388ea26`；独立后台 zip SHA-256 `e17fa820a4a2d184541f068bc996dea70ffa3bb6502be102dad902b1bd599f6d`。
+- 未包含：每日/每周主题更新提醒、自动安装主题、不可篡改账本；实时费用仍是 fork 实验性估算功能。运行态数据库迁移、真实 Agent 上报和登录浏览器联调等待用户在 Linux 测试机部署。
+
+### 2026-07-15 Linux integration test bundle
+
+- 已确认 Komari PR #604 没有���改上游默认主题，但其提交历史已包含 PR #602 的访客审计 RPC、默认关闭开关、限流和日志过滤修复。
+- 已确认 Glassmorphism `dist/` 包含由 komari-web `b8fcc4580fe2cd5b715b76c97f4ff4b9ba066581` 构建的完整 `/admin-app/`，入口桥接覆盖 `/admin`、`/terminal`、`/manage/*`。
+- 用户指定只需 Linux 测试包；目标收窄为 `linux/amd64`。
+- PR #604 复核修复：账单累计写入失败现在只记录日志，不再阻断已保存的 Agent 上报和运行时在线状态；新增回归测试，提交 `b242ee8` 已推送 PR 分支。流量费率明确为每 TiB（`1024^4 bytes`）。
+- komari-web #82 本地补强：管理端账单弹窗新增流量、运行时间、首次开机费和总估算，30 秒刷新；费率前后端统一限制为 `0..1e12`；明确锚点可修改但首次上报后不可清空。`npm run lint` 为 0 error / 27 个既有 warning，`npm run build` 通过。
+- v3.1.6 空白页已稳定复现：`HomeView` 新增 `PingMonitorDialog` 时把弹窗放在主根节点外，视图变成 Fragment；Vue 报 `Component inside <Transition> renders non-element root node`，`out-in` 离场后主区域为空。修复为把弹窗移入 `.home-view` 单一根容器；浏览器首页 -> 详情 -> 返回首页恢复正常且无新 warning/error。
+- 永久约束已写入 `AIAGENTREADME.md` 和 `src/AGENTS.md`：路由视图必须单元素根，新增全局弹窗后必须验证动画开启/关闭两种路由往返。
+
+### 2026-07-15 v3.1.6 release preparation
+
+- 默认主题后台：完整 komari-web 已从 `b8fcc4580fe2cd5b715b76c97f4ff4b9ba066581` 重新构建并同步到 `public/admin-app/`；旧主控不返回 `traffic_rate` 时隐藏且不提交新增计费字段。komari-web PR #82 为 open、clean、mergeable。
+- 实时费用上游：Komari PR #604 为 open、clean、mergeable；`build-frontend` 和 Linux/Windows 386、amd64、arm64、riscv64 共 8 个构建任务全部成功。字段覆盖流量单价、小时单价、一次性首次开机费、首次 Agent 上报锚点和持久累计流量。
+- 主题功能：节点卡/列表延迟与丢包可打开完整 Ping 图；剩余价值可打开逐节点费用、币种和汇率明细；访客审计增加开关、UTF-8 字节截断及完整 JSON/CSV 导出；默认背景替换为原创青蓝/淡紫/薄荷网格图。
+- 背景资产：`public/images/default-background-v2.webp` 与 `output/imagegen/default-background-v2.webp` 均为 2048x1152、32,436 bytes、SHA-256 `42377961822666817def3d3b51b2c236a0f5f631dd1475535d9438a6b7ac551b`；仅使用本地 Lanczos 放大修正画布，未再次调用图像 API。
+- 代码复核：修复费用明细把“未设置到期时间”误显示为“今天”的问题；空费率和空开机费按 0，开机费只有存在首次成功上报锚点才计入；汇率保持“1 CNY 对应目标币种”的既有换算方向；旧核心能力检测通过。
+- 验证：`bun run lint`、`bun run type-check`、`bun run build` 和产品源码 diff check 全部通过。浏览器验证桌面无横向溢出；价值弹窗 1280x720 下为 1024x525，390x844 下为 358x687 且表格滚动不溢出；`/admin` 恢复原 URL、完整菜���和 `glass-admin.css` 正常加载。
+- 本地包：`komari-theme-Glassmorphism-build-e3abeff.zip`，7,606,509 bytes，SHA-256 `7539c1ef6ba8d65391215d04075256e59957e1b3af758832c72841412c17632b`；770 个条目，顶层��� `komari-theme.json`、`preview.png`、`dist/`，包内版本 3.1.6，`dist/admin-app/` 419 个条目且无 PWA/Service Worker 文件。
+- 发布完成：提交 `c368669ec10468a026991e21556ee3e34d5c99a0` 已推送 main；Release On Version Bump run `#29420879366`（#54）成功；annotated tag `v3.1.6`、Release target 与 main 均指向该提交。
+- 线上资产：`komari-theme-Glassmorphism-build-c368669.zip`，7,615,774 bytes，GitHub digest / 下载后 SHA-256 均为 `c9495a97e754512103fb0bb38a528ea27a31c3e02888cf18b796fd7a6985f3ae`；下载复核版本 3.1.6、770 个条目、419 个后台条目、顶层契约和无 PWA/Service Worker 文件均正确。
+- 发布边界：`.claude/` 和 `output/` 未进入发布提交；版本唯一来源保持 `komari-theme.json` 的 3.1.6。
+
+### 2026-07-15 default-theme integration review follow-up
+
+- 正在复核已有 admin-app 路由桥接、PWA 作用域、同步可重复性，以及 v3.1.5 色觉友好 / 访客审计与 Komari PR #602 合并代码的真实契约。
+- 已确认 `/admin`、`/terminal`、`/manage/*` 通过独立静态子应用恢复原 URL 的方案可行；公开主题主包不会加载 React 管理端 chunk。
+- 已发现并修复：浏览器禁用 sessionStorage 时入口不跳转；桥接架构下官方 `/admin-app/` Service Worker 无法覆盖恢复后的真实路由却可能保留旧后台资源；同步脚本缺���上游 HTML 结构断言。
+- 真实后端联调发现 Vite 代理只改 Host、未改 HTTP Origin，Komari 默认来源校验会拒绝本地 RPC；开发代理现统一把 `/api`、`/themes` Origin 设为 `VITE_API_TARGET`，WebSocket 继续使用 `rewriteWsOrigin`。
+- 访客审计补强：详���限额改按 UTF-8 字节计算，超���优���保留会话、站点指纹和 WebRTC 摘要；审计面板增加 `visitor_audit_enabled` 管理员开关，复用 `admin:editSettings` 的部分更新契约。
+
+### 2026-07-15 complete default-theme admin integration
+
+- 已核对 Komari `web/public/public.go`：`/admin` 和 `/terminal` 强制使用 embedded defaultTheme，静态文件会在当前主题缺失时回退 embedded defaultTheme。
+- 已从官方 `komari-monitor/komari-web` 提交 `ebfbd3e079f8777a746276fe67429b519024f7c7` 完整构建 415 个 PWA 预缓存文件，并同步到 `public/admin-app/`。
+- 已加入根入口路由桥接和 admin-app URL 恢复，BrowserRouter 在 `/admin/...`、`/terminal`、`/manage/*` 下保留原路径语义。
+- 已加入 Glassmorphism 亮暗色 CSS 覆盖，不改官方 React ���能代码；后台菜单已在浏览器确认包含站点、主��、登录、通知、XtermJS、监控数据库、远程执行、Ping、会话、账户和日志等完整模块。
+- ���新增 `bun run sync:admin -- <komari-web-path>`，可从新的官方 checkout 重建并记录来源提交。
+- 已为主题 Vite 开发服务器补 `/api`、`/themes` 代理，默认指向 `http://127.0.0.1:25774`，可用 `VITE_API_TARGET` 覆盖。
+- 最终校验：`bun run lint` 和 `bun run build` 均通过；生成 `komari-theme-Glassmorphism-build-e3abeff.zip`（7,573,457 bytes、770 个条目），关键管理模块与来源记录均已核对。浏览器已确认 `/admin` 完整菜单和 Glassmorphism 亮暗色覆盖；本地未启动 Komari 后端，因此未进行登录后的 API 写操作验证。
+
+## 上一任务
+
+- 状态：done
+- 目标：新增可选的色觉友好配色，提前适配 Komari PR #602 的访客审计上报与日志查看能力，并发布 `v3.1.5`。
+- 里程碑：主类 M5 新功能；色觉友好界面属于 M4，访客审计的数据最小化、权限和隐私边界按 M3 执行。
+- 范围：主题托管设置、语义色与图表/Ping 色板；`visitor_audit_enabled` 能力检测；公开访客事件上报、站点隔离安全指纹与操作埋点；AuditLogPanel 的 visitor 过滤、解析和结构化展示；版本/README、构建、推送和 GitHub Release 全流程。
+- 计划：色觉友好 token/色板 -> 访客审计 RPC/service/composable -> 安全指纹与页面操作埋点 -> 审计面板 visitor 视图 -> lint/build/浏览器验证 -> v3.1.5 版本/说明 -> zip/Actions/Release/线上资产验证。
+- 不做：不记录密码、token、Cookie、query value、完整搜索词、WebSSH/剪贴板内容；不上传原始 WebRTC ICE 地址，不调用第三方 STUN，不采集设备 ID、Canvas 或音频指纹；不在核心 `1.2.6` 缺少能力时发送未知 RPC；不改 `package.json.version`，不提交 `.claude/`。
+
+## 执行日志
+
+### 2026-07-15 color-vision-friendly palette / visitor audit preparation
+
+- 参考结论：色觉友好模式不能只换红绿色；���要拉开明度/饱和度，使用朱红、蓝绿、蓝、橙、紫红等安全色，并让重要状态同时具备文字、图标、形状或线型差异。
+- 上游状态：Komari PR #602 已于 2026-07-15 合并，head `0c80f0f`、merge commit `5fa59ab`；PR CI run `29389802493` 成功。当前最新正式 Release ���为 `1.2.6`（2026-07-12），所以主题只能提前适配并通过公开设置字段做能力检测。
+- 上游契约：`public:recordVisitorEvent` 只接收 `event/path/route/target/detail`；IP、User-Agent、登录 UUID 和时间由服务端可信记录；`visitor_audit_enabled` 默认 false；每 IP 30 次/分钟、burst 10；`admin:getLogs` 新增 SQL 级 `msg_type` 精确过滤。
+- 指纹决策：在核心开关明确启用后，记录随机 session ID、浏览器/系统能力、时区语��、屏幕/硬件摘要、自动化标记和含当前 origin 的 SHA-256 站点隔离指纹；WebRTC 仅使用本地 ICE gathering，保存候选类型/协议/地址类别和站点隔离哈希，不保存原始候选或地址，不调用第三方 STUN。
+- 发布目标：功能完成并确认无明显逻辑漏洞后更新唯一版本源和 README 到 `v3.1.5`，执行 lint/build/zip 检查，推送 main 并核验 GitHub Actions、Release 和线上包。
+- 已实现：主题设置新增标准 / 色觉友好模式；语义状态色、Ping 分级纹理和多任务图表虚实线同步切换，亮暗色关键前景组合对比度均高于 4.5:1。
+- 已实现：按 PR #602 契约接入 `visitor_audit_enabled`、`public:recordVisitorEvent` 和 `admin:getLogs.msg_type`；旧核心缺少能力字段时不发送新 RPC。
+- 已实现：页面、节点、分组、搜索长度、快捷筛选、视图、后台入口、工具、快照与审计导出等事件；首次页面事件附带站点隔离会话、稳定浏览器指纹及语言、时区、屏幕、硬件、自动化、WebGL、WebRTC 哈希摘要。
+- 已实现：AuditLogPanel 新增访客视图和结构化 IP / UA / 身份 / 会话 / 指纹展示；JSON / CSV 导出拉取当前服务端筛选的完整分页数据，包含去重/旧核心分页保护，CSV 沿用公式注入防护和 UTF-8 BOM。
+- 安全复核：不提交查询值、完整搜索词、密码、Cookie/Token、命令、剪贴板、原始 ICE candidate 或原始局域网地址；WebRTC 不使用第三方 STUN，只保存站点隔离哈希与候选类型摘要。
+- 本地验证：`bun run lint` 通过；`bun run build`（含 `vue-tsc --build`）通过；访客消息解析 / Chrome Windows UA 样例���过；色觉语义前景对比度为 5.19-8.21:1；桌面浏览器渲染无新增重叠。移动窄视口自动化被浏览器安全策略阻止，已改做响应式模板与生产 CSS 静态复核。
+- 最终本地验证：rebase 到远端 `2183a48` 后，`bun run lint`、`bun run build`、`git diff --check` 再次通过；发布提交 `af32f25`；本地包 `komari-theme-Glassmorphism-build-af32f25.zip` 大小 5,114,116 bytes，SHA-256 `098c3882b5b4b576912e23157f8ca59ddc771f900c152882c651336db2adb28c`，顶层为 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.5`，345 个 dist entries。
+- 远端验证：发布提交 `af32f25f90f9e9c5b52e7b8885a2c0787b827f0c` 已推送 `main`；GitHub Actions `Release On Version Bump` run `#29397249147`（#52）成功；tag `v3.1.5` 与正式 Release 均指向该完整提交。
+- 线上资产：`komari-theme-Glassmorphism-build-af32f25.zip`，大小 5,129,174 bytes，GitHub digest / 下载后 SHA-256 均为 `45e71e7d82bb6caf8d36625bbee8e069b71270eba5f9f475086560b7c6b41d9d`；下载复核顶层结构、包内 `3.1.5`、预览图和 345 个 dist entries 均符合发布契约。
+
+### 2026-07-14 v3.1.4 Issue #18 per-bucket Ping loss fix
+
+- Issue 判断：应修复。Komari 1.2.6 的 `public:queryMetrics` 已返回 `ping.loss` 分时序列，当前主题只查询 `ping.latency`，再把 `avgLoss` 覆盖到每个历史格，导致所有格子同值同色。
+- 修复边界：周期汇总继续采用 `public:getPingMetricStats` 的按样本加权平均；历史时间格改为消费 `ping.loss`，按时间桶与 point `count` 加权，ratio 转百分比；`null` 保持空桶；旧 records 负值丢包逻辑保持不变。
+- 已实现：Metric Store 查询同时请求 `ping.latency_ms` / `ping.loss`；按任务与时间桶聚合 loss point，使用 `count` 加权；丢包序列覆盖不完整时回退 legacy records；本地 Ping 缓存版本升到 8，避免旧错误结果继���命中。
+- 发布准备：唯一版本源更新为 `3.1.4`，README 当前版本、专项说明与更新日志已同步；`.claude/` 继续排除。`gh` 登录 token 已失效，本次公开 Issue / Actions / Release 核验改用 GitHub REST，git 推送凭据正常。
+- 本地验证：`bun run lint`、`bun run build` 和 `git diff --check` 均���过；构建仅有既有 `@vueuse/core` PURE 注释与 `globe` 大 chunk 警告。
+- 本地资产：`komari-theme-Glassmorphism-build-4f37416.zip`，大小 5,105,926 bytes，SHA-256 `3b9510345ad79319d70311ed8a3c03a79cf4159cbf5b0ef48c3f04623798df74`；顶层为 `komari-theme.json`、`preview.png`、`dist/`，包内版本��� `3.1.4`。
+- 远端验证：发布提交 `91c9b06` 已推送 `main`；GitHub Actions `Release On Version Bump` run `#29312369165`（#49）成功���tag `v3.1.4` 指向完整提交 `91c9b06fc5c4b5ee2636dc18779861186806abd7`；Release 为正式发布（非 draft / prerelease）；Issue #18 已由 `Fixes #18` 自动关闭为 completed。
+- 线上资产：`komari-theme-Glassmorphism-build-91c9b06.zip`，大小 5,114,852 bytes，SHA-256 `f8b4c9b6f61cc66d755d7a612357d16d1d2774f9494b9b0c3ce87e572ee5da9b`；下载复核顶层结构为 `komari-theme.json`、`preview.png`、`dist/`（344 个 dist entries），包内版本为 `3.1.4`。
+
+### 2026-07-14 v3.1.3 reduced-motion route transition fix
+
+- 线上复现：`tz.yisaw.com` 开启减弱过渡动画时，点击节点后 URL 已进入详情但 `<main>` 为空；`km.ydao.de` 使用同一构建且未触发配置时，详情和返回首页均正常。
+- 根因：路由 `Transition` 在 `css=false` 时仍使用 `mode="out-in"`；同步离场的 `afterLeave` 与 `KeepAlive` 更新重入后，Vue 访问空 DOM 锚点并抛出 `nextSibling` / `parentNode`。
+- 修复：减弱动画时路由 Transition 改用默认并行模式；正常动画继续使用 `out-in`，首页缓存策略保持不变。
+- 发布准备：唯一版本源更新为 `3.1.3`���README 当前版本、专项说明和更新日志已同步；`.claude/` 继续排除。
+- 本地验证：`bun run lint`、`bun run build` 和 `git diff --check` 均通过；构建仅有既有 `@vueuse/core` PURE 注释与 `globe` 大 chunk 警告。
+- 本地资产：`komari-theme-Glassmorphism-build-4716f15.zip`，大小 5,105,653 bytes，SHA-256 `e202ce28508a3dc0c9b1a4a1e8c5c7706dd1f281ef72d8f4d73d429b891bac11`；顶层为 `komari-theme.json`、`preview.png`、`dist/`，包内版本为 `3.1.3`。
+- 远端验证：提交 `4f37416` 已推送到 `main`；GitHub Actions `Release On Version Bump` run `#29311122789` 成功；tag `v3.1.3` 已生成；Release 为正式发布（非 draft / prerelease）。
+- 线上资产：`komari-theme-Glassmorphism-build-4f37416.zip`，大小 5,120,783 bytes，SHA-256 `f4d5f1be0c769ffc5372ab6a9b780042768f82529827b7222a843ef642605bee`；下载后复核顶层结构为 `komari-theme.json`、`preview.png`、`dist/`，包内版本为 `3.1.3`。
+
+### 2026-07-14 post-release README restructure
+
+- 按用户提供的发帖结构重写 README：突出 `v3.1.2` 启动自愈，并重新组织详情指标、自定义、Metric / Ping、首页、高级工具、架构、安全、WebKit / Firefox 兼容和安装说明。
+- 事实边界：普通 Load / Ping 历史继续公开；敏感高级工具、Geo、导出和磁盘预测保持登录校验；Safari 15.4 是构建基础边界，Tailwind CSS v4 完整视觉基线仍为 Safari 16.4+。
+- 本轮仅计划提交 `README.md` 与 `AICACHE.md`；主题版本继续保持 `3.1.2`。
+- 验证：`bun run lint` 通过；`git diff --check` 通过；lint 后差异仍只有两个 Markdown 文件，`komari-theme.json` 和运行时代码均未修改。
+
+### 2026-07-14 startup single-point-of-failure fix
+
+- 已确认根因：`InitManager.init()` 串行等待 `healthCheck()`，首次 Ping 失败会阻止 public settings、用户、节点数据和实时连接启动；`connectionError` ��在首页渲染，详情路由缺少故障反馈。
+- 设计：健康检查使用已有 5 秒配置并增加 3 次递增间隔重试；四个启动请求通过 `Promise.allSettled()` 隔离；节点首拉失败仍启动轮询自动恢复；显式重试复用现有 manager，避免重复定时器和 WebSocket 监听。
+- 已实现：RPC Ping 支持 AbortSignal；健康检查超时会取消底层请求；初始化改为独立并行；全局 app shell 显示连接错误和重试状态，首页重复提示已���除。
+- 首轮验证：`bun run lint`、`bun run build` 通过，生成 `komari-theme-Glassmorphism-build-bb52e94.zip`；仅有既有 `@vueuse/core` PURE 注释提示和 `globe` chunk 体积警告。
+- 浏览器验证：首页和直接进入 `/instance/missing-node` 都显示全局连接错误；1270px 和 390x844 无横向溢出或按钮/文案重叠；重试按钮会进入禁用的“重试中”状态，失败后恢复。
+- 快速复查：未发现新的发布阻断 bug；Firefox 毛玻璃回退、列表虚拟化、共享 Ping/负载缓存已存在。后续高收益专项候选为卡片模式 30+ 节点全量挂载，以及约 2.98 MB 地球纹理和 1.98 MB `globe` chunk 的传输/解析成本。
+- 发布准备：`komari-theme.json.version` 已更新为 `3.1.2`，README 当前版本与更新日志已同步。
+- 最终验证：版本更新后 `bun run lint`、`bun run build` 通过，生成 `komari-theme-Glassmorphism-build-bb52e94.zip`；zip 顶层契约为 `komari-theme.json`、`preview.png`、`dist/`，包内版本为 `3.1.2`。构建仍仅有既有 `@vueuse/core` PURE 注释和 `globe` 大 chunk 警告。
+- 已发布：提交 `aed8626` 已推送到 `main`；GitHub Actions `Release On Version Bump` run `#29305550352` 成功；tag `v3.1.2` 指向该提交，Release 为正式发布（非 draft / prerelease）。
+- 线上资产：`komari-theme-Glassmorphism-build-aed8626.zip`，大小 5,114,600 bytes，SHA-256 `71155874add7df49ee0cbe14b403f5d959767e754ffbe21b0a8259c6bf7014d9`；下载后复核顶层结构与包内 `3.1.2` 版本均符合契约。
+
+### 2026-07-14 v3.1.1 release preparation
+
+- 已将唯一版本源 `komari-theme.json.version` 更新为 `3.1.1`，README 当前版本与更新日志同步。
+- 发布前 `bun run lint`、`bun run build` 和 zip 清单检查通过；本地 zip 内版本为 `3.1.1`，顶层包含 `komari-theme.json`、`preview.png`、`dist/`。
+- `.claude/` 为本机配置，继续排除；远端 `91f46ac` 仅修改 README 赞助名单，将在发布提交后 rebase 合入。
+
+### 2026-07-14 v3.1.0 background/list/Ping regression quick fix
+
+- 修复默认背景被 `body` 实色层遮挡：页面可见背景统一由 `Background.vue` 负责，`html` 继续提供无 JS/加载失败时的底色。
+- 列表模式小 Ping 条移除每行 40 个��对定位气泡，改用原生提示，避免气泡压住运行时间，同时降低列表 DOM/hover 合成开销。
+- 首页快捷控制计数改为直接计数；月成本、流量、上下行、峰值等只显示数量的入口不再��轮实时更新重复排序全部节点。
+- 普通节点 Ping 延迟/丢包恢复公开访问，移除 `historyMetrics` 登录权限；高级工具、Geo、导出、审计和磁盘预测权限保持不变，相关开发文档已同步。
+- Ping 详情请求增加序列保护，快速切换时间范围/节点时旧请求不再覆盖新结果；时间锚点合并从遍历全部历史锚点改为只回看最近候选，避免大样本下退化为 O(n²)。
+- 验证：`bun run lint` 通过；`bun run build` 通过并生成 `komari-theme-Glassmorphism-build-771c363.zip`。仍有既有 `@vueuse/core` PURE 注释提示和 `globe` chunk 体积警告。
+- 暂不扩展：按用户要求放弃全量审查；卡片模式全量挂载、首页小 Ping 按节点请求仍可作为后续性能优化项。
+
+### 2026-07-14 v3.1.0 release
+
+- 已将 `komari-theme.json.version` 更新为 `3.1.0`；README 补齐 25 个 definition、12 个图表族、详情预设、Ping 自定义时间与丢包修复，并新增 v3.1.0 更新日志。
+- `.claude/settings.local.json` 为本机配置，明确排除在发布提交之外；其余当前产品代码、适配文档和新增图表组件纳入本次 release。
+- 发布前 `bun run lint`、`bun run build` 与 zip 清单检查通过；本地包内版本为 `3.1.0`，顶层包含 `komari-theme.json`、`preview.png`、`dist/`。构建仍只有既有 `@vueuse/core` PURE 注释和 `globe` chunk 体积警告。
+- 已提交并推送 `main`：commit `14dac71`。GitHub Actions `Release On Version Bump` run `#42`（ID `29268363931`）成功；tag `v3.1.0` 指向该提交，Release 已发布，资产为 `komari-theme-Glassmorphism-build-14dac71.zip`（5,120,319 bytes，SHA-256 `6ecfccecf9e434da554ccea794123247c48646e9b64ba94910e697888843115c`）。
+
+### 2026-07-14 official detail metric dashboard expansion
+
+- 已实测公开节点详情页 `mt.vpnmiao.com`：官方默认将 CPU+Load、RAM+Swap、实时网络+累计流量、Ping 多任务合并成卡，支持 S/M/L、增删指标和拖拽；新增菜单来自 `public:listMetricDefinitions`。
+- 已核对 RPC 文档与 Komari 1.2.6 `c828653`：后端固定创建 25 个定义；GPU 设备序列带 `device_index/device_name`，Ping 序列带 `task_id`；`ping.loss` 写入值为 0/1，聚合后按比例显示；`public:queryMetrics` 的空桶是 `null`。
+- 设计决策：主题设置提供 12 个稳定指标族和多套预设，覆盖全部官方指标但避免 25 张单指标碎卡；保留原有独立 PingChart，LoadChart 中的 Ping 卡为可选紧凑总览。
+- 已完成 25 个 definition 到 12 个图表族的查询、展示和预设映射；统一图标头部，并校验 Iconify 图标资源。GPU、显存、温度、流量、Ping ��迟和 Ping 丢包按 definition/数据存在性自动显示。
+- 按用户反馈将详情概览恢复为宽屏 4 列、中屏 3 列、移动端 2 列，预设调整为 8/12/16 张；独立 Ping 图新增精确起止时间，新 metric API 传 `start/end`，无有效时序点时回落 legacy 并按保留窗口回溯后裁剪，legacy 仍以 `value < 0` 识别丢包。
+- 丢包兼容补强：PingChart 只有 latency series 对应任务同时具备非 approximate loss stats 才采用新路径，否则整体回落旧 records；首页 Ping 汇总不再过滤 100% 丢包任务，metric loss 按 `total` 加权，loss stats 缺失/估算时回落 legacy。旧接口的负值哨兵判断保持不变。
+
+### 2026-07-13 Komari 1.2.6 configurable card adaptation
+
+- 已核对官方 `komari-web` `radix` 分支提交 `ebfbd3e` 与 Komari 1.2.6 tag 提交 `c828653`。官方公开页仍为首页与节点详情两页；首页有当前时间、在线节点、地区、总流量、实时网速 5 ���状态卡，详情页使用 Metric Store 展示 CPU、内存、硬盘、网络、GPU、连接、进程与 Ping 指标。
+- 差集结论：本地主题已覆盖并扩展大部分公开监控能力，但详情概览和图表排序缺少直观配置；本轮以 `/instance/` 为重点，并补齐官方时间卡与新版探针 GPU 总览。
+- `InstanceDetail.vue` 已接入 18 类可配置概览卡：价格/月成本/到期/剩余价值、CPU/GPU/内存/Swap/磁盘、负载/温度/进程/连接/运行时间、上下行速率/总流量/流量额度。默认财务预设保持原有视觉行为。
+- `app.ts` 已新增详情概览和图表预设及配置兼容。图表提供 all/compact/resource/network/gpu/custom 公开预设，并继续兼容旧独立卡位、advanced 值和 `chartDashboardTemplate` JSON/逗号列表。
+- `komari-theme.json` 已把设置重组到 8 个编号区段；后续按用户反馈移除 23 个逐项下拉卡位，收缩为 48 个唯一设置 key，并压短易溢出的 help。主页、详情概览、详情图表分别使用一个英文逗号 keys 字段；打包预览字段为发布契约要求的 `preview.png`。
+- `index.html`、`main.css` 和 `vite.config.ts` 已增加旧 WebKit 兼容边界：构建目标 Safari 15.4，缺少 `oklch` / `color-mix` 时切换 sRGB token 并关闭毛玻璃，��� ESM 时显示可读升级提示。Tailwind CSS v4 的正式浏览器基线仍是 Safari 16.4+。
+- Ping 诊断结论：legacy `value < 0` 是 Komari 1.2.6 的历史丢包哨兵，不能直接删除；后续应修复 100% 丢包任务被过滤、不同样本量按任务等权平均，以及新接口只有延迟序列但缺少 loss stats 时未整体 fallback 的低报风险。本轮未改 Ping 语义。
+- 设置紧凑化 follow-up：5 个 key 列表改为 `richtext` 多行输入，`parseKeyList()` 统一接受英文/中文逗号、分号、空格和换行；help 补全每个英文 key 的中文含义，并用映射间空格保证官方后台可换行。详情概览从桌面 4 列改为 3 列，财务/状态/网络/GPU 预设各 6 卡、资源 9 卡、综合 12 卡；同时修复自定义头部白名单遗漏 `monthlyCost`。
+- 安全边界：后台 Metric Store 配置/迁移、数据库维护、通知、Agent 管理、命令执行和终端继续使用 Komari 官方后台，不进入公开主题路由。
+
+### 2026-07-13 light-mode flash and home reveal follow-up
+
+- 开始按用户“亮色模式还是太闪，刷新和显示主页没有过渡”的反馈做第二轮视觉修复：本轮不改启动数据流，重点降低 light mode 首屏/token/loading/默认背景亮度，并软化 loading -> app shell -> HomeView 的显示过渡。
+- 已更新 `src/styles/main.css`、`src/utils/glassTheme.ts`、`src/stores/app.ts`、`komari-theme.json`：亮色根背景、卡片/弹层 token、默认毛玻璃 preset、自定义默认色和 Firefox fallback 均从纯白/高白度改成灰蓝雾面，降低浏览器第一帧和 fallback 合成时的亮度。
+- 已更新 `src/components/Background.vue`：自定义图片预加载期间继续显示柔和默认背景兜底；默认亮色背景与视频 loading/fallback 改为低亮灰蓝渐变，并降低 emerald/lime spotlight 亮度。
+- 已更新 `src/components/LoadingCover.vue`、`src/components/Provider.vue`、`src/App.vue`、`src/views/HomeView.vue`：LoadingCover 亮色普通遮罩改为低亮渐变；body 仅在存在当前背景 URL 时透明；loading/app shell/router 过渡改为更柔和的 200–300ms opacity/微位移���router transition 遵守 `disablePageAnimation`；首页容器增加轻量 reveal 且 reduced-motion 下关闭。
+
+### 2026-07-13 home refresh flash fix
+
+- 开始修复用户反馈的首页强闪屏：参考 vlongx 主题的稳定首屏/非白色加载策略，采用低风险首屏主题预设 + token 化加载遮罩 + 密集节点卡片禁用首轮动画方案。
+- 决策：先解决高置信视觉闪屏根因，不引入卡片虚拟滚动或 Ping 聚合重构，避免扩大数据层和布局风险。
+- 已更新 `index.html`：在首屏前按本机 `themeMode` 或北京日夜 fallback 预设 `.dark` 和 `colorScheme`，异常时默认暗色，避免夜间白屏。
+- 已更新 `src/styles/main.css` 与 `src/components/LoadingCover.vue`：初始文档背景使用 token；加载遮罩使用 `--color-background` + `color-mix` 半透明背景��并保留纯 token fallback。
+- 修复用户反馈的自定义背景图片失效：根因是 `#app` 被首屏防闪屏补丁设置为不透明 `background-color: var(--color-background)`，而 `Background.vue` 的 fixed 背景层在 `z-index: -1`，因此被 `#app` 自身背景盖住；已移除 `#app` 背景，仅保留 `body` 初始 token 背景。
+- 继续修复刷新时仍能看到白雾 Loading 的反馈：`LoadingCover.vue` 现在读取归一化背景配置，自定义背景启用且当前模式有背景 URL 时，加载覆盖层不再铺 `color-mix(... 82%)` 半透明背景，也不再显��� `Loading...` 文案，只保留轻量圆形指示器，避免把背景洗白。随后进一步移除 `App.vue` LoadingCover 外层 Transition 的 `backdrop-blur-sm` enter/leave class，并去掉自定义背景加载指示器自身的小块 `backdrop-filter`；最新调整将自定义背景加载遮罩改为极低透明深色层、普通加载层改为低对比灰蓝/深色层，并让图片背景预加载阶段不显示纯白 token 占位，避免任何 loading 阶段继续出现高亮白雾。
+- 已更新 `src/constants/ui.ts`、`src/views/HomeView.vue`、`src/components/NodeCard.vue`：30+ 卡片节点禁用首轮卡片切换 CSS 动画，60+ 卡片节点禁用在线状态扩散环，普通节点数量仍保留原动画。
+- 修复首页延迟/丢包与详情页不一致：`useNodePingStats.ts` 的 metric series 路径此前把 `queryMetrics(fill_empty: true)` 返回的 `null` 点��成 `-1` ���计入丢包��导致首��卡片显示明显丢包；详情页图表会把同类 null 当断点，所以看不到丢包。现改为 metric series 只用于有效延迟点，丢包摘要优先读取 `public:getPingMetricStats` 的非估算 `loss`，`loss_approximate` 时不参与首页平均��包；详情页 `PingChart.vue` 也同步忽略 metric null 点。
+- 首页小卡延迟/丢包采样显示按用户反馈恢复为等高整条颜色分级，不再按高度变化。旧接口 fallback 仍保留：只有 `public:getPingMetricStats` / `public:queryMetrics` 不可用或无数据时，才走 legacy `common:getRecords`，并继续按旧接口的 `value < 0` 记录计算丢包。
+
+### 2026-07-13 chunk/request pressure follow-up
+
+- 开始修复历史详情页加载时请求爆炸放大因素：将 v3 共享服��/工具模块纳入 Vite manual chunk，并让 LoadChart legacy fallback 与详情页 24h 统计使用同一个 `LOAD_RECORD_MAX_COUNT` cache/request 维度。
+- 已更新 `vite.config.ts`：新增 `v3-services` manual chunk，合并 history/metrics/request/cache service 与 osImageHelper/metricSeries/useNodePingDisplay 等跨异步组件共享模块，减少 Rollup 自动拆出的零散共享 chunk。
+- 已更新 `src/components/LoadChart.vue`：legacy fallback 调用 `loadNodeLoadRecords(props.uuid, hours, LOAD_RECORD_MAX_COUNT)`��与 `InstanceDetail.vue` 的 24h 峰值统计保持同一 `maxCount` 维度以复用 cache/request key。
+- 发布前同步 `origin/main`（包含 README 更新提交 `94691f1`），并将 `komari-theme.json.version` 从 `3.0.2` bump 到 `3.0.3`，避免已有 `v3.0.2` tag 导致 release workflow 跳过。
+
+### 2026-07-13 v3.0.0 frontend follow-up
+
+- 开始补完用户复查指出的 4 项：物理核心参与每核成本并展示到 NodeCard、LoadChart 增加 start/end 自定义时间范围、metric definitions 加 TTL 结果缓存、修复 `SharedCache.retain()` 覆盖后 release 引用计数孤儿化。
+- 约束：保持 v3.0.0 版本号和发布结构不变；自定义范围在 metric API 可用时精确传 `start` / `end`，旧后端 fallback 只做近 N 小时近似。
+- 已实现 AuditLogPanel：`admin:getLogs` RPC 类型和方法、`audit.service.ts` request key 去重、`auditLog` 权限 key、首页第 5 个高级工具入口、只读表格和分页；`limit` / `page` 调用时按官方文档转为 string。
+- 已实现磁盘预测体验补充：`prediction.service.ts` 新增 `analyzeDiskPrediction()` 返回不可用原因，NodeCard / HealthSummaryPanel 在样本不足或历史不足 2 天时显示“数据积累中”；NodeCard 调 `useNodeLoadStats` 时显式传 `LOAD_RECORD_MAX_COUNT`，避免未传 `maxCount` 走后端默认配额时体验不稳定。
+
+### 2026-07-13 official metric-store feature port
+
+- 开始实施官方 komari-web 高价值功能移植第一批：新增 metric series 工具、metrics service、Ping metric 优先路径与节点 `message` 提示；保持旧版 `common:getRecords` fallback，不改发布结构和版本。
+- 已新增 `src/utils/metricSeries.ts` 与 `src/services/metrics.service.ts`，封装 metric tags/series 拆分、Ping task/stat helper、EWMA 平滑工具，以��� `public:listMetricDefinitions` / `public:queryMetrics` / `public:getPingMetricStats` / `public:getPublicPingTasks` 服务层请求。
+- 已改 `src/composables/useNodePingStats.ts` 与 `src/components/PingChart.vue`：优先并发尝试 Ping metric stats 和 metric series；新接口失败或空数据时回退 legacy Ping records；Ping 图表信息卡补充 stddev、valid、loss approximate 等官方统计字段。
+- 已改 `src/components/NodeCard.vue` 与 `src/components/NodeList.vue`：节点名旁展示 `message` warning 图标，tooltip 纯文本/换行显示 message 与 `status_updated_at`，不使��� `v-html`。
+- 已运行 `bun run lint` 与 `bun run build`，均通过；构建生成 `dist/` 和 `komari-theme-Glassmorphism-build-881385d.zip`。
+- 继续按用户“全部上马”要求实施剩余官方功能：LoadChart 历史模式优先 metric store、GPU detail/per-device metric 图表、`chartDashboardTemplate` 托管配置读取与布局排序。
+- 已改 `src/components/LoadChart.vue`：非实时历史数据优先通过 `public:listMetricDefinitions` 过滤可用指标，再调用 `public:queryMetrics` 查询 `cpu.usage`、`load.average`、memory/swap/disk/net/connections/process/GPU 等指标并转换为当前 ECharts 数据；无定义、无数据或失败时回退 `loadNodeLoadRecords()` legacy 路径。实时模式仍保留 `common:getNodeRecentStatus`。
+- 已补 GPU 兼容：`src/utils/rpc.ts` 增加 live/history GPU detail 类型；LoadChart 支持 `gpu.usage`、`gpu.device.usage`、`gpu.memory.used`、`gpu.memory.total`、`gpu.temperature`，按 `device_name` / `device_index` 汇总 tooltip，并在存在 GPU 数据时显示 GPU 卡片。
+- 已接入 `chartDashboardTemplate`：`komari-theme.json` 增加托管配置项；`src/stores/app.ts` 安全解析 JSON / 逗号列表并暴露 `chartDashboardTemplate`；LoadChart 按 cards 顺序渲染 cpu/memory/disk/network/gpu/connections/process，非法配置自动回默认。
+- 全量移植验证：第一次 `bun run lint && bun run build` 因 LoadChart `chartData` 在 `hasGpuData` 前置引用触发 `ts/no-use-before-define` 失败；移动 computed 后第二次 build 因 `parseChartDashboardTemplate` 局部变量类型推断为窄类型失败；显式标注 `let value: unknown` 后重跑 `bun run lint && bun run build` 通过。
+- 按用户要求压缩主题设置：`glassCustomColors` 合并原 10 个自定义颜色字段，help 文案列出可用 key；`app.ts` 支持新 JSON 配置并兼容旧字段。按用户补充要求增加 `gpuChartEnabled` 开关，默认关闭，LoadChart 只有开关开启且有 GPU 数据才显示 GPU 卡片。
+
+### 2026-07-12 Komari 1.2.x compatibility adaptation
+
+- 已调研官方 `komari.wiki` / `komari-document.pages.dev` 的 RPC、API、theme、agent 文档，以及 `komari-monitor/komari`、`komari-web`、`komari-agent`、`komari-document` 官方仓库/release。
+- 决策：主题打包结构保持 `komari-theme.json` + `preview.png` + `dist/` 不变；适配重点放在数据层兼容。
+- 开始实施第一批兼容补丁：RPC 参数/类型、历史 records 返回形态、新探针字段、public RPC 方法壳。
+- 已完成第一批兼容补丁：`src/utils/rpc.ts` 新增 Komari 1.2.x public RPC/metric 类型与方法壳，并让 `common:getRecords` 同时发送 `maxCount` 与 `max_count`；`src/services/history.service.ts` 兼容 records array/map 返回；`src/utils/api.ts`、`src/stores/nodes.ts`、`src/views/InstanceDetail.vue` 补充新探针字段与物理核心展示。
+- 验证中首次 `bun run build` 因 `MetricQueryParams` / `PingMetricStatsParams` 缺少 index signature 导致 type-check 失败；已修复后重跑通过。
+- 按用户要求只参考官方 `komari-monitor/komari-web`（radix 分支），不再参考未适配的社区主题；已在临时目录只读查看官方实现。官方主题仍大量使用 `common:getNodes` / `common:getNodesLatestStatus`，但新图表/Ping 已转向 `public:listMetricDefinitions`、`public:queryMetrics`、`public:getPingMetricStats`、`public:getPublicPingTasks`。
+
+### 2026-07-12 v3.0 stability refactor
+
+- 已完成只读探索和计划审批；开始按计划实施网络层、缓存层、组件算法、导出与 CSV 安全重构。
+- 已核对当前实现：网络层 timeout / abort 清理、RequestManager `try...finally`、Promise cache 失效清理、Provider metadata 模块级共享缓存、拓扑 Map 索引、虚拟列表固定行高和负载采样 0 条 warn 已基本落地。
+- 收尾修复 `src/utils/csv.ts`：公式注入检测正则显式覆盖前导空白、BOM、NBSP 与 `= + - @ |`。
+- 收尾修复 `src/services/snapshot.service.ts` 与 `src/components/SnapshotExportPanel.vue`：新增异步 JSON 构建流程，按节点分片序列化并让出主线程，避免导出时一次性 `map + JSON.stringify` 大对象。
+- 收尾补充 `src/stores/nodes.ts` 注释：节点对象本身必须保持响应式，复杂静态元数据后续应字段级 `markRaw` 或放入共享缓存，避免破坏实时指标刷新。
+- 说明：此前 `AICACHE.md` 只写入任务开始状态，未继续写���实现/验证/交接；它不是自动记忆文件，必须由 agent 显式编辑。
+
+## 验证记录
+
+- 2026-07-14 v3.1.4 Issue #18 release：`bun run lint`、`bun run build`、`git diff --check` 通过；发布提交 `91c9b06` 已推送 `main`，Actions run `#29312369165`（#49）成功，tag / Release target 均为完整提交 `91c9b06fc5c4b5ee2636dc18779861186806abd7`，Issue #18 已关闭。线上 zip `komari-theme-Glassmorphism-build-91c9b06.zip` 大小 5,114,852 bytes，SHA-256 `f8b4c9b6f61cc66d755d7a612357d16d1d2774f9494b9b0c3ce87e572ee5da9b`，下载��核顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.4`。构建仍只有既有 `@vueuse/core` PURE 注释与 `globe` 大 chunk 警告。
+- 2026-07-14 v3.1.3 release：发布提交 `4f37416` 已推送 `main`；GitHub Actions run `#29311122789` 成功。Release `v3.1.3` 为正式发布（非 draft / prerelease），target 为完整提交 `4f3741692bd81141ed542614d5b31a01ff0dc0fc`，zip 资产 `komari-theme-Glassmorphism-build-4f37416.zip` 上传状态为 `uploaded`。下载复核：大小 5,120,783 bytes，SHA-256 `f4d5f1be0c769ffc5372ab6a9b780042768f82529827b7222a843ef642605bee`，顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.3`。
+- 2026-07-14 v3.1.0 release：发布提交 `14dac71` 已推送 `main`；GitHub Actions run `#42` 成功。Release `v3.1.0` 为正式发布（非 draft / prerelease），target 为完整提交 `14dac711d3e1ad1e7963c6dc2609ab6d1921f82d`，zip 资产上传状态为 `uploaded`。
+- 2026-07-14 official detail metric dashboard / Ping custom range：`komari-theme.json` 解析通过，共 56 个表单行、48 个唯一 key、无重复；12 个图表族使用的 Tabler 图标均存在。最终 `bun run lint` 与 `bun run build` 通过，生成 `dist/` 和 `komari-theme-Glassmorphism-build-4e9ae53.zip`，zip 顶层保持 `komari-theme.json`、`preview.png`、`dist/`。本地 `http://127.0.0.1:5174/` 页面非空且桌面布局无重叠；本地无 Komari 后端，未完成真实节点数据下的移动端详情页、新旧 Ping 接口和 GPU 多设备实测。构建仍只有既有 `@vueuse/core` PURE 注释与 `globe` chunk 体积警告。
+- 2026-07-13 managed settings compact keys follow-up：`komari-theme.json` 经 PowerShell `ConvertFrom-Json` 解析通过，共 56 个表单行、48 个唯一 key、0 个 Slot 字段、5 个 `richtext` 多行 keys 字段。混合分隔样例 `cpu,memory\ndisk process；gpu` 按顺序解析为 5 个 key。`bun run lint` 通过；`bun run build` 内含 `vue-tsc --build` 并通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-4e9ae53.zip`。构建仍只有既有 `@vueuse/core` PURE 注释和 `globe` 大 chunk 警告。
+- 2026-07-13 Komari 1.2.6 detail/settings/iOS adaptation：`bun run lint` 通过；`bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-4e9ae53.zip`。Zip 顶层已核对为 `komari-theme.json`、`preview.png`、`dist/`；清��� 71 个设置 key 无重复。390x844 浏览器检查无横向溢出，中文与旧浏览器提示可读。因本地无 Komari 后端，尚未验证真实 1.2.6 数据、后台保存流程和 iOS 15.4 真机；构建仍仅有既有 `@vueuse/core` PURE 注释和 `globe` 大 chunk 警告。
+- 2026-07-13 light-mode flash and home reveal follow-up：`bun run lint` 通过；`bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-4e9ae53.zip`。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。本轮将 light mode 根背景、默认毛玻璃 preset、自定义默认色、Firefox fallback、默认背景和 loading/video fallback 全部压到低亮灰蓝雾面；自定义图片预加载阶段保留默认背景兜底��LoadingCover/app shell/router/HomeView 增加更柔和过渡并遵守 `disablePageAnimation` / reduced-motion。未做真实浏览器硬刷新录屏或真实 Komari 自定义背景验证，需在真实环境中确认视觉效果。
+- 2026-07-13 home refresh flash fix / custom background / ping follow-up：`bun run lint` 通过；`bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-4e9ae53.zip`。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。已修复 `#app` 不透明背景覆盖自定义背景的问题；已调整自定义背景启用时的 `LoadingCover`，刷新加载阶段不再覆盖白雾遮罩/Loading 文案，仅保留轻量圆形指示器，并移除外层 Transition blur；图片背景预加载阶段不再显示纯白 token 占位，普通 loading 改低对比灰蓝/深色。已修复首页 Ping metric null 点误计丢包；首页小卡延迟/丢包采样条按用户反馈恢复为等高整条颜色分级；legacy `common:getRecords` fallback 仍保留按 `value < 0` 计算丢包。未做真实浏览器夜间首屏录屏、真实 Komari 自定义背景验证或新旧后端 Ping 实测，需在真实环境中确认视觉效果与 Ping 摘要。
+- 2026-07-13 v3.0.1 release refresh：README 已重写为更短、更有设计感的功能介绍，致谢已收束到文末；`komari-theme.json.version` 已更新为 `3.0.1`，准备按发布契约推送 main 触发新 release。
+- `bun run lint`：通过；本脚本带 `--fix`，运行后已继续执行 build 验证。
+- `bun run build`：首次失败，原因是 `src/utils/rpc.ts` 的 `MetricQueryParams` / `PingMetricStatsParams` 传给 RPC `call()` 时缺少 `Record<string, unknown>` index signature；已补充 `[key: string]: unknown` 后重跑通过。
+- `bun run build`：最终通过；生成 `dist/` 与 `komari-theme-Glassmorphism-build-881385d.zip`。构建中仍有既有 Rollup 提示：`@vueuse/core` PURE 注释位置警告，以及 `globe` chunk 超过 600 kB 的体积警告。
+- CSV 攻击样例检查：通过。对 `"\t=cmd|' /C calc'!\r\nFakeNode,10.0.0.1,Admin"` 调用 `escapeCsvCell()` 输出为单个加引号 CSV cell，内容前置半角单引号并保留 CRLF 在 RFC 4180 引号包裹内。
+- 2026-07-13 official metric-store feature port：`bun run lint` 通过；`bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-881385d.zip`。构建中仍有既有 Rollup 提示：`@vueuse/core` PURE 注释位置警告，以及 `globe` chunk 超过 600 kB 的体积警告。
+- 2026-07-13 full official feature port：首次 `bun run lint && bun run build` lint 失败（LoadChart `chartData` 前置引用）；第二次 build 失败（`parseChartDashboardTemplate` 局部变量类型过窄）；均已修复。最终 `bun run lint && bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-881385d.zip`。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。
+- 2026-07-13 settings compaction / GPU switch：`bun run lint && bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-881385d.zip`。构建仍有既有 `@vueuse/core` PURE 注释警告�� `globe` chunk 超过 600 kB 警告。
+- 2026-07-13 v3.0.0 release prep：README 已删除预览图并重写为实用功能介绍，`komari-theme.json.version` 已更新为 `3.0.0`；`bun run lint && bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-881385d.zip`。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。
+- v3.0.0 已提交并推送 main：commit `c50f6ed`；GitHub release workflow #34 已成功；Release `v3.0.0` 已发布，资产为 `komari-theme-Glassmorphism-build-c50f6ed.zip`。
+- 2026-07-13 v3.0.0 frontend follow-up / AuditLogPanel：`bun run lint` 通过；`bun run build` 通过，生成 `dist/` 与 `komari-theme-Glassmorphism-build-6ccc9d7.zip`。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。
+- 2026-07-13 v3.0.2 home card cleanup：按�����反馈移除首页 NodeCard ���物理核心���案和磁盘“数据积累中”提示，HealthSummaryPanel 也不再输出该提示；详情页 LoadChart 磁盘模块继续显示磁盘预测和样本不足原因；`bun run lint && bun run build` 通过，生成 `dist/` 与本地 `komari-theme-Glassmorphism-build-7be6c21.zip`（提交前短 SHA）。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。
+- 2026-07-13 chunk/request pressure follow-up：同步 `origin/main` 后首次 `bun run lint && bun run build` 因远端 README 标题从 H1 跳到 H3 触发 `markdown/heading-increment` 失败；已将副标题改为 H2 并同步 README 当前版本为 v3.0.3。重跑 `bun run lint && bun run build` 通过；构建输出新增 `assets/v3-services-*.js`（约 54.67 kB / gzip 18.22 kB），���于合并 v3 共享���务/工具模块；生成 `dist/` 与 `komari-theme-Glassmorphism-build-94691f1.zip`（提交前短 SHA）。构建仍有既有 `@vueuse/core` PURE 注释警告与 `globe` chunk 超过 600 kB 警告。已提交并推送 main：commit `8b40b59`；GitHub release workflow #29231673966 成功；Release `v3.0.3` 已发布，资产为 `komari-theme-Glassmorphism-build-8b40b59.zip`。
+
+## 风险点
+
+- `bun run lint` 当前脚本包含 `--fix`，会自动修改文件；如需运行，应在运行后检查 diff。
+- PingChart、首页 Ping 摘要、LoadChart 历史模式已优先尝试 public metric store，并保留 legacy fallback；HealthSummaryPanel 尚未迁移到 metric store。
+- PingChart 自定义���围在 metric API 可用时精确传 `start/end`；legacy fallback 会按保留时间扩大回溯后再裁剪，但仍受旧接口最大保留时长与 6000 点上限约束。
+- AuditLogPanel 已按 `admin:getLogs` 接入但尚未在真实登录后端手动验证返回形态；若后端字段或分页语义变化，需按真实响应微调。
+- 自定义 LoadChart 时间范围在 metric API 可用时精确传 `start` / `end`；旧后端 fallback 仍只能近似为“最近 N 小时”。
+- `traffic_up` / `traffic_down` 当前只做字段接收与历史 normalize，不替换现有流量 UI 语义。
+- `message` 已在 NodeCard / NodeList 以纯文本 tooltip 展示，禁止 `v-html` 的约束仍需保持。
+- JSON 导出已经分片构建节点字符串��但最终字符串拼接和 Blob 创建仍是浏览器同步边界；相比原先整棵大对象 `JSON.stringify` 已降低主线程尖峰。
+- 不应对整个 `NodeData` 使用 `markRaw`，否则会破坏实时 CPU、内存、网络和在线状态响应式刷新。
+
+## 交接说明
+
+已完成：
+
+- 首页强闪屏修复：首屏前预设暗色 class/color-scheme、文档初始背景 token 化、LoadingCover 去除 `bg-white/80`、密集节点卡片禁用首轮动画与在线状态扩散环。
+- 自定义背景图片 follow-up：`src/styles/main.css` 不再给 `#app` 设置不透明背景，避免遮住 `Background.vue` 的 fixed 背景层；仍保留 `html` / `body` token 背景来降低首屏白底闪现。`LoadingCover.vue` 在自定义背景启用且当前模式有背景 URL 时不再铺白雾遮罩/Loading 文案，仅保留轻量圆形指示器。
+- 本次未��真实浏览器夜间首屏录屏或真实 Komari 自定义背景验证；建议在真实 Komari 多节点环境中用暗色/auto 模式硬刷新首页，并打开自定义背景图片确认无白屏闪烁且背景可见。
+- HTTP/WS timeout 与 abort 清理、RequestManager 队列 `finally` 释放、共享 Promise reject/finally 清理。
+- Provider metadata 模块级共享缓存与 `markRaw` 元数据。
+- NodeTopologyPanel 拓扑索引与离线上游解析复杂度优化。
+- NodeList 虚拟列表固定行高与文本截断防御。
+- useNodeLoadStats 对在线节点 0 采样的 DEV warn。
+- CSV 公式注入与 RFC 4180 转义收尾修复。
+- Snapshot JSON/CSV 导出加载态与异步分片构建。
+- `AICACHE.md` 已从旧文档任务交接内容更新为当前 v3.0 任��状态。
+- Komari 1.2.x 第一批兼容补���已完成：RPC/API 类型补新字段、`common:getRecords` `maxCount` 兼容、public RPC/metric 方法壳、历史 records array/map normalize、节点 store 同步新字段、详情页展示物理核心。
+- 官方 komari-web 高价值功能移植第一批已完成：metric series 工具、metrics service、PingChart / 首页 Ping 摘要 metric 优先 + legacy fallback、NodeCard / NodeList 探针 `message` 纯文本提示。
+- 用户要求“全部上马”后的剩余官方功能已完成：LoadChart 历史模式 metric store 优先 + legacy fallback、GPU detail/per-device metric 图表、`chartDashboardTemplate` 托管配置读取和布局排序。
+- 详情页 Metric Store 扩展已完成：25 个官方 definition 归并为 12 个图表族，补齐流量、显存、温度、Ping 延迟/丢包卡片及预设；概览恢复宽屏 4 列和 8/12/16 卡预设；PingChart 支持自定义起止时间并补强新旧丢包 fallback。
+- v3.0.0 复查 follow-up 已完成：物理核心 UI / 每核成本、自定义 LoadChart 时间范围、metric definitions TTL 缓存、`SharedCache.retain()` 修复、AuditLogPanel、磁盘预测数据积累提示、NodeCard 显式传 `LOAD_RECORD_MAX_COUNT`。
+
+未完成：
+
+- chunk/request pressure follow-up 已完成：`vite.config.ts` 新增 `v3-services` manual chunk；`LoadChart.vue` legacy fallback 与详情页统计统一使用 `LOAD_RECORD_MAX_COUNT` 维度，降低重复历史请求概率。
+- HealthSummaryPanel 尚未接入 metric store。
+- 尚未实现后台写入/保�� `chartDashboardTemplate`，当前只读取托管配置。
+- 尚未在真实 Komari 1.2.x 后端上手动确认 `public:getPingMetricStats` / `public:queryMetrics` / GPU metric 返回形态；当前只通过类型检查、lint、build 验证。
+
+下一步：
+
+1. 人工查看当前 diff，注意工作区还包含此前 v3.0 稳定性重构和 AI 文档改动，不只有本批 Komari 1.2.x 适配。
+2. 在真实新版后端打开 PingChart 和 LoadChart，确认 Network 优先出现 `public:getPingMetricStats` / `public:queryMetrics`，旧后端确认 fallback 到 `common:getRecords` / `loadNodeLoadRecords`。
+3. 有 GPU 节点时检查 GPU 卡片、per-device tooltip、显存百分比和温度展示；无 GPU 节点时确认 GPU 卡片自动��藏。
+4. 若不希望提交构建产物，提交前按项目发布流程决定是否保留本次 `dist/` 与 zip 输出。
+
+---
+
+## 上一个任务记录
+
+- 状态：done
+- 目标：整理 AI 开发入口文档，新增 AIAGENTREADME 与 AICACHE，让 AI/二开者能理解项目架构、开发路径和交接方式。
+- 范围：根目录 AI 文档、Claude/Agent 指引、src 作用域指引、AI 工作缓存模板。
+- 不做：不改运行时代码、不改主题版本、不改 release workflow。
+
+## 上一个任务执行日志
+
+### 2026-07-12
+
+- 新增 [AIAGENTREADME.md](AIAGENTREADME.md)：集中说明项目是什么、技术栈、架构分层、服务层职责、开发路径、发布契约、安全/性能规则和 AI 交接要求。
+- 重写 [CLAUDE.md](CLAUDE.md)：精简为 Claude Code 入口，指向 AIAGENTREADME、AICACHE ��最近作用域 AGENTS。
+- 重写 [AGENTS.md](AGENTS.md)：精简为根作用域 agent 指引，保留 build/release/root map/safeguards。
+- 重写 [src/AGENTS.md](src/AGENTS.md)：精简为 src 子树实现规则，强调 v3 分层、store/service/UI/security/validation。
+- 新增本文件 [AICACHE.md](AICACHE.md)：提供持久化待办、执行日志、验证和交接模板。
+
+## 新任务模板
+
+复制以下模板到“当前任务”或追加到执行日志：
+
+```markdown
+## 当前任务
+
+- 状态：planned | in-progress | blocked | done
+- 目标：
+- 范围：
+- 不做：
+- 负责人/代理：
+
+## 执行日志
+
+### YYYY-MM-DD HH:mm
+
+- 做了什么：
+- 改了哪些文件：
+- 决策原因：
+
+## 验证记录
+
+- 命令：
+- 结果：
+- 警告：
+- 未验证项及原因：
+
+## 风险点
+
+-
+
+## 交接说明
+
+已完成：
+
+-
+
+未完成：
+
+-
+
+下一步：
+
+1.
+```
+
+## 2026-07-15 Preview redesign (M4)
+
+- Redesigning `docs/preview.png` because the current marketing-hero composition is too close to Komari Emerald (left title, large globe, three-word slogan).
+- New direction: a product-first monitoring dashboard scene with frosted node cards and compact telemetry, no globe, no Emerald logo, no marketing slogan.
+- Generated `output/imagegen/komari-glass-dashboard-preview-v2.png` with `gpt-image-2` (high quality) and selected its 1280x720 web derivative after visual inspection. The new composition is a full monitoring workspace with a top status strip, network overview, and six node cards.
+- Runtime screenshot/mock work was deferred. `docs/preview.png` was replaced with a pure conceptual settings cover: no version badge and no actual page preview; it emphasizes eight configurable areas over the generated cyan/mint/lilac glass background.
+- Shortened the managed configuration menu label from `Glassmorphism 设置` to `主题设置`.
+- Release audit found `applyClient()` did not refresh the new billing fields after initial load. v3.1.7 now updates rates, anchor state, cumulative traffic, and startup-fee-applied state during the existing client metadata polling cycle.
+- Fixed the misleading `完整` general-card preset: it was hard-coded to six cards even though the responsive renderer supports additional rows. It now expands to every unique `ALL_GENERAL_CARD_KEYS` entry; other presets remain curated six-card layouts.
+
+## 2026-07-15 v3.1.7 release candidate
+
+- `bun run lint`: passed.
+- `bun run build`: passed, including `vue-tsc`; only the existing Rollup annotation and large globe chunk warnings remain.
+- Local archive contains `komari-theme.json`, `preview.png`, and `dist/index.html`; embedded manifest version is `3.1.7` and configuration name is `主题设置`.
+- Home -> detail -> home was browser-verified earlier with no refresh and no Fragment/Transition warning after moving `PingMonitorDialog` inside the single `HomeView` root.
+- Komari PR #604 head `f08f47d` is `CLEAN` / `MERGEABLE`; all frontend and cross-platform binary checks succeeded.
+- komari-web PR #82 head `0fee1f1` is `CLEAN` / `MERGEABLE`; that exact commit is embedded under `public/admin-app/`.
+- Local-only `.claude/`, `output/`, and `tmp/` must remain uncommitted.
+
+## 2026-07-15 v3.1.7 published
+
+- Release commit: `3710532164e6b58433373199321d2977574e9913`.
+- GitHub Actions run `29428658864`: success.
+- Release: `https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism/releases/tag/v3.1.7`.
+- Published asset: `komari-theme-Glassmorphism-build-3710532.zip`, SHA-256 `ac1a203a53a5d31fdc8a148964e1e64f1659dea7beb9745c906a8731686180a4`.
+- Downloaded asset verification passed: manifest `3.1.7`, `主题设置`, `preview.png` hash equals repository preview, and `dist/index.html` exists.
+- Old preview seen after upgrading is browser cache: komari-web uses `/themes/<short>/<preview>` without a version query. A hard refresh/cleared image cache displays the released image; a durable cache-busting change belongs in komari-web.
+- Maintainer feedback indicates the real-time billing PRs do not fit Komari's simple cycle billing model. Treat Komari #604 and komari-web #82 as experimental fork work pending explicit upstream acceptance: wall-clock hourly estimates include offline time, traffic estimates do not reset by billing cycle, and startup fee is a static one-time add-on rather than a cycle item.
+
+## 2026-07-15 v3.1.8 Swap tooltip hotfix
+
+- Root cause: the Swap hover used `DataTooltip`, whose absolutely positioned content remains inside the node-card overflow boundary. The card clipped the tooltip into a thick horizontal bar that overlaid unrelated content.
+- Fix: memory metrics now use a native `title` tooltip, which does not participate in card layout or clipping. The text reports `Swap 已用 <size> / 总计 <size>` and falls back to used-only when total is unavailable.
+- Guardrail: do not use the current non-portal `DataTooltip` for content that must escape node/list containers with overflow clipping; use a native title or a portal-backed overlay.
+- Validation: `bun run lint` and `bun run build` passed. The local archive contains `komari-theme.json`, `preview.png`, and `dist/index.html`; its embedded manifest is version `3.1.8` with configuration name `主题设置`.
+
+## 2026-07-15 v3.1.8 published
+
+- Release commit: `a52572aea7631239e1c35a47283c74a744a9911d`.
+- GitHub Actions run `29430366028`: success.
+- Release: `https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism/releases/tag/v3.1.8`.
+- Published asset: `komari-theme-Glassmorphism-build-a52572a.zip`, SHA-256 `f4dd86ad26a9a55ebfcecc1c76ac07cdcd5fcfd1883cf608ec4e7f491388ea26`.
+- Downloaded asset verification passed: manifest `3.1.8`, configuration name `主题设置`, `preview.png`, and `dist/index.html` are present.
+
+## 2026-07-16 v3.1.9 release candidate (M4/M5/M6)
+
+- Removed all theme/runtime dependencies on experimental Komari #604 and komari-web #82 fields. The embedded admin is rebuilt from official komari-web `radix` commit `ebfbd3e079f8777a746276fe67429b519024f7c7`; the integration core is upstream Komari `43547b947ff82b4b899452ead7ba7b1517ba1f84` and does not contain #604.
+- Added a per-node frontend usage estimator under `theme:usage-estimator:v1:<node_uuid>`. It uses a frozen cumulative traffic snapshot, manual billable hours, a one-time estimate-only add-on, explicit source/display currencies, TiB units, finite non-negative bounds and a clear non-billing disclaimer.
+- Reworked the value dialog into fixed-value, metered-estimate and exchange-rate sections. Rate source/update time is visible; missing exchange rates are not silently treated as 1; local settings can be cleared.
+- Synced the complete official admin app and rewrote root-relative flag/OS assets for `/admin-app/`. The sync script injects the route bridge and hash-busts `glass-admin.css`; the CSS applies stronger cyan/mint/lilac glass styling while avoiding per-card backdrop filters on dense tables.
+- Fixed the embedded-default identity mismatch that caused Theme Management to request an uninstalled `/themes/Glassmorphism` directory. Integration packages normalize the embedded manifest short name to `default`; the release theme remains `Glassmorphism`.
+- Added safe persistent background resolution: `local:path` maps to `/themes/user-assets/<encoded path>` and rejects `.`/`..`. Administrators should store files under Komari `data/theme/user-assets/`, outside replaceable theme packages.
+- Added the compact header advanced-tools toggle, removed the monthly-cost quick filter, changed the authenticated visitor label to `尊敬的管理员`, hid the detail visitor card below `2xl`, and retained the bottom IP pill.
+- Constrained the standard earth canvas and increased the header band height so the globe no longer overlaps controls or the first node row at 1280px. Ping gaps now say `无采样数据` instead of `N/A`.
+- Browser verification on `https://mt.vpnmiao.com/`: 390x844 and 1280x720 had no document overflow; the visitor detail card stayed hidden; globe/list boundaries were visually clean; `/admin`, `/admin/settings/theme`, `/admin/theme_managed` and `/terminal` loaded; Theme Management had no 404; admin images had no broken resources; console had no new warnings/errors.
+- Integration validation: `go test ./database/clients ./web/api/client ./web/rpc/jsonrpc` and `go vet ./...` passed. Linux amd64 CGO/static build succeeded and was deployed for live testing. The test host was cleaned to the active binary/data only, with no backups retained per operator request.
+- Release guardrail: do not reintroduce #604/#82 into the theme release or new upstream PRs. Komari default-theme work must be a clean branch from upstream main; komari-web asset-path work must be a clean branch from upstream radix.
+
+## 2026-07-16 v3.1.9 published and upstreamed
+
+- Release commit `f17a5eb7c18138fba78d22504e1ed5b19b347284`; workflow `29492624741` succeeded; Release `v3.1.9` points to the same SHA.
+- Published asset `komari-theme-Glassmorphism-build-f17a5eb.zip`, SHA-256 `aab1572006c02447461410422962d5c65c569c6429a0191a74e6ee5544eaff9b`. Downloaded verification passed for version, `Glassmorphism` short name, `主题设置`, preview hash, `dist/index.html`, embedded admin index, admin source SHA and absence of #604 fields.
+- Komari fork branch `codex/glassmorphism-default-theme`, commit `7b64db3c403f05f6dfbcb603ae4763c8842442a8`, upstream PR `komari-monitor/komari#606`. It pins Glassmorphism `v3.1.9`, builds with Bun, normalizes the embedded manifest to `short: default`, and tests metadata preservation. PR CI run `29493915098` passed frontend plus all seven Linux/Windows binary jobs.
+- komari-web fork branch `codex/base-aware-static-assets`, commit `2ff6c2be70ac12a641ac7272cdfed1995439d58a`, upstream PR `komari-monitor/komari-web#83`. It resolves flag and OS images from Vite `BASE_URL`; lint has 0 errors/27 existing warnings, and both root and `/admin-app/` production builds pass.
+- The admin sync script accepts both legacy root-relative komari-web assets (rewritten after build) and #83-style native BASE_URL assets (already correct). Do not restore the old requirement that at least one root-relative path must be rewritten.
+
+## 2026-07-16 default-theme updater and globe follow-up (M4/M5/M6)
+
+- In progress: paired clean upstream PRs add writable updates for Komari's embedded `default` theme. Core changes use `data/theme/default` as an atomic overlay and retain the binary-embedded theme as fallback; komari-web exposes the update action and explains the fallback behavior.
+- Core regression coverage includes successful default installation, manifest normalization, preservation of the previous overlay after an invalid archive, safe local asset lookup, and rejection of traversal paths.
+- Globe regression found in v3.1.9: the normal header was raised from the established `md:h-58` layout to `md:h-72` and the globe column gained forced height/clipping. Those three layout classes are being restored to the v3.1.8 implementation; renderer selection remains configurable and `realistic` remains the default.
+- Cross-renderer browser verification found and fixed a tiled-map scoped-CSS regression: `:global(.dark) .child` compiled to bare `.dark` selectors, applying map image opacity/filter rules to the entire document. The selectors now wrap the complete descendant selector in `:global(...)`.
+- Browser checks use the real 47-node test dataset. Realistic renders at about 475px desktop / 369px mobile after the original layout restoration; Cobe renders at 448px / 348px; tiled mode keeps its 672px mobile map inside a 356px horizontal scroll container with no document overflow.
+- v3.2.0 validation: `bun run lint` and `bun run build` passed; the local archive contains manifest version `3.2.0`, `preview.png`, and `dist/index.html`. Browser checks covered all three earth renderers on desktop/mobile and home -> detail -> home. The only build warnings are the existing VueUse annotation and large globe chunk notices.
+- Default-theme updater validation: `go test ./web/api/admin ./web/public` and targeted `go vet` passed. A broader `go test ./web/...` reached unrelated SQLite-backed packages and failed because the local Go binary uses `CGO_ENABLED=0`; do not treat that environment failure as a regression in these packages.
+- komari-web updater UI: i18n sync is clean, lint reports 0 errors / 27 existing warnings, and both root-base and `/admin-app/` production builds pass.
+
+## 2026-07-25 metric tags, node search and CPU estimate follow-up (M4/M6)
+
+- Komari main commit `d853a83e` removed the deprecated public metric `tag` alias; current responses use `tags`. Keep the theme's legacy `tag` type and fallback for transitional 1.2.x cores, but merge in `labels -> tag -> tags` order so canonical `tags` always wins conflicts.
+- Komari 1.2.5 does not expose `public:queryMetrics`; detail and Ping history must retain the existing `getRecords` / `getPingRecords` fallback. Do not make MetricSeries support a hard requirement.
+- Metric tag identity keys now use sorted JSON tuples instead of delimiter-joined strings, avoiding collisions when tag values contain `|` or `=`. Normalized series clear the legacy `tag` alias after canonicalizing it into `tags`.
+- Home search moved to `utils/nodeSearch.ts` and now covers node name, UUID, region, groups, tags, OS/kernel, virtualization/architecture, public metadata, CPU/GPU model and available IPv4/IPv6 values. IPv4 octet wildcards such as `192.168.x.x` and `192.168.*.*` are supported. Guest search cannot expose private IPs because Komari omits them from the public node payload before the theme receives it.
+- The local S/A/B CPU heuristic was discarded after review because model-family rules cannot provide a credible performance ladder. Detail pages now generate a small external PassMark CPU Mark lookup link from the reported model; benchmark data and ranking stay with PassMark and are not copied into the theme.
+- Komari snapshot `c7819cd9` adds public Ping task `weight`. The theme accepts it as optional and orders metric Ping lines by `weight -> id`; old cores without weight remain compatible and fall back to numeric task ID ordering.
+- Mobile visitor bar now hides while actively scrolling and returns 700 ms after scroll idle; its mobile layout hides the redundant `Your IP:` label and truncates long IPv6 values. Back-to-top appears only after 320 px, uses a smaller mobile button above the visitor bar, and no longer uses a modal-level `z-index`.
+- Validation: `bun run lint`, `bun run build`, and `git diff --check` passed after all changes. Behavior smokes passed for `tags` precedence, collision-safe metric keys, Ping weight ordering, fuzzy IPv4/IPv6 and CPU text search, and PassMark model normalization/link generation. The required theme archive layout remains intact; only the existing VueUse annotation and large globe chunk warnings remain.
+- CPU benchmark data remains external: PassMark does not expose a browser CORS API and its downloadable benchmark data is licensed, so do not reintroduce guessed local grades or scrape the site from the theme. The lookup action now sits at the CPU card's top-right and opens the normalized model query directly.
+- At the maintainer's request, CPU detail also shows a clearly labelled local approximate model tier. The ordered classifier covers common EPYC/Xeon/Ryzen/Core/Threadripper/Apple Silicon/Ampere/Graviton/Neoverse and low-power/legacy families without embedding proprietary scores. Preserve the established labels (`旗舰服务器级`, `高端消费级`, `云原生 ARM 级`, etc.); only the underlying model-generation data should evolve. Keep the tooltip disclaimer: this is a model-generation reference, not a benchmark of the node's allocated vCPUs.
+- Disk prediction subtitles are intentionally compact (`预计 N 天后满`, `暂无趋势`, `样本不足`, `趋势积累中`) to avoid wrapping over the chart on narrow viewports.
+- CPU tier samples were checked across EPYC 7551/7B13/9654, Xeon E5 v4/Gold 6133/Platinum 8480+, Core i9-14900K, Ryzen 9950X, Ampere Altra Max, Intel N100, KVM64 and an unknown model. Final `bun run lint`, `bun run build`, and `git diff --check` passed; the test archive remains `komari-theme-Glassmorphism-build-ce11932.zip`.
+- CPU rating presentation keeps the established unframed row under the model (`tier + thin bar + label`). Only the external CPU Mark action belongs in the card header; do not turn the tier into a top-right badge.
+
+## 2026-07-25巡检效率与大规模节点优化（M2/M4/M5）
+
+- 超过 30 台节点时，卡片模式使用 `DeferredRender` 在视口前后 700px 内按需挂载 `NodeCard`，未挂载区域保留按卡片密度计算的���定高度；列表模式继续使用既有虚拟列表。
+- 收藏节点保存在站点隔离的 `theme:favorite-nodes:v1`，卡片、列表与详情页均可切换星标；首页快捷控制新增 `favorite`。运行时会清洗损坏的本地存储值。
+- 详情页头部新增收藏、上一台、下一个和下拉节点切换器，继续使用公开可见节点列表，不引入新接口。
+- 首页工具新增公开的实时节点对比，最多选择 4 台，支持按名称/IP/CPU 搜索，显示 CPU、内存、磁盘、网络、流量、运行时间和按隐私设置降级的价格；选择保存在 `theme:node-compare:v1`。
+- 健康摘要在现有历史请求结果上派生综合��常排行，合并离线、CPU、内存、磁盘、流量、Ping 和磁盘耗尽风险，不增加重复请求。
+- 明确排除：不做地球自动画质，也不增加 CPU 天梯规则的在线维护功能。
+- PR #29 (`7e582c2`, merged as `9c9a7ee`) restores PWA metadata. Local integration preserves its iOS standalone intent and manifest retention, then hardens it: the root theme links the manifest, Apple touch uses the existing 512px PNG, and `sync-komari-admin.ts` parses manifest JSON to rewrite `/assets/` icons under `/admin-app/assets/`. Service worker files remain intentionally removed to avoid stale admin assets after route bridging.
+- Final test package validation passed: `bun run lint`, `bun run build`, and `git diff --check`; `dist/index.html` links `/admin-app/manifest.json` and `/admin-app/assets/pwa-icon.png`, all manifest PWA paths resolve inside the archive, and the output remains manifest version `3.2.0`. After removing the redundant default quick control, test zip SHA-256 is `DF72FC12C4B57C59482A24F28793C1C9B7E7874205F21E410DC87BE487B5610D`.
+- Quick controls no longer render a redundant `默认` item or expose a default-filter setting. No active filter means all nodes; clicking a filter selects it, clicking it again clears it, matching the advanced-tool toggle interaction. Legacy `default` keys are ignored during normalization.
+
+## 2026-07-25 online browser verification follow-up (M2/M4)
+
+- The uploaded 54-node build passed desktop checks for toggleable quick filters, favorites, four-node comparison limits, detail previous/next/select navigation, normalized CPU Mark links, compact disk trend text, and document-width containment.
+- Node comparison no longer preselects two nodes. Its empty state previews every available comparison field, while persisted explicit selections remain supported.
+- Fixed a dynamic-enable gap in `DeferredRender`: when the node list initially starts below the 30-node threshold and later grows above it, offscreen cards are now suspended after a viewport-distance check instead of remaining mounted. A requestAnimationFrame-throttled scroll/resize fallback covers browsers without `IntersectionObserver`.
+- First uploaded-build verification proved the component-level watcher alone was insufficient: the initial data injection still retained 54 already-mounted cards, while toggling a quick filter remounted the same grid with only 16 near-viewport cards. The node wrapper key now includes the deferred/full mode so crossing the 30-node threshold deterministically recreates wrappers in deferred mode.
+- Second uploaded-build verification reduced the desktop first mount to 20 cards plus 34 stable placeholders with no horizontal overflow. Its scroll reveal still stalled in the in-app browser, whose page environment did not expose `IntersectionObserver` or `requestAnimationFrame`; the fallback scheduler now uses a 16 ms window timer when animation frames are unavailable.
+- Deferred cards now use a hybrid reveal policy: the viewport and its 700px buffer mount first, scrolling prioritizes newly-near cards, and staggered idle timers progressively mount the remaining cards over roughly 1–5 seconds even when the user does not scroll. Each timer is cleared after an early reveal or component teardown.
+- Final live verification on `https://mt.vpnmiao.com/` loaded the expected `index-Cq7ioLuk.js` asset. Desktop remount measured 16 cards at 0/500 ms, 26 at 2.3 s and all 54 at 5.1 s; a rapid 1800px scroll raised the mounted set from 16 to 40 within 200 ms. Mobile 390x844 measured 4 cards initially and all 54 by 5.3 s, with `scrollWidth === clientWidth` on both breakpoints.
+- The comparison panel opened at 0/4 with all comparison metric labels previewed. Weekly health generation returned an immediate realtime summary, completed the capped 6,000-sample history pass in about 8 seconds, and populated composite anomaly, CPU, memory, disk-growth, traffic and Ping findings. The final browser console contained no warnings or errors.
+
+## 2026-07-25 visual regression automation (M6)
+
+- Goal: add deterministic Playwright screenshot regression coverage without adding any runtime theme feature or real-site dependency.
+- Planned fixture coverage: long node names, IPv4/IPv6, Swap, offline/high-load/traffic-warning states, fixed prices and fixed timestamps. Network responses are mocked in Playwright; fixture data must not enter the release zip.
+- Planned baseline matrix starts intentionally small: desktop/mobile home, desktop list, desktop detail, dark/color-vision home and one alternate earth renderer. GitHub Actions must upload actual/diff artifacts on failure.
+- Implemented 7 deterministic Playwright baselines: light desktop home, dark mobile home, accessible desktop list, Cobe and tiled earth layouts, light desktop detail and dark mobile detail. All use mocked Komari API/RPC/visitor data, fixed time, disabled animations and hidden dynamic 3D canvas pixels while retaining globe layout boundaries.
+- First baseline generation and repeated comparison both passed 7/7 with system Chrome. Windows system-channel Chrome did not exit cleanly after reporting results, so release validation does not treat that local channel teardown as a product failure; CI installs and runs Playwright's managed Chromium.
+- Added the independent `Visual Regression` workflow for pull requests and `main`, with actual/diff/HTML report artifacts retained for 14 days on failure. Release target is v3.3.0.
+
+## 2026-08-27 · 线状图纸地球（line-grid）MVP
+
+- **目标**：参考 Komari-line-grid（MIT）实现"线状正交投影地球"，作为 cobe 点阵地球的**可选样式**（`earthRenderer: 'line-grid'`），后台可切换。
+- **实现**：
+  - `src/data/world-outlines.ts`：移植 79 个多边形海岸线数据（19KB，MIT 注明上游 Komari-line-grid / selkk-lab）。
+  - `src/utils/lineGlobe.ts`：纯函数（正交投影 ortho / 海岸线 path / 经纬网格 / 节点投影 / 左右标签堆叠布局）。
+  - `src/components/NodeEarthLineGridGlobe.vue`：SVG 字符串（v-html + esc 转义）、拖拽（pointer 事件）、自动旋转（useRafFn，stopEarth 控制）���地区聚合标签（useNodeGeoClusters）、明暗主题（--globe-* CSS 变量）、移动端自适应（viewBox 缩放）。
+  - `NodeGeneralCards.vue`：`earthRenderer !== 'line-grid'` → cobe，否则 line-grid。
+  - `app.ts`：EarthRenderer 类型/校验加 'line-grid'。
+  - `komari-theme.json`：加回地球样式（cobe/line-grid）、stopEarth、hideEarth 后台配置（02 首页布局）。
+  - `main.css`：--globe-rim/grid/coast/point/text 亮暗两套。
+- **验证**：type-check/lint/build ✅；视觉回归 11 绿（line-grid 截图确认渲染正常，线稿���与蓝图契合）。
+- **已知待办**：MVP 单精度档；无右侧地区统计面板；每节点标签（当前地区聚合）；移动端未专项截测；后续可删 cobe（保留双模式先看效果）。
+- **注意事项**：webServer 用 `vite preview`（dist）——改了源码必须 `bun run build` 后再跑 fixture 测试，否则用旧 dist；GitHub Release 验证后确认发布。
+
+## 2026-09-01 · 首页"地球"工具（d3-geo 点阵地球 + 投影插值变形）验收与修复
+
+- 该功能（`NodeGlobePanel.vue` + `useGlobeProjection.ts` + `regionCoordinates.ts` + `HomeView.vue` 集成）已在此前会话实现并提交���`403b98b`），本次会话专做浏��器可视化验收。
+- **发现并修复一个渲染 bug**：`NodeGlobePanel.vue` 的 `withAlpha(color, alpha)` helper 对已经是百分比整数（6/16/38/55/80）的 `alpha` 参数又做了 `alpha * 100`，拼出 `color-mix(in oklab, ... 600% ...)` 之类的非法百分比值。浏览器静默拒绝这个非法 `fillStyle`/`strokeStyle` 赋值并回退成 canvas 默认的不透明黑色，导致地球在浅/深色模式���都渲染成纯黑球体（陆地、经纬网���、球体轮廓全部看不见，只剩标记点）。修复：`withAlpha` 直接用 `Math.round(alpha)`，不再二次乘 100（��交 `f273a8a`）。
+- 用 Playwright + `installKomariFixture` 补充了地球工具专项截图验收（浅色/深色默认视图、拖拽旋转、地球↔地图切换、移动端堆叠、标记聚合），全部通过后按仓库约定删除了临时 `_debug_globe.spec.ts` / `_verify_globe.spec.ts`（提交 `e79ac0f`），不保留在仓库里。
+- **踩坑记录**：`playwright.config` 的 webServer 跑的是 `vite preview`（serve `dist/`），源码改完必须先 `bun run build` 再跑测试，否则截图仍是旧代码的黑球——本次调试一开始就是被这个坑迷惑了一轮。
+- 验收结论：地球模式（浅/深色）陆地颜色、国��线、经纬网格、球体轮廓均正常显示；拖拽旋转正确重新投影标记点；地球→平面地图（等距矩形）过渡后网格线/陆地/标记全部正确重新计算位置，"地图"分段按钮高亮态正确；移动端纵向堆叠布局无横向溢出。
+- **已知无关问题（未修复，超出本次任务范围）**：`bun run` 全量视觉回归 `tests/visual/visual.spec.ts` 中 `nodes tool view renders card grid` 失败，原因是该测试断言 `[data-node-metric-icon="disk"]` 存在，但 `NodeCard.vue` 从未给磁盘图标打上这个 data 属性（只有 cpu/memory/traffic 三个）。该测试断言是在 `a21c961`（早于本次地球相关提交）引入���，与本次地球改动无关，`git log` 确认 `NodeCard.vue` 最后一次改动（`9e909bb`）也早于本次地球提交。建议后续单独开任务给磁盘图标�� `data-node-metric-icon="disk"` 或修正测试断言。
+- `bun run lint` 通过（无告警）；`bun run build` 通过，`NodeGlobePanel` 独立 chunk 56.93 kB / gzip 21.48 kB，`countries-110m` 独立 chunk 107.88 kB / gzip 38.57 kB，均按需动态加载不影响首屏。
+
+## 2026-09-01（续）· 地图模式杂散横线修复 + 地球扫描线效果 + 呼吸留白
+
+- **地图模式杂散横线根因与修复**（用户反馈截图：切换到"地图"后画面上出现多条横穿全宽的半透明蓝线）：`useGlobeProjection.ts` 的 `buildProjection` 始终用 `projection.clipAngle(90 + t * 90)`（小圆裁剪），过渡到纯平面地图态时 `t=1` 令裁剪角=180°。180° 小圆裁剪在数值上是退化情形（裁剪圆退化为一个点），d3.geoPath 用小圆裁剪算法给经纬网格/陆地边界求交时在这个退化边界上产生穿越整张画布的杂散线段——这不是"网格层没隐藏"，而是自定义 `interpolateRaw` 插值投影 + 小圆裁剪在 180° 时的算法退化 bug。修复：`t >= 0.999`（完全进入平面地图态，过渡动画已结束）时改调 `projection.clipAngle(null)`，切换回 d3 默认的"反经线裁剪"，与标准 `d3.geoEquirectangular()` 行为一致，从根源消除杂线；`0<t<1` 过渡中间态仍用小圆裁剪从 90°→180° 渐变以保留"背面地区逐渐展开"的过渡视觉。同步修正 `isPointVisible`：`t>=0.999` 时直接返回 `true`（平面地图上任意��纬度点都应可见，不再按到球心角距离判断）。
+- **地球扫描线效果**（对标用户提供的参考图：球面上一条竖直经线弧持续扫描）：`NodeGlobePanel.vue` 新增非响应式的 `scanLambda` 状态，在 `renderFrame` 每帧递增 `SCAN_SPEED_DEG=0.35`，用 `buildScanMeridian(lambda)` 生成一条纵贯南北极的经线弧（纬度 -90→90，步长 2°，固定经度），叠加 `ctx.shadowBlur=8` 发光效果后用比经纬网格更高的不透明度（75%）描边。扫描线透明度按 `1 - transitionProgress.value` 线性衰减，过渡到平面地图态时完全淡出，不会与地图内容混淆。裁剪逻辑与陆地/网格共用同一个 `path()`，球面态下扫描线走��背面会被小圆裁剪自然隐藏，效果符合参考图。
+- **地球呼吸留��**：`buildProjection` 的球体直径缩放系数由 `Math.min(width, height) / 2.05` 调整为 `/ 2.3`，球体半径整体缩小约 11%，外层卡片边框到球体轮廓之间留出更明显的空白边距，不再贴边。此调整同时影响地图态缩放（共用同一个 `scale`），但平面地图本身因宽高比差异已有留白，缩小无副作用。
+- 用 Playwright 截图（684×719，浅色）分别验证：① 地球默认视图——扫描线可见且随帧推进移动、球体与卡片边缘留白明显增加；② 地图视图——原先的多条横向杂线已完全消失，世界地图/网格/国界线/标记点清晰无遮挡。
+- `bun run lint`、`bun run build`（含 `vue-tsc --build` 类型检查）均通过；`tests/visual/visual.spec.ts` 全量回归 8 项中仅 1 项失败，且是上一条记录里提到的既有 `disk` 图标 data 属性缺口（`NodeCard.vue` 未改动，与本次 globe 修复无关），其余 7 项全部通过，未引入新回归。
+
+## 2026-10-23 · 流量口径切换到「本周期」（服务端自算周期）
+
+- **背景**：Komari 服务端 0.0.22 起下发 `net_period_up` / `net_period_down` / `period_started_at`（节点级 `traffic_reset_day` + `traffic_reset_timezone`），0.0.24 起管理端已切周期口径；本主题仍全部直取 `net_total_up/down`（累计），导致"配置了每月重置也看不到归零"。
+- **新增**：`src/utils/trafficPeriod.ts`（口径与数值的**单一真源** `resolveTrafficUsage`：`traffic_reset_day >= 1` 且有 `period_started_at` ⇒ 周期值，否则回落累计；另给 `basisSwitched` / 重置文案信息）、`src/constants/trafficPeriodText.ts`（最小双语表 zh-CN / en，语言取 `<html lang>`，未知回落 zh-CN）。
+- **改造**：`utils/nodeMetricsHelper.ts` 的 `getTrafficUsed` / `getTrafficUsedPercentage` 委托给解析器（新增 `getTrafficUsage`），所有调用点自动切口径；`stores/nodes.ts`（NodeData/StatusData + 默认值 + applyStatus/客户配置合并）与 `utils/rpc.ts`、`utils/api.ts` 补齐周期字段；`components/NodeCard.vue`、`components/NodeList.vue`、`components/NodeGeneralCards.vue`、`components/NodeComparePanel.vue`、`views/InstanceDetail.vue` 加口径标注（「本周期」/「累计（历史）」）、重置边界文案与「口径已切换」徽标；`TrafficProgress` 改为接收已解析口径的上行/下行值。
+- **未改**（有意）：`LoadChart.vue` 与 `services/history.service.ts` 的历史曲线仍是累计语义（图表本身标注「累计上传/下载」），不在本次口径切换范围。
+- **自检**：`bun scripts/check-traffic-period.ts`（仓库无测试框架，故为独立脚本而非 bun test/vitest）——**29 项断言全通过**，覆盖①配置周期（含 Asia/Shanghai 重置文案、百分比按周期 0.404% 而非累计 49.95%）、①-b 累计超额触发「口径已切换」、②未配置周期回落累计、③`period_started_at` 无效按 0、④NaN/负数/Infinity 兜底、⑤`limit_type` 组合、⑥双语文案表。
+- **验证**：`bun run lint` 通过（0 error）；`bun run build` 通过（`vue-tsc --build` 类型检查 + vite build），产物 `dist/` + `ink-build-a706123.zip`（3.58 MB，构建后已随提交更新为新的短 SHA）。
+- **部署状态**：**尚未部署**。产物与当前线上主题（137 的 `data/theme/ink/`，v0.6.14）相比：728 个文件不变、29 个旧产物被替换、30 个新产物；未触及 `komari-theme.json` 版本号（本地产物，未发 release）。
+- **风险**：口径切换会让「已用/限额」从累计值（约 49.9%）变为周期值（约 0.4%），属预期；若节点未配置周期则行为与改动前一致。
+
+## 2026-10-23（续）· 静默版：只切数字，不动任何文案/布局
+
+- **背景**：用户确认要的效果是"面板数字按月走，布局/文字/样式一个字都不要加"，并明确反感自造文案 ⇒ 撤回上一版加的口径徽标、标签后缀与重置边界提示。
+- **做法**：5 个 UI 文件（NodeCard / NodeList / NodeGeneralCards / NodeComparePanel / InstanceDetail）用 `git checkout main --` 逐字回到 v0.6.14；删除 `src/constants/trafficPeriodText.ts`（自定义文案模块）；自检脚本改为纯口径断言（不含文案用例）。
+- **仅保留的可见改动（数值来源）**：`NodeCard` 的「总流量」列上下行、`NodeList` 的 tooltip 上下行与 `TrafficProgress` 进度条改用口径解析结果；卡片百分比/已用、详情页、概览配额卡经由 `nodeMetricsHelper` 委托自动跟随。
+- **未改（有意）**：`NodeGeneralCards` 的「累计流量」卡与 `NodeComparePanel` 的「累计流量」行仍显示累计值 —— 其标签本身写明"累计"，若改成周期值会与文字冲突；按"不改文字"约束保持原样，待用户确认是否另议。
+- **验证**：`bun run lint` 通过；`bun run build` 通过；dist 全量 grep「本周期」「累计（历史）」「口径已切换」「本周期尚未开始」「每月」= 0；与线上 v0.6.14 产物对比基础 chunk 名集合一致（无新增组件/无结构变化）。
