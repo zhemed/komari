@@ -538,6 +538,9 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
     升级流程也不删 WAL（代码里只有 `PRAGMA wal_checkpoint(TRUNCATE)`，`database/dbcore/dbcore.go:247`）。
   - 处置：**重启一次服务端即恢复一致**（之后外部读到的就是实时数据），本次重启后
     `komari.db-wal` 0 字节、fd 正常、外部读取实时。
+  - **2026-10-23 更正**：上面那条"外部只读连接已排除"**不成立**——当日实测复现（外部 sqlite 访问后出现
+    `(deleted)`）。因此每次外部访问生产库后都要查 `/proc/<pid>/fd`，见
+    `.trellis/spec/backend/database-guidelines.md` 附录第 1 条。
   - 影响面：WAL 处于 unlink 状态时，若进程被 `kill -9` 会丢掉尚未 checkpoint 的写入；
     正常 `systemctl stop`（SIGTERM）会 checkpoint 回主库，本次未观察到数据丢失。
   - 结论：升级后发现"外部工具读到旧数据"，先重启一次服务再判断，不要直接当成丢数据。
