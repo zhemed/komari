@@ -43,7 +43,10 @@ func TestAdminGetDatabaseSizeExposesTrafficPipelineHeartbeat(t *testing.T) {
 		"accumulate_errors_total",
 		"queue_len",
 		"worker_alive",
+		"pending_len",
 		"stall_events_total",
+		"dropped_batches_total",
+		"dropped_reports_total",
 	} {
 		if _, ok := pipeline[key]; !ok {
 			t.Fatalf("traffic_pipeline 缺少字段 %q：%s", key, encoded)

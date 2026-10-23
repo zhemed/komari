@@ -31,8 +31,15 @@ type TrafficPipelineHeartbeat struct {
 	// QueueLen / WorkerAlive：批处理队列积压与 worker 存活，是停摆判据的并发条件。
 	QueueLen    int  `json:"queue_len"`
 	WorkerAlive bool `json:"worker_alive"`
+	// PendingLen：已出队但尚未写成的报告数（有上限，见 maxPendingReports）。
+	// 与 QueueLen 的区别：QueueLen 是通道里的、PendingLen 是 worker 手里卡住的。
+	PendingLen int `json:"pending_len"`
 	// StallEventsTotal：看门狗判定为"停摆"的事件次数（同一次停摆只 +1）。
 	StallEventsTotal uint64 `json:"stall_events_total"`
+	// DroppedBatchesTotal / DroppedReportsTotal：死信丢弃的批次数与报告数
+	// （重试到上限仍失败，或 pending 超上限时按策略丢弃）。
+	DroppedBatchesTotal uint64 `json:"dropped_batches_total"`
+	DroppedReportsTotal uint64 `json:"dropped_reports_total"`
 	// LastBatchError：最近一次批处理错误（已截断），便于事后核对。
 	LastBatchError string `json:"last_batch_error,omitempty"`
 }
@@ -48,6 +55,8 @@ var (
 	batchErrorsTotal      uint64
 	accumulateErrorsTotal uint64
 	stallEventsTotal      uint64
+	droppedBatchesTotal   uint64
+	droppedReportsTotal   uint64
 	lastBatchErrorText    string
 )
 
@@ -86,8 +95,28 @@ func recordAccumulateStall() {
 	heartbeatMu.Unlock()
 }
 
+// recordDroppedReportBatch 记录一次死信丢弃（重试到上限仍失败的批次）。
+func recordDroppedReportBatch(reportCount int) {
+	heartbeatMu.Lock()
+	droppedBatchesTotal++
+	if reportCount > 0 {
+		droppedReportsTotal += uint64(reportCount)
+	}
+	heartbeatMu.Unlock()
+}
+
+// recordDroppedPendingReports 记录因 pending 超上限被丢弃的报告（按策略丢最旧）。
+func recordDroppedPendingReports(reportCount int) {
+	if reportCount <= 0 {
+		return
+	}
+	heartbeatMu.Lock()
+	droppedReportsTotal += uint64(reportCount)
+	heartbeatMu.Unlock()
+}
+
 // TrafficPipelineStatus 组装对外心跳快照。
-// queue_len / worker_alive 取实时值（来自批处理 worker），其余取计数器的快照。
+// queue_len / worker_alive / pending_len 取实时值（来自批处理 worker），其余取计数器快照。
 func TrafficPipelineStatus() TrafficPipelineHeartbeat {
 	heartbeatMu.Lock()
 	heartbeat := TrafficPipelineHeartbeat{
@@ -96,6 +125,8 @@ func TrafficPipelineStatus() TrafficPipelineHeartbeat {
 		BatchErrorsTotal:          batchErrorsTotal,
 		AccumulateErrorsTotal:     accumulateErrorsTotal,
 		StallEventsTotal:          stallEventsTotal,
+		DroppedBatchesTotal:       droppedBatchesTotal,
+		DroppedReportsTotal:       droppedReportsTotal,
 		LastBatchError:            lastBatchErrorText,
 	}
 	heartbeatMu.Unlock()
@@ -106,6 +137,7 @@ func TrafficPipelineStatus() TrafficPipelineHeartbeat {
 	if worker != nil {
 		heartbeat.QueueLen = len(worker.queue)
 		heartbeat.WorkerAlive = reportWorkerAlive(worker)
+		heartbeat.PendingLen = worker.pendingReportsLen()
 	}
 	return heartbeat
 }

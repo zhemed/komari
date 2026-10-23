@@ -278,7 +278,7 @@ func TestReportBatchKeepsEverySample(t *testing.T) {
 		{UUID: "node-b", UpdatedAt: base.Add(time.Second), CPU: v1.CPUReport{Usage: 40}, Network: v1.NetworkReport{TotalUp: 260}},
 	}
 
-	if err := writePendingReports(ctx, &pending); err != nil {
+	if err := writePendingReports(ctx, &pending, &reportBatchRetry{}); err != nil {
 		t.Fatalf("write report batch: %v", err)
 	}
 	if len(pending) != 0 {

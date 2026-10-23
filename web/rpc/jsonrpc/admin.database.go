@@ -49,7 +49,10 @@ type trafficPipelineStatus struct {
 	AccumulateErrorsTotal     uint64 `json:"accumulate_errors_total"`
 	QueueLen                  int    `json:"queue_len"`
 	WorkerAlive               bool   `json:"worker_alive"`
+	PendingLen                int    `json:"pending_len"`
 	StallEventsTotal          uint64 `json:"stall_events_total"`
+	DroppedBatchesTotal       uint64 `json:"dropped_batches_total"`
+	DroppedReportsTotal       uint64 `json:"dropped_reports_total"`
 	LastBatchError            string `json:"last_batch_error,omitempty"`
 }
 
@@ -107,7 +110,10 @@ func trafficPipelineStatusFrom(heartbeat metricstore.TrafficPipelineHeartbeat) t
 		AccumulateErrorsTotal:     heartbeat.AccumulateErrorsTotal,
 		QueueLen:                  heartbeat.QueueLen,
 		WorkerAlive:               heartbeat.WorkerAlive,
+		PendingLen:                heartbeat.PendingLen,
 		StallEventsTotal:          heartbeat.StallEventsTotal,
+		DroppedBatchesTotal:       heartbeat.DroppedBatchesTotal,
+		DroppedReportsTotal:       heartbeat.DroppedReportsTotal,
 		LastBatchError:            heartbeat.LastBatchError,
 	}
 }

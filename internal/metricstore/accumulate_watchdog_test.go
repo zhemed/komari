@@ -81,6 +81,8 @@ func resetTrafficHeartbeat() {
 	batchErrorsTotal = 0
 	accumulateErrorsTotal = 0
 	stallEventsTotal = 0
+	droppedBatchesTotal = 0
+	droppedReportsTotal = 0
 	lastBatchErrorText = ""
 	heartbeatMu.Unlock()
 }

@@ -59,9 +59,22 @@ func currentTrafficAccumulator() func(string, int64, int64, int64, int64) error 
 
 const (
 	reportBatchInterval     = 3 * time.Second
-	reportBatchQueueSize    = 4096
 	pingBatchMaxRecords     = 512
 	reportBatchWriteTimeout = 10 * time.Second
+	// maxReportBatchAttempts 是"同一队头批次"允许的连续失败次数：达到后进死信（丢弃）。
+	// 取 3：单次失败往往是瞬时抖动（锁竞争、瞬时 IO），重试 2 次足够；
+	// 再失败的批次极可能是毒丸（数据/驱动层面的确定性失败），继续重试只会永久堵住后面的报告。
+	maxReportBatchAttempts = 3
+)
+
+var (
+	// reportBatchQueueSize 是报告队列容量。取 var 是为了让测试能缩小规模后覆写
+	// （生产默认值不变：4096）。
+	reportBatchQueueSize = 4096
+	// maxPendingReports 是"已出队但未写成"的缓冲上限：2 × 队列容量。
+	// 每条报告数百字节量级 ⇒ 上限对应几 MB 内存，同时留出约两个 flush 周期（3s）的余量；
+	// 超出时丢**最旧**的（策略理由见 trimPendingReports）。
+	maxPendingReports = reportBatchQueueSize * 2
 )
 
 var (
@@ -88,6 +101,8 @@ type reportBatchWorker struct {
 	requests  chan reportBatchRequest
 	done      chan struct{}
 	stopping  bool
+	// pendingLen 是"已出队但未写成"的报告数（心跳暴露，见 heartbeat.go）。
+	pendingLen int
 }
 
 // StartReportBatcher starts the shared report writer. Exact samples are kept in
@@ -232,15 +247,20 @@ func (w *reportBatchWorker) run() {
 
 	var pending []v1.Report
 	var pendingPings []models.PingRecord
+	retry := &reportBatchRetry{}
+	defer w.setPendingLen(0)
 	for {
 		select {
 		case request := <-w.requests:
 			pending = append(pending, drainReportQueue(w.queue, reportBatchQueueSize)...)
+			pending = trimPendingReports(pending, maxPendingReports)
+			w.setPendingLen(len(pending))
 			pendingPings = append(pendingPings, drainPingQueue(w.pingQueue, reportBatchQueueSize)...)
 			err := errors.Join(
-				writePendingReports(request.ctx, &pending),
+				writePendingReports(request.ctx, &pending, retry),
 				writePendingPingRecords(request.ctx, &pendingPings),
 			)
+			w.setPendingLen(len(pending))
 			if request.stop {
 				if err != nil {
 					logger.Errorf("metricstore", "failed to flush metric report batch during shutdown: %v", err)
@@ -256,11 +276,28 @@ func (w *reportBatchWorker) run() {
 				logger.Errorf("metricstore", "failed to flush ping batch: %v", err)
 			}
 			pending = append(pending, drainReportQueue(w.queue, reportBatchQueueSize)...)
-			if err := writePendingReports(context.Background(), &pending); err != nil {
+			pending = trimPendingReports(pending, maxPendingReports)
+			w.setPendingLen(len(pending))
+			if err := writePendingReports(context.Background(), &pending, retry); err != nil {
 				logger.Errorf("metricstore", "failed to flush metric report batch: %v", err)
 			}
+			w.setPendingLen(len(pending))
 		}
 	}
+}
+
+// setPendingLen 发布"已出队但未写成"的报告数（心跳用，与 stopping 共用一把锁）。
+func (w *reportBatchWorker) setPendingLen(length int) {
+	w.mu.Lock()
+	w.pendingLen = length
+	w.mu.Unlock()
+}
+
+// pendingReportsLen 读取已发布的值（心跳快照用）。
+func (w *reportBatchWorker) pendingReportsLen() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.pendingLen
 }
 
 func (w *reportBatchWorker) enqueuePing(ctx context.Context, record models.PingRecord) error {
@@ -326,8 +363,25 @@ func drainPingQueue(queue <-chan models.PingRecord, limit int) []models.PingReco
 	return records
 }
 
-func writePendingReports(ctx context.Context, pending *[]v1.Report) error {
+// reportBatchRetry 保存"当前 pending 队头批次"的连续失败次数（跨 tick 保留）。
+type reportBatchRetry struct {
+	attempts int
+}
+
+func (r *reportBatchRetry) reset() { r.attempts = 0 }
+
+// writePendingReports 把 pending 里的报告按批写库。
+//
+// 健壮性（缺陷 1）：失败不再"原地无限重试同一前缀"——那样一个毒丸批次会永久堵住
+// 它后面所有报告，而 pending 又无上限。现在的策略：
+//
+//   - 同一队头批次连续失败 maxReportBatchAttempts 次 ⇒ 进**死信**：丢弃该批次、
+//     计数、写一条含批次摘要的 ERROR，然后继续写后面的报告（队头阻塞被解开）；
+//   - 任何一批写成功就把重试计数清零（正常路径行为完全不变）；
+//   - 失败但未达上限时仍然返回错误，让调用方照旧记 ERROR（保持"吵闹"）。
+func writePendingReports(ctx context.Context, pending *[]v1.Report, retry *reportBatchRetry) error {
 	if len(*pending) == 0 {
+		retry.reset()
 		return nil
 	}
 	batchSize := len(*pending)
@@ -342,11 +396,72 @@ func writePendingReports(ctx context.Context, pending *[]v1.Report) error {
 			// 批处理失败统一在这里计数：无论失败来自信号量等待、store 缺失还是写库，
 			// 都算一次"批次没完成"，与"累计回调报错"分开统计。
 			recordBatchError(err)
-			return err
+			retry.attempts++
+			if retry.attempts < maxReportBatchAttempts {
+				return err
+			}
+			deadLetterReportBatch((*pending)[:batchSize], err)
+			*pending = (*pending)[batchSize:]
+			retry.reset()
+			continue
 		}
+		retry.reset()
 		*pending = (*pending)[batchSize:]
 	}
 	return nil
+}
+
+// deadLetterReportBatch 丢弃一个"重试到上限仍失败"的批次：计数 + ERROR（含批次摘要），
+// 让后面的报告能继续写出去。报告本身已在上报时被 agent 视为送达，这里只能丢弃并留痕。
+func deadLetterReportBatch(reports []v1.Report, cause error) {
+	recordDroppedReportBatch(len(reports))
+	logger.Errorf("metricstore", "dropping metric report batch after %d failed attempts: %s (last error: %v)",
+		maxReportBatchAttempts, summarizeReports(reports), cause)
+}
+
+// summarizeReports 生成批次摘要：条数、涉及节点数、时间窗与少量 uuid 样本。
+// 只用于日志，不包含任何地址/端口等敏感信息。
+func summarizeReports(reports []v1.Report) string {
+	if len(reports) == 0 {
+		return "empty batch"
+	}
+	uuids := make(map[string]struct{}, len(reports))
+	earliest := reports[0].UpdatedAt
+	latest := reports[0].UpdatedAt
+	sample := make([]string, 0, reportSummarySampleSize)
+	for _, report := range reports {
+		uuids[report.UUID] = struct{}{}
+		if report.UpdatedAt.Before(earliest) {
+			earliest = report.UpdatedAt
+		}
+		if report.UpdatedAt.After(latest) {
+			latest = report.UpdatedAt
+		}
+		if len(sample) < reportSummarySampleSize {
+			sample = append(sample, report.UUID)
+		}
+	}
+	return fmt.Sprintf("reports=%d nodes=%d window=[%s..%s] sample_uuids=%v",
+		len(reports), len(uuids), earliest.UTC().Format(time.RFC3339), latest.UTC().Format(time.RFC3339), sample)
+}
+
+// reportSummarySampleSize 是批次摘要里附带的 uuid 样本数（足够定位问题，又不刷屏）。
+const reportSummarySampleSize = 3
+
+// trimPendingReports 把 pending 截到上限；超出时丢弃**最旧**的并计数 + 告警。
+//
+// 为什么丢最旧而不是拒绝最新：报告在 WriteReport 时已经对 agent 应答成功（不能事后拒绝），
+// 而时序数据里"最新"的信息价值更高；同时队头往往正是卡住的那一批，
+// 丢最旧也顺带把队头阻塞解开。返回新切片，避免旧数组继续被引用而不释放。
+func trimPendingReports(pending []v1.Report, limit int) []v1.Report {
+	if limit <= 0 || len(pending) <= limit {
+		return pending
+	}
+	dropped := len(pending) - limit
+	recordDroppedPendingReports(dropped)
+	logger.Warn("metricstore", "dropping oldest pending metric reports to keep the buffer bounded",
+		"dropped", dropped, "pending_len", len(pending), "pending_limit", limit)
+	return append([]v1.Report(nil), pending[dropped:]...)
 }
 
 func writePendingPingRecords(ctx context.Context, pending *[]models.PingRecord) error {

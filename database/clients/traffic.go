@@ -1,6 +1,8 @@
 package clients
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
+	logger "github.com/komari-monitor/komari/utils/log"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -88,20 +91,28 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 	now := time.Now().UTC()
 	db := dbcore.GetDBInstance()
 
-	created := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ClientTrafficTotal{
-		UUID:      uuid,
-		UpTotal:   totalUp,
-		DownTotal: totalDown,
-		UpdatedAt: now,
-	})
-	if created.Error != nil {
+	var created *gorm.DB
+	if err := withMainDBTimeout(uuid, "seed traffic total", func(ctx context.Context) error {
+		created = db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ClientTrafficTotal{
+			UUID:      uuid,
+			UpTotal:   totalUp,
+			DownTotal: totalDown,
+			UpdatedAt: now,
+		})
 		return created.Error
+	}); err != nil {
+		return err
 	}
 	if created.RowsAffected > 0 {
 		// 新建成功 = 这是首次见到该节点，基线已经写入，本次增量不再重复加。
 		// 周期同样只建基线：起点取 max(周期边界, 现在)，本次增量不计入。
 		entry := TrafficTotal{Up: totalUp, Down: totalDown}
-		if _, _, state, _ := periodConfigFor(db, uuid); state == periodConfigEnabled {
+		lookup, err := loadPeriodConfig(uuid, db)
+		if err != nil {
+			// 读配置失败（超时/连接错误）：本次只放弃周期播种，累计基线已经写入。
+			return err
+		}
+		if lookup.state == periodConfigEnabled {
 			// PeriodWindow 返回的是"包含 now 的那个周期"的起点，按定义不会晚于 now
 			// （顺延出来的未来边界是 next，不是 start），所以 max(boundary, now) 恒等于 now：
 			// 即"周期从启用时刻起算"。
@@ -113,7 +124,10 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 				"needs_rebaseline":  false,
 				"updated_at":        now,
 			}
-			if err := db.Model(&models.ClientTrafficTotal{}).Where("uuid = ?", uuid).Updates(updates).Error; err != nil {
+			if err := withMainDBTimeout(uuid, "seed traffic period start", func(ctx context.Context) error {
+				return db.WithContext(ctx).Model(&models.ClientTrafficTotal{}).
+					Where("uuid = ?", uuid).Updates(updates).Error
+			}); err != nil {
 				return err
 			}
 			entry.PeriodStart = start
@@ -126,10 +140,18 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 
 	// 已存在的行：先取配置（启用/禁用/非法三态），再读当前周期状态——
 	// 直接从库里读，避免内存与库不一致时误判边界。
-	resetDay, tzName, periodState, periodCause := periodConfigFor(db, uuid)
+	lookup, err := loadPeriodConfig(uuid, db)
+	if err != nil {
+		// 读配置失败（超时/连接错误）：**什么都不写**直接返回。
+		// 绝不能把"读不到"当成"禁用"——那会顺手清空该节点的周期列（数据丢失）。
+		return err
+	}
+	resetDay, tzName, periodState, periodCause := lookup.resetDay, lookup.tzName, lookup.state, lookup.cause
 
 	var row models.ClientTrafficTotal
-	if err := db.Where("uuid = ?", uuid).First(&row).Error; err != nil {
+	if err := withMainDBTimeout(uuid, "read traffic total", func(ctx context.Context) error {
+		return db.WithContext(ctx).Where("uuid = ?", uuid).First(&row).Error
+	}); err != nil {
 		return err
 	}
 	cur := TrafficTotal{
@@ -222,7 +244,10 @@ func AccumulateTraffic(uuid string, totalUp, totalDown, deltaUp, deltaDown int64
 		cur.NeedsRebaseline = false
 	}
 
-	if err := db.Model(&models.ClientTrafficTotal{}).Where("uuid = ?", uuid).Updates(updates).Error; err != nil {
+	if err := withMainDBTimeout(uuid, "accumulate traffic totals", func(ctx context.Context) error {
+		return db.WithContext(ctx).Model(&models.ClientTrafficTotal{}).
+			Where("uuid = ?", uuid).Updates(updates).Error
+	}); err != nil {
 		return err
 	}
 
@@ -262,20 +287,51 @@ func effectiveDelta(cur TrafficTotal, deltaUp, deltaDown int64) (int64, int64) {
 //
 // 每次上报多一条按主键的 SELECT（SQLite 单连接）：不引入新的全局缓存，
 // 因此没有新的可变状态竞争，也不会出现"直接改库后缓存陈旧"的问题。
-func periodConfigFor(db *gorm.DB, uuid string) (resetDay int, tzName string, state periodConfigState, cause error) {
+// periodConfigLookup 是一次配置读取的结果。
+type periodConfigLookup struct {
+	resetDay int
+	tzName   string
+	state    periodConfigState
+	// cause 是"配置非法"的具体原因（供告警）。
+	cause error
+	// err 是**读库本身**失败（超时/连接错误）。调用方必须据此放弃本次上报：
+	// 把"读不到"当成"禁用"会顺手清空周期列，那是数据丢失。
+	err error
+}
+
+// lookupPeriodConfig 读取并判定配置；节点不存在等价于"未配置"（不是读失败）。
+func lookupPeriodConfig(ctx context.Context, db *gorm.DB, uuid string) periodConfigLookup {
 	var client models.Client
-	if err := db.Select("traffic_reset_day", "traffic_reset_timezone").
+	if err := db.WithContext(ctx).Select("traffic_reset_day", "traffic_reset_timezone").
 		Where("uuid = ?", uuid).First(&client).Error; err != nil {
-		return 0, "", periodConfigDisabled, nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return periodConfigLookup{state: periodConfigDisabled}
+		}
+		return periodConfigLookup{err: err}
 	}
 	normalizedTZ, err := ValidatePeriodConfig(client.TrafficResetDay, client.TrafficResetTimezone)
 	if err != nil {
-		return client.TrafficResetDay, client.TrafficResetTimezone, periodConfigInvalid, err
+		return periodConfigLookup{
+			resetDay: client.TrafficResetDay,
+			tzName:   client.TrafficResetTimezone,
+			state:    periodConfigInvalid,
+			cause:    err,
+		}
 	}
 	if client.TrafficResetDay == 0 {
-		return 0, "", periodConfigDisabled, nil
+		return periodConfigLookup{state: periodConfigDisabled}
 	}
-	return client.TrafficResetDay, normalizedTZ, periodConfigEnabled, nil
+	return periodConfigLookup{resetDay: client.TrafficResetDay, tzName: normalizedTZ, state: periodConfigEnabled}
+}
+
+// loadPeriodConfig 在主库超时约束下读取一次配置。
+func loadPeriodConfig(uuid string, db *gorm.DB) (periodConfigLookup, error) {
+	var lookup periodConfigLookup
+	err := withMainDBTimeout(uuid, "load traffic period config", func(ctx context.Context) error {
+		lookup = lookupPeriodConfig(ctx, db, uuid)
+		return lookup.err
+	})
+	return lookup, err
 }
 
 // periodTimezoneLabel 是审计日志里展示用的时区名（空 ⇒ 显式标出实际生效的 UTC）。
@@ -319,10 +375,13 @@ func MarkTrafficRebaseline(uuid string) error {
 		return fmt.Errorf("invalid client UUID")
 	}
 	db := dbcore.GetDBInstance()
-	result := db.Model(&models.ClientTrafficTotal{}).Where("uuid = ?", uuid).
-		Update("needs_rebaseline", true)
-	if result.Error != nil {
+	var result *gorm.DB
+	if err := withMainDBTimeout(uuid, "mark traffic rebaseline", func(ctx context.Context) error {
+		result = db.WithContext(ctx).Model(&models.ClientTrafficTotal{}).Where("uuid = ?", uuid).
+			Update("needs_rebaseline", true)
 		return result.Error
+	}); err != nil {
+		return err
 	}
 	if result.RowsAffected == 0 {
 		// 还没有累计行（节点从未上报过）：首次上报本来就是"只建基线、不累加"，
@@ -343,7 +402,10 @@ func DeleteTrafficTotal(uuid string) error {
 	if uuid == "" {
 		return nil
 	}
-	if err := dbcore.GetDBInstance().Delete(&models.ClientTrafficTotal{}, "uuid = ?", uuid).Error; err != nil {
+	db := dbcore.GetDBInstance()
+	if err := withMainDBTimeout(uuid, "delete traffic total", func(ctx context.Context) error {
+		return db.WithContext(ctx).Delete(&models.ClientTrafficTotal{}, "uuid = ?", uuid).Error
+	}); err != nil {
 		return err
 	}
 	trafficMu.Lock()
@@ -351,4 +413,43 @@ func DeleteTrafficTotal(uuid string) error {
 	trafficMu.Unlock()
 	clearPeriodWarnState(uuid)
 	return nil
+}
+
+// 主库写入路径的超时与慢操作阈值。
+//
+// 为什么必须显式超时：主库是 SetMaxOpenConns(1)（database/dbcore/dbcore.go 的 SQLite 分支），
+// 而这些 GORM 调用此前不带 ctx ⇒ 池等待用的是 context.Background()：**无超时、无日志**。
+// 一旦唯一连接被占死（长事务、迁移、外部工具持锁），累计会**无限期静默挂起**——
+// 生产实测过一次"updated_at 冻结 150s 且日志无 error"。DSN 的 _busy_timeout 只管
+// SQLite 锁等待，**不管连接池等待**，所以必须在调用点给 ctx。
+//
+// 5s 与 _busy_timeout 同量级：正常路径远用不到，异常时立刻变成可见错误。
+// 两个量都声明为 var，便于测试把阈值压小后验证超时/慢日志路径（生产用默认值）。
+var (
+	mainDBOperationTimeout       = 5 * time.Second
+	slowMainDBOperationThreshold = time.Second
+)
+
+// withMainDBTimeout 在主库上执行一次操作：显式超时 + 慢操作/超时日志。
+//
+// 超时只会让**这一次**上报少计一次增量（累加本身就是增量语义，宁可少计也不能写坏或回退），
+// 不改变任何列的语义；错误原样上抛，由调用方（internal/server）记 ERROR。
+func withMainDBTimeout(uuid, operation string, fn func(ctx context.Context) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), mainDBOperationTimeout)
+	defer cancel()
+
+	start := time.Now()
+	err := fn(ctx)
+	elapsed := time.Since(start)
+
+	switch {
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		logger.Warn("clients", "main database operation timed out, skipping this accumulation",
+			"operation", operation, "uuid", uuid,
+			"elapsed_ms", elapsed.Milliseconds(), "timeout_ms", mainDBOperationTimeout.Milliseconds())
+	case err == nil && elapsed >= slowMainDBOperationThreshold:
+		logger.Warn("clients", "slow main database operation",
+			"operation", operation, "uuid", uuid, "elapsed_ms", elapsed.Milliseconds())
+	}
+	return err
 }

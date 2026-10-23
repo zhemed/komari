@@ -82,7 +82,7 @@ func TestTrafficHeartbeatCountsBatchErrors(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	pending := []v1.Report{{UUID: "hb-batch-err", UpdatedAt: time.Now().UTC()}}
-	if err := writePendingReports(ctx, &pending); err == nil {
+	if err := writePendingReports(ctx, &pending, &reportBatchRetry{}); err == nil {
 		t.Fatal("cancelled context should fail the batch")
 	}
 
