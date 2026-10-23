@@ -8,7 +8,6 @@ import { useNow } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { CardX } from '@/components/ui/card-x'
 import { DataTooltip } from '@/components/ui/data-tooltip'
-import { getTrafficPeriodText } from '@/constants/trafficPeriodText'
 import { UI_CONFIG } from '@/constants/ui'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
@@ -20,7 +19,6 @@ import {
   getExpiryDays,
   getHighLoadMetrics,
   getRealtimeTotalSpeed,
-  getTrafficUsage,
   getTrafficUsed,
   getTrafficUsedPercentage,
   isExpiringNode,
@@ -341,35 +339,11 @@ const onlineStats = computed<OnlineStats>(() => {
 
 const totalSpeed = computed(() => onlineStats.value.totalSpeed)
 
-/**
- * 概览「流量」汇总：口径与单节点卡片一致——配置了周期且周期已开始的节点按周期值统计，
- * 其余节点回落累计值；只要有一个节点处于周期口径，整卡标注为「本周期」。
- */
 const totalTraffic = computed(() => {
-  let up = 0
-  let down = 0
-  let periodNodes = 0
-
-  for (const node of summaryNodes.value) {
-    const usage = getTrafficUsage(node)
-    if (usage.basis === 'period') {
-      periodNodes += 1
-      up += usage.usedUp
-      down += usage.usedDown
-    }
-    else {
-      up += usage.totalUp
-      down += usage.totalDown
-    }
-  }
-
-  return { up, down, periodNodes }
+  const up = summaryNodes.value.reduce((sum, node) => sum + (node.net_total_up || 0), 0)
+  const down = summaryNodes.value.reduce((sum, node) => sum + (node.net_total_down || 0), 0)
+  return { up, down }
 })
-
-const hasPeriodTraffic = computed(() => totalTraffic.value.periodNodes > 0)
-const totalTrafficLabel = computed(() => hasPeriodTraffic.value
-  ? `${getTrafficPeriodText().period}流量`
-  : '累计流量')
 
 const formattedTrafficUp = computed(() => formatBytesSplit(totalTraffic.value.up, appStore.byteDecimals))
 const formattedTrafficDown = computed(() => formatBytesSplit(totalTraffic.value.down, appStore.byteDecimals))
@@ -562,14 +536,11 @@ function getCardDefinition(key: GeneralCardKey): GeneralMetricCard {
     case 'totalTraffic':
       return {
         key: 'totalTraffic',
-        label: totalTrafficLabel.value,
+        label: '累计流量',
         icon: 'tabler:download',
         value: totalTrafficTooltip.value.value,
         unit: totalTrafficTooltip.value.unit,
-        tooltip: [
-          `↑ ${formattedTrafficUp.value.value} ${formattedTrafficUp.value.unit}\n↓ ${formattedTrafficDown.value.value} ${formattedTrafficDown.value.unit}`,
-          hasPeriodTraffic.value ? `${getTrafficPeriodText().period}：${totalTraffic.value.periodNodes} 个节点` : '',
-        ].filter(Boolean).join('\n'),
+        tooltip: `↑ ${formattedTrafficUp.value.value} ${formattedTrafficUp.value.unit}\n↓ ${formattedTrafficDown.value.value} ${formattedTrafficDown.value.unit}`,
       }
     case 'netSpeed':
       return {
@@ -692,7 +663,7 @@ function getCardDefinition(key: GeneralCardKey): GeneralMetricCard {
     case 'trafficQuota':
       return {
         key: 'trafficQuota',
-        label: hasPeriodTraffic.value ? `流量配额（${getTrafficPeriodText().period}）` : '流量配额',
+        label: '流量配额',
         icon: 'tabler:gauge',
         value: trafficQuota.value.limit > 0 ? formatDecimal(trafficQuotaPercentage.value) : '-',
         unit: trafficQuota.value.limit > 0 ? '%' : undefined,

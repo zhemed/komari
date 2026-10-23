@@ -909,3 +909,11 @@
 - **验证**：`bun run lint` 通过（0 error）；`bun run build` 通过（`vue-tsc --build` 类型检查 + vite build），产物 `dist/` + `ink-build-a706123.zip`（3.58 MB，构建后已随提交更新为新的短 SHA）。
 - **部署状态**：**尚未部署**。产物与当前线上主题（137 的 `data/theme/ink/`，v0.6.14）相比：728 个文件不变、29 个旧产物被替换、30 个新产物；未触及 `komari-theme.json` 版本号（本地产物，未发 release）。
 - **风险**：口径切换会让「已用/限额」从累计值（约 49.9%）变为周期值（约 0.4%），属预期；若节点未配置周期则行为与改动前一致。
+
+## 2026-10-23（续）· 静默版：只切数字，不动任何文案/布局
+
+- **背景**：用户确认要的效果是"面板数字按月走，布局/文字/样式一个字都不要加"，并明确反感自造文案 ⇒ 撤回上一版加的口径徽标、标签后缀与重置边界提示。
+- **做法**：5 个 UI 文件（NodeCard / NodeList / NodeGeneralCards / NodeComparePanel / InstanceDetail）用 `git checkout main --` 逐字回到 v0.6.14；删除 `src/constants/trafficPeriodText.ts`（自定义文案模块）；自检脚本改为纯口径断言（不含文案用例）。
+- **仅保留的可见改动（数值来源）**：`NodeCard` 的「总流量」列上下行、`NodeList` 的 tooltip 上下行与 `TrafficProgress` 进度条改用口径解析结果；卡片百分比/已用、详情页、概览配额卡经由 `nodeMetricsHelper` 委托自动跟随。
+- **未改（有意）**：`NodeGeneralCards` 的「累计流量」卡与 `NodeComparePanel` 的「累计流量」行仍显示累计值 —— 其标签本身写明"累计"，若改成周期值会与文字冲突；按"不改文字"约束保持原样，待用户确认是否另议。
+- **验证**：`bun run lint` 通过；`bun run build` 通过；dist 全量 grep「本周期」「累计（历史）」「口径已切换」「本周期尚未开始」「每月」= 0；与线上 v0.6.14 产物对比基础 chunk 名集合一致（无新增组件/无结构变化）。

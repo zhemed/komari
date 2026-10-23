@@ -7,7 +7,6 @@ import { DataTooltip } from '@/components/ui/data-tooltip'
 import { FlagIcon } from '@/components/ui/flag-icon'
 import { ProgressThin } from '@/components/ui/progress-thin'
 import { useNodePingDisplay } from '@/composables/useNodePingDisplay'
-import { formatResetNote, getTrafficPeriodText } from '@/constants/trafficPeriodText'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, getStatus, getUptimeDays } from '@/utils/helper'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
@@ -119,19 +118,8 @@ function lossTextClass(text: string): string {
 }
 const trafficUsedPercentage = computed(() => getTrafficUsedPercentage(props.node))
 const trafficUsed = computed(() => getTrafficUsed(props.node))
-/** 口径与数值的唯一来源（周期优先，回落累计） */
+/** 口径解析结果：卡片内所有流量数字（百分比/已用/上下行）统一取自这里 */
 const trafficUsage = computed(() => getTrafficUsage(props.node))
-const trafficText = computed(() => getTrafficPeriodText())
-const showPeriodMarker = computed(() => trafficUsage.value.basis === 'period' && hasTrafficLimit(props.node))
-const trafficResetNote = computed(() => {
-  if (!trafficUsage.value.periodMode)
-    return ''
-  return trafficUsage.value.periodStarted
-    ? formatResetNote(trafficUsage.value.resetDay, trafficUsage.value.resetTimezone)
-    : trafficText.value.periodNotStarted
-})
-/** 周期模式下，「总流量」列展示的其实是累计值，需明确标注 */
-const cumulativeColumnLabel = computed(() => trafficUsage.value.periodMode ? trafficText.value.cumulative : '总流量')
 const nodeMessage = computed(() => props.node.message?.trim() ?? '')
 const nodeMessageTooltip = computed(() => {
   const message = nodeMessage.value
@@ -333,23 +321,14 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
             <div class="flex justify-between text-xs">
               <span class="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
                 <Icon :icon="NODE_METRIC_ICONS.traffic" data-node-metric-icon="traffic" width="12" height="12" class="shrink-0 text-muted-foreground/70" aria-hidden="true" />
-                <span class="truncate">{{ showPeriodMarker ? `${trafficText.period}流量` : '流量' }}</span>
-                <span
-                  v-if="trafficUsage.basisSwitched"
-                  class="rounded bg-muted px-1 text-[10px] text-muted-foreground"
-                  :title="trafficText.basisSwitchedTip"
-                >{{ trafficText.basisSwitched }}</span>
+                <span class="truncate">流量</span>
               </span>
               <span class="font-mono tabular-nums font-medium" :class="trafficPercentageClass">
                 {{ hasTrafficLimit(props.node) ? `${trafficUsedPercentage.toFixed(1)}%` : '∞' }}
               </span>
             </div>
             <ProgressThin :percentage="trafficUsedPercentage" :status="trafficStatus" :height="2" />
-            <div
-              class="text-[11px] truncate"
-              :class="trafficUsedPercentage >= 95 ? 'text-destructive' : 'text-muted-foreground'"
-              :title="trafficResetNote || undefined"
-            >
+            <div class="text-[11px] truncate" :class="trafficUsedPercentage >= 95 ? 'text-destructive' : 'text-muted-foreground'">
               {{ formatBytes(trafficUsed) }}
               <template v-if="hasTrafficLimit(props.node)">
                 / {{ formatBytes(props.node.traffic_limit) }}
@@ -357,9 +336,6 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
               <template v-else>
                 / ∞
               </template>
-            </div>
-            <div v-if="trafficResetNote" class="text-[10px] truncate text-muted-foreground/80">
-              {{ trafficResetNote }}
             </div>
           </div>
         </div>
@@ -409,23 +385,14 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
           <div class="flex flex-col gap-1">
             <div class="flex justify-between text-xs">
               <span class="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
-                <span class="truncate">{{ showPeriodMarker ? `${trafficText.period}流量` : '流量' }}</span>
-                <span
-                  v-if="trafficUsage.basisSwitched"
-                  class="rounded bg-muted px-1 text-[10px] text-muted-foreground"
-                  :title="trafficText.basisSwitchedTip"
-                >{{ trafficText.basisSwitched }}</span>
+                <span class="truncate">流量</span>
               </span>
               <span class="font-mono tabular-nums font-medium" :class="trafficPercentageClass">
                 {{ hasTrafficLimit(props.node) ? `${trafficUsedPercentage.toFixed(1)}%` : '∞' }}
               </span>
             </div>
             <ProgressThin :percentage="trafficUsedPercentage" :status="trafficStatus" :height="2" />
-            <div
-              class="text-[11px] truncate"
-              :class="trafficUsedPercentage >= 95 ? 'text-destructive' : 'text-muted-foreground'"
-              :title="trafficResetNote || undefined"
-            >
+            <div class="text-[11px] truncate" :class="trafficUsedPercentage >= 95 ? 'text-destructive' : 'text-muted-foreground'">
               {{ formatBytes(trafficUsed) }}
               <template v-if="hasTrafficLimit(props.node)">
                 / {{ formatBytes(props.node.traffic_limit) }}
@@ -433,9 +400,6 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
               <template v-else>
                 / ∞
               </template>
-            </div>
-            <div v-if="trafficResetNote" class="text-[10px] truncate text-muted-foreground/80">
-              {{ trafficResetNote }}
             </div>
           </div>
         </div>
@@ -454,18 +418,15 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
             </div>
           </div>
 
-          <!-- 总流量（周期模式下展示的是累计值，需明确标注「累计（历史）」） -->
+          <!-- 总流量 -->
           <div class="flex flex-col gap-0.5 rounded-lg bg-transparent min-w-0 overflow-hidden" :class="nodeCardMetricBoxClass">
-            <div class="text-[10px] text-muted-foreground/80 truncate">
-              {{ cumulativeColumnLabel }}
-            </div>
             <div class="text-[11px] text-muted-foreground flex items-center gap-1">
               <Icon icon="tabler:upload" width="12" height="12" />
-              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(props.node.net_total_up ?? 0) }}</span>
+              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(trafficUsage.usedUp) }}</span>
             </div>
             <div class="text-[11px] text-muted-foreground flex items-center gap-1">
               <Icon icon="tabler:download" width="12" height="12" />
-              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(props.node.net_total_down ?? 0) }}</span>
+              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(trafficUsage.usedDown) }}</span>
             </div>
           </div>
 
