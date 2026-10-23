@@ -55,3 +55,4 @@ docker run -d --name komari-agent --restart always \
 - 构建产物（`bin/`、`ops-dist/`、`themes/ink/dist`、`themes/ink/node_modules`）一律不入库；
 - 详细规则见 `ops-docs/VERSION.md`、`ops-docs/BUILD.md`、`ops-docs/DEPLOY.md`、`ops-docs/ROLLBACK.md`。
 - **动本仓前先看** `ops-docs/BUILD.md` 末尾「运维经验」：① GitHub 推送首推常 408，需 HTTP/1.1 + 单线程并预期重试；② 提交必须带 `[task:<slug>]`（全局钩子更严时用 `git -c core.hooksPath=.githooks` 单次覆盖）。
+- **权威来源**：本仓即我们自维护的权威来源（内核 + 主题 0.0.1 + 部署/构建脚本）；主题不再跟随任何上游，可选的内核上游同步流程见 `ops-docs/VERSION.md`。

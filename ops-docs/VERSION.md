@@ -23,3 +23,29 @@
 - 主题：`theme-ink/v0.0.1`
 - 服务端：`server/v0.0.24-own.1`
 - 一个可部署组合 = 主题 tag + 服务端 tag，记录在 `ops-dist/BUILD-INFO.txt`。
+
+## 权威来源（我们自己的仓库）
+
+- **本仓库 `zhemed/komari` 是我们自维护的权威来源**：内核 + 主题 + 部署/构建脚本 + 文档，全部在本仓；
+  不再有第二个"自有单仓"（早先的 `komari-own` 已删除归档，本地目录仅作历史参考，其全历史已存为 bundle）。
+- **主题不再跟随任何上游**：上游 `komari-theme-ink` 的 0.6.x 只是这份代码的历史起点；
+  主题自身的提交历史已用 `git subtree` 并入本仓 `themes/ink/`（179 个提交），
+  查法：`git log --oneline -- themes/ink`，或回溯导入合并提交的第二父：
+  `git log --oneline "$(git log --format=%H --grep=\"Add 'themes/ink/'\" -1)^2"`。
+- 构建与部署**一律使用本仓脚本**（`./build.sh`、`deploy/`），不要引用仓外路径。
+
+## 可选：同步 Komari 内核上游（手动、不自动）
+
+内核沿用上游版本号（当前 `0.0.24`），我方改动以语义版本元数据 `+own.N` 标注。
+**当前内核代码路径 0 处我方改动**，与上游同步的冲突风险极低。需要时按下面步骤手动做：
+
+```bash
+git remote add upstream <上游 Komari 仓库>        # 只需一次
+git fetch upstream --tags
+git switch -c sync/upstream-$(date -u +%Y%m%d)   # 临时分支，别直接改 main
+git merge upstream/main                          # 或 rebase，按当时情况选
+./build.sh                                       # 重建内核镜像与主题 zip
+# 按 ops-docs/DEPLOY.md 部署并在临时环境验证；确认无误后再并入 main
+```
+
+注意：**主题与部署脚本属于我们自己的改动范围**，与上游内核同步时不需要、也不应该被覆盖。
