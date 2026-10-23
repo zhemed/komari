@@ -189,3 +189,40 @@
 ### Next Steps
 
 - 跨 2026-11-22 00:00Z 边界观察一次周期归零（唯一未做验证）；决定是否发 0.0.23 带上 WARN 去重、是否升级 0.0.7 的 agent
+
+
+## Session 66: 0.0.23 发布（WARN 去重）+ 收尾决策
+<!-- trellis-session: v=2 fp=703c12fe87a05e0c -->
+
+**Date**: 2026-10-23
+**Task**: 0.0.23 发布（WARN 去重）+ 收尾决策
+**Branch**: `main`
+
+### Summary
+
+按用户裁决完成收尾：推送 6 个提交、发布 0.0.23（WARN 去重）、并把生产升到 0.0.23；用户决定不升级 agent（仍 0.0.7）、不设跨边界提醒。0.0.23 验收：18 资产、逐平台载荷 5/5（含 ELF e_machine 判据）、生产 0.0.23 + digest 一致、0 错误、agent online、累计不回退且周期继续增长。
+
+### Main Changes
+
+- 版本字面量 0.0.22→0.0.23（含 README/MAINTAINING 四处口径）；rel-notes-0.0.23.md
+- 镜像 :0.0.23/:latest 重推，server index 4817dbd2…、agent index d261e841…
+- 生产升级（回滚点 komari.backup.20261023_074704 + /tmp/komari.rollback.0.0.22 + upgrade-20261023-074710.zip）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `267acbe` | chore(task): archive 10-23-post-0-0-22-decisions |
+
+### Testing
+
+- [OK] 逐平台载荷 5/5 == release 资产（amd64 3e00 / arm64 b700 / armv7 2800）
+- [OK] 生产验收：0.0.23 + da0139c、digest 3f9fc6b3… 一致、0 错误、周期 22s 内 +25,432、累计 +362,988,906 不回退
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 唯一未做：跨 2026-11-22 00:00Z 边界观察；可选：把 agent 校验和资产 name 规则写进 §3.4
