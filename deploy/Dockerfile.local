@@ -1,7 +1,10 @@
 # 本地构建镜像用（glibc 基础镜像 + 动态链接二进制）
 # 说明：官方发版镜像基于 alpine（需 zig 静态链接）；本仓库日常自用走 glibc 路线，
 # 需要与官方一致的形态时另装 zig 并用 server/scripts/build-komari.sh KOMARI_STATIC=1。
-FROM debian:bookworm-slim
+# 基础镜像：debian 13 (trixie) slim，钉 digest 保证可复现。
+# 2026-10-23 从 bookworm-slim 换到 trixie-slim：trivy 扫描显示裸 bookworm-slim 有 57 项
+# HIGH/CRITICAL（全部"无修复版本"），trixie-slim 为 43 项；两者剩余项均是 Debian 未发布修复的 OS 包。
+FROM debian@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*

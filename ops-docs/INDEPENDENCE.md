@@ -211,3 +211,43 @@ cd themes/ink && bun audit          # 本机 bun 1.4.2 已带该子命令
 **结论**：①我们镜像的 **Go 依赖漏洞已清零**（对照官方 24 项）；②剩余 59 项**全部是 Debian OS 包且 Debian 未发布修复版本**（含 1 项 CRITICAL `zlib1g` CVE-2023-45853，Debian 长期 wontfix），**裸镜像本身就有 57 项** ⇒ 与我们的 Dockerfile/构建方式无关；③换 `trixie-slim` 只能降到 43 项，且属于变更基础镜像版本 ⇒ **按约束先回报，本轮未换**；④`trivy fs`（仓库扫描）只有 **2 项**：`braces@3.0.3`（CVE-2026-93687，HIGH，**无修复版**），分别来自 `frontend/package-lock.json` 与 `themes/ink/bun.lock`。
 
 **最小修复与部署**：内核 `klauspost/compress v1.17.11 → v1.18.7` ⇒ 重建镜像 **own.3** 并部署（备份 DB/inspect/旧脚本 → `docker save | ssh docker load` → 新版本化脚本 `deploy/komari-v0.0.24-own.3-listen-local.sh` 重建 → 核对通过）；标签 `server/v0.0.24-own.3`。
+
+### 6.7 收尾修复：内嵌 admin 前端重建 + trixie 基础镜像（own.4）
+
+#### a) admin 前端重建（让 frontend 的依赖修复真正进产物）
+
+| 步骤 | 结果 |
+|---|---|
+| `scripts/build-frontend.sh`（首次） | 重建成功，但哈希门禁失败：期望 `f90849d1…`、实际 **`ab48b91d…`**（依赖解析变化，符合预期） |
+| 更新 `scripts/frontend-build.env` | `FRONTEND_TREE_SHA256` → `ab48b91d6f164cad8ad458619ed7e7daa25c7eed0f8880aa5c5727b5ca327ecf`，并补写第十一次变更记录（说明是依赖安全修复导致） |
+| 复跑自检 | ✅ `哈希校验通过（与 scripts/frontend-build.env 一致）` |
+| 产物变化量 | `web/public/defaultTheme` 431 个跟踪文件里 **116 个内容变化**；体积仍 7.2 M（未变） |
+| admin 入口 | `entry-index-BNk8udx-.js` → **`entry-index-Cuh5tdrm.js`**（部署后线上可验证） |
+| frontend `npm audit` | 仍为 **0** |
+
+#### b) 基础镜像 bookworm → trixie
+
+`deploy/Dockerfile.local`：`FROM debian:bookworm-slim` → `FROM debian@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad`（= `debian:13/trixie-slim`，钉 digest；附注释说明原因）。镜像体积 164 MB → **163 MB**。
+
+#### c) 镜像漏洞对照（`trivy image --severity HIGH,CRITICAL`）
+
+| 镜像 | 合计 | Go 依赖项 | OS 包项 | 有修复版本 |
+|---|---|---|---|---|
+| own.3（bookworm） | 59（HIGH 58 + CRITICAL 1） | 0 | 59 | 0 |
+| **own.4（trixie）** | **43（HIGH 43 + CRITICAL 0）** | **0** | 43 | **0** |
+| 裸 `debian:trixie-slim`（对照） | 43 | — | 43 | 0 |
+| 裸 `debian:bookworm-slim`（对照） | 57 | — | 57 | 0 |
+
+**结论（关键）**：own.4 的 43 项与**裸 `debian:trixie-slim` 完全同源同数**（43 = 43），即全部来自 Debian 基础镜像本身，**每一个都没有 Debian 发布的修复版本**（`FixedVersion` 均为空）；我们的二进制与配置**没有引入任何额外漏洞**（Go 依赖项为 0）。CRITICAL 项已随 bookworm→trixie 归零。
+
+#### d) `trivy fs`（仓库文件系统）
+
+仍为 **2 项**：`braces@3.0.3`（CVE-2026-93687，HIGH，**上游无修复版本**），分别来自 `frontend/package-lock.json` 与 `themes/ink/bun.lock`。无新增。
+
+#### e) 部署 own.4
+
+备份（DB 在线 backup `/root/backups/komari-db-20261023142847.db`、inspect 快照、own.3 脚本）→
+`docker save | ssh docker load` → 新脚本 `deploy/komari-v0.0.24-own.4-listen-local.sh` 重建 →
+容器 `running`、`Restarts=0`、`/api/version` hash `fb9f973d…`（= 我方 HEAD）、端口 `127.0.0.1:25774`、
+nginx `/` 与 `/admin` 双次 200、**`/admin` 入口已变为 `entry-index-Cuh5tdrm.js`**、主题入口仍 `index-08OsQRET.js`、
+三处「本周期流量」不变、DB 周期增长且累计不回退、日志无异常。
