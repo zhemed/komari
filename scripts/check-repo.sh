@@ -52,6 +52,46 @@ elif [ "${README_VER}" = "${VER}" ]; then
 else
   bad "README 的当前版本声明是 ${README_VER}，与 version.env（${VER}）不一致"; ver_declare_ok=0
 fi
+# 判据 A（2026-10-23 加）：凡「当前 x.y.z」/「当前 **x.y.z**」形态的字面量都必须等于 ${VER}。
+# 起因：标题写「当前 0.0.22」、正文写「（当前 **0.0.20**）」，两种都不含「版本：」字样，
+# 上面那条 `**当前版本：\`x\`**` 校验一律漏网——实测漂了三个版本没人发现。
+cur_lits="$(grep -oE '当前 ([*]{2})?0\.0\.[0-9]+([*]{2})?' docs/MAINTAINING.md 2>/dev/null \
+  | grep -oE '0\.0\.[0-9]+' | sort -u || true)"
+if [ -z "${cur_lits}" ]; then
+  ok "MAINTAINING 里没有「当前 x.y.z」形态的字面量（本项无可核对）"
+else
+  bad_cur=""
+  for v in ${cur_lits}; do [ "${v}" = "${VER}" ] || bad_cur="${bad_cur} ${v}"; done
+  if [ -z "${bad_cur}" ]; then
+    ok "MAINTAINING 里「当前」口径的版本字面量 = ${VER}（$(printf '%s' "${cur_lits}" | tr '\n' ' ')）"
+  else
+    bad "MAINTAINING 里「当前」口径的版本字面量不是 ${VER}：${bad_cur}（当前版本口径要统一到 scripts/version.env）"
+    ver_declare_ok=0
+  fi
+fi
+# 判据 B（2026-10-23 加）：「已发布 `0.0.1`…`0.0.M`」的右端 M 必须是 ${VER} 的**上一个**版本
+# （本仓库逐版 +1，直接按 patch 段 -1 推算；末段为 0 时无法推算，跳过并提示，不硬算错。）
+pub_range="$(grep -oE '已发布 `0\.0\.[0-9]+`(…|\.\.\.)`0\.0\.[0-9]+`' docs/MAINTAINING.md 2>/dev/null | head -1 || true)"
+if [ -z "${pub_range}" ]; then
+  ok "MAINTAINING 里没有「已发布 `x`…`y`」区间字面量（本项无可核对）"
+else
+  pub_right="$(printf '%s' "${pub_range}" | sed -nE 's/.*`0\.0\.([0-9]+)`$/\1/p')"
+  ver_patch="${VER##*.}"
+  if ! printf '%s' "${ver_patch}" | grep -qE '^[0-9]+$'; then
+    bad "version.env 的版本号末段不是数字（${VER}），无法推算上一版（当前版本口径要统一到 scripts/version.env）"
+    ver_declare_ok=0
+  elif [ -z "${pub_right}" ]; then
+    bad "无法解析「已发布」区间右端：${pub_range}（当前版本口径要统一到 scripts/version.env）"
+    ver_declare_ok=0
+  elif [ "$((10#${ver_patch}))" -eq 0 ]; then
+    printf '  \033[33m·\033[0m %s\n' "提示：${VER} 末段为 0，无法推算「上一版」，跳过「已发布」区间右端核对"
+  elif [ "$((10#${pub_right}))" -eq "$((10#${ver_patch} - 1))" ]; then
+    ok "「已发布」区间右端 = ${VER%.*}.$((10#${ver_patch} - 1))（${VER} 的上一版）"
+  else
+    bad "「已发布」区间右端是 0.0.${pub_right}，应为 ${VER} 的上一版 ${VER%.*}.$((10#${ver_patch} - 1))（当前版本口径要统一到 scripts/version.env）"
+    ver_declare_ok=0
+  fi
+fi
 if [ "${ver_declare_ok}" = 1 ]; then
   ok "文档版本声明一致（不依赖 scripts/version.env 之外的写死值）"
 fi
