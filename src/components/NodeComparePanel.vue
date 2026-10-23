@@ -5,9 +5,10 @@ import { useStorageAsync } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { getTrafficPeriodText } from '@/constants/trafficPeriodText'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat } from '@/utils/helper'
-import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
+import { getDiskPercentage, getMemoryPercentage, getTrafficUsage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
 import { isNodeMatchSearch } from '@/utils/nodeSearch'
 import { formatPriceWithCycle, isFreePrice } from '@/utils/tagHelper'
 
@@ -66,11 +67,18 @@ const compareMetrics = computed<CompareMetric[]>(() => {
     { key: 'memory', label: '内存', value: node => `${formatBytes(node.ram || 0)} / ${formatBytes(node.mem_total || 0)}`, percentage: getMemoryPercentage },
     { key: 'disk', label: '磁盘', value: node => `${formatBytes(node.disk || 0)} / ${formatBytes(node.disk_total || 0)}`, percentage: getDiskPercentage },
     { key: 'network', label: '实时网络', value: node => `↑ ${formatSpeed(node.net_out || 0)}  ↓ ${formatSpeed(node.net_in || 0)}` },
-    { key: 'traffic', label: '累计流量', value: node => `${formatBytes(node.net_total_up || 0)} ↑ / ${formatBytes(node.net_total_down || 0)} ↓` },
+    { key: 'traffic', label: '累计流量（历史）', value: node => `${formatBytes(node.net_total_up || 0)} ↑ / ${formatBytes(node.net_total_down || 0)} ↓` },
     {
       key: 'trafficQuota',
       label: '流量配额',
-      value: node => hasTrafficLimit(node) ? `${formatBytes(getTrafficUsed(node))} / ${formatBytes(node.traffic_limit)}` : '无限',
+      value: (node) => {
+        if (!hasTrafficLimit(node))
+          return '无限'
+
+        const usage = getTrafficUsage(node)
+        const basis = usage.basis === 'period' ? `（${getTrafficPeriodText().period}）` : ''
+        return `${formatBytes(getTrafficUsed(node))} / ${formatBytes(node.traffic_limit)}${basis}`
+      },
       percentage: node => hasTrafficLimit(node) ? getTrafficUsedPercentage(node) : null,
     },
     { key: 'uptime', label: '运行时间', value: node => formatUptimeWithFormat(node.uptime || 0, 'day') },

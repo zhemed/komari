@@ -898,3 +898,14 @@
 - **地球呼吸留��**：`buildProjection` 的球体直径缩放系数由 `Math.min(width, height) / 2.05` 调整为 `/ 2.3`，球体半径整体缩小约 11%，外层卡片边框到球体轮廓之间留出更明显的空白边距，不再贴边。此调整同时影响地图态缩放（共用同一个 `scale`），但平面地图本身因宽高比差异已有留白，缩小无副作用。
 - 用 Playwright 截图（684×719，浅色）分别验证：① 地球默认视图——扫描线可见且随帧推进移动、球体与卡片边缘留白明显增加；② 地图视图——原先的多条横向杂线已完全消失，世界地图/网格/国界线/标记点清晰无遮挡。
 - `bun run lint`、`bun run build`（含 `vue-tsc --build` 类型检查）均通过；`tests/visual/visual.spec.ts` 全量回归 8 项中仅 1 项失败，且是上一条记录里提到的既有 `disk` 图标 data 属性缺口（`NodeCard.vue` 未改动，与本次 globe 修复无关），其余 7 项全部通过，未引入新回归。
+
+## 2026-10-23 · 流量口径切换到「本周期」（服务端自算周期）
+
+- **背景**：Komari 服务端 0.0.22 起下发 `net_period_up` / `net_period_down` / `period_started_at`（节点级 `traffic_reset_day` + `traffic_reset_timezone`），0.0.24 起管理端已切周期口径；本主题仍全部直取 `net_total_up/down`（累计），导致"配置了每月重置也看不到归零"。
+- **新增**：`src/utils/trafficPeriod.ts`（口径与数值的**单一真源** `resolveTrafficUsage`：`traffic_reset_day >= 1` 且有 `period_started_at` ⇒ 周期值，否则回落累计；另给 `basisSwitched` / 重置文案信息）、`src/constants/trafficPeriodText.ts`（最小双语表 zh-CN / en，语言取 `<html lang>`，未知回落 zh-CN）。
+- **改造**：`utils/nodeMetricsHelper.ts` 的 `getTrafficUsed` / `getTrafficUsedPercentage` 委托给解析器（新增 `getTrafficUsage`），所有调用点自动切口径；`stores/nodes.ts`（NodeData/StatusData + 默认值 + applyStatus/客户配置合并）与 `utils/rpc.ts`、`utils/api.ts` 补齐周期字段；`components/NodeCard.vue`、`components/NodeList.vue`、`components/NodeGeneralCards.vue`、`components/NodeComparePanel.vue`、`views/InstanceDetail.vue` 加口径标注（「本周期」/「累计（历史）」）、重置边界文案与「口径已切换」徽标；`TrafficProgress` 改为接收已解析口径的上行/下行值。
+- **未改**（有意）：`LoadChart.vue` 与 `services/history.service.ts` 的历史曲线仍是累计语义（图表本身标注「累计上传/下载」），不在本次口径切换范围。
+- **自检**：`bun scripts/check-traffic-period.ts`（仓库无测试框架，故为独立脚本而非 bun test/vitest）——**29 项断言全通过**，覆盖①配置周期（含 Asia/Shanghai 重置文案、百分比按周期 0.404% 而非累计 49.95%）、①-b 累计超额触发「口径已切换」、②未配置周期回落累计、③`period_started_at` 无效按 0、④NaN/负数/Infinity 兜底、⑤`limit_type` 组合、⑥双语文案表。
+- **验证**：`bun run lint` 通过（0 error）；`bun run build` 通过（`vue-tsc --build` 类型检查 + vite build），产物 `dist/` + `ink-build-a706123.zip`（3.58 MB，构建后已随提交更新为新的短 SHA）。
+- **部署状态**：**尚未部署**。产物与当前线上主题（137 的 `data/theme/ink/`，v0.6.14）相比：728 个文件不变、29 个旧产物被替换、30 个新产物；未触及 `komari-theme.json` 版本号（本地产物，未发 release）。
+- **风险**：口径切换会让「已用/限额」从累计值（约 49.9%）变为周期值（约 0.4%），属预期；若节点未配置周期则行为与改动前一致。

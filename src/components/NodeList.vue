@@ -11,11 +11,12 @@ import { DataTooltip } from '@/components/ui/data-tooltip'
 import { FlagIcon } from '@/components/ui/flag-icon'
 import { ProgressThin } from '@/components/ui/progress-thin'
 import { useNodeProviderMetadata } from '@/composables/useNodeProviderMetadata'
+import { formatResetNote, getTrafficPeriodText } from '@/constants/trafficPeriodText'
 import { UI_CONFIG } from '@/constants/ui'
 import { useAppStore } from '@/stores/app'
 import { formatCityNameZh } from '@/utils/cityNameHelper'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
-import { getRealtimeTotalSpeed, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
+import { getRealtimeTotalSpeed, getTrafficUsage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
 import { getOSImage, getOSName } from '@/utils/osImageHelper'
 import { getRegionDisplayName, hasRegion } from '@/utils/regionHelper'
 import { formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, parseTags } from '@/utils/tagHelper'
@@ -25,17 +26,6 @@ interface ColumnConfig {
   label: string
   width: string | number
   sortable: boolean
-}
-
-interface NodeMetadataItem {
-  key: string
-  value: string
-  title?: string
-  icon?: string
-  region?: string
-  variant?: 'secondary' | 'outline'
-  class?: string
-  style?: CSSProperties
 }
 
 const props = defineProps<{
@@ -49,6 +39,17 @@ const emit = defineEmits<{
   click: [node: NodeData]
   pingClick: [node: NodeData]
 }>()
+
+interface NodeMetadataItem {
+  key: string
+  value: string
+  title?: string
+  icon?: string
+  region?: string
+  variant?: 'secondary' | 'outline'
+  class?: string
+  style?: CSSProperties
+}
 
 const rowStaggerMs = UI_CONFIG.motion.staggerMs
 const rowStaggerLimit = UI_CONFIG.motion.staggerLimit
@@ -194,6 +195,22 @@ const nodeRowsContainerBind = computed(() => {
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
 const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, 'hour')
+
+/** 流量口径工具：列表内所有流量展示都走这里（周期优先、回落累计） */
+function trafficUsageFor(node: NodeData) {
+  return getTrafficUsage(node)
+}
+
+function trafficTooltip(node: NodeData): string {
+  const usage = trafficUsageFor(node)
+  const text = getTrafficPeriodText()
+  const lines = usage.basis === 'period'
+    ? [`${text.period}：↑ ${formatBytes(usage.usedUp)} / ↓ ${formatBytes(usage.usedDown)}`, `${text.cumulative}：↑ ${formatBytes(usage.totalUp)} / ↓ ${formatBytes(usage.totalDown)}`]
+    : [`↑ ${formatBytes(usage.totalUp)}`, `↓ ${formatBytes(usage.totalDown)}`]
+  if (usage.periodMode)
+    lines.push(formatResetNote(usage.resetDay, usage.resetTimezone))
+  return lines.filter(Boolean).join('\n')
+}
 
 const columnKeys = computed(() => columns.value.map(c => c.key))
 
@@ -641,7 +658,7 @@ function buildNodeMetadataItems(node: NodeData): NodeMetadataItem[] {
                 <div
                   v-else-if="col.key === 'traffic'"
                   class="group min-w-0"
-                  :title="`↑ ${formatBytes(node.net_total_up ?? 0)}\n↓ ${formatBytes(node.net_total_down ?? 0)}`"
+                  :title="trafficTooltip(node)"
                 >
                   <div class="space-y-1 w-full">
                     <div class="text-[11px] font-medium text-foreground/75 truncate">
@@ -655,7 +672,7 @@ function buildNodeMetadataItems(node: NodeData): NodeMetadataItem[] {
                       </span>
                     </div>
                     <TrafficProgress
-                      :upload="node.net_total_up ?? 0" :download="node.net_total_down ?? 0"
+                      :upload="trafficUsageFor(node).usedUp" :download="trafficUsageFor(node).usedDown"
                       :traffic-limit="node.traffic_limit" :traffic-limit-type="(node.traffic_limit_type || 'sum')"
                       height="4px"
                     />

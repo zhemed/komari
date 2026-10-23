@@ -41,6 +41,10 @@ export interface NodeData {
   hidden: boolean
   traffic_limit: number
   traffic_limit_type: TrafficLimitType
+  /** 每月重置日（0/未配置 = 关闭周期；1..31 = 该日 00:00 归零） */
+  traffic_reset_day?: number
+  /** 周期时区（IANA 名称，空 = UTC） */
+  traffic_reset_timezone?: string
   created_at: string
   updated_at: string
   // Status 信息
@@ -59,6 +63,11 @@ export interface NodeData {
   net_out: number
   net_total_up: number
   net_total_down: number
+  /** 服务端自算的「本周期」用量（0.0.22 起下发） */
+  net_period_up?: number
+  net_period_down?: number
+  /** 本周期起点（ISO 串）；缺失/无效 = 周期尚未开始 */
+  period_started_at?: string | null
   traffic_up?: number
   traffic_down?: number
   process: number
@@ -89,6 +98,11 @@ interface StatusData {
   net_out: number
   net_total_up: number
   net_total_down: number
+  /** 服务端自算的「本周期」用量（0.0.22 起下发） */
+  net_period_up?: number
+  net_period_down?: number
+  /** 本周期起点（ISO 串）；缺失/无效 = 周期尚未开始 */
+  period_started_at?: string | null
   traffic_up?: number
   traffic_down?: number
   process: number
@@ -197,6 +211,8 @@ const useNodesStore = defineStore('nodes', () => {
       hidden: client.hidden,
       traffic_limit: client.traffic_limit,
       traffic_limit_type: client.traffic_limit_type as TrafficLimitType,
+      traffic_reset_day: client.traffic_reset_day,
+      traffic_reset_timezone: client.traffic_reset_timezone,
       created_at: client.created_at,
       updated_at: client.updated_at,
       // Status 默认值
@@ -215,6 +231,9 @@ const useNodesStore = defineStore('nodes', () => {
       net_out: 0,
       net_total_up: 0,
       net_total_down: 0,
+      net_period_up: 0,
+      net_period_down: 0,
+      period_started_at: null,
       traffic_up: 0,
       traffic_down: 0,
       process: 0,
@@ -263,6 +282,13 @@ const useNodesStore = defineStore('nodes', () => {
       node.net_total_up = status.net_total_up
     if (node.net_total_down !== status.net_total_down)
       node.net_total_down = status.net_total_down
+    // 周期口径字段：服务端 0.0.22 起下发；缺失时保持 undefined（由口径判定回落累计）
+    if (node.net_period_up !== status.net_period_up)
+      node.net_period_up = status.net_period_up
+    if (node.net_period_down !== status.net_period_down)
+      node.net_period_down = status.net_period_down
+    if (node.period_started_at !== status.period_started_at)
+      node.period_started_at = status.period_started_at
     if (node.traffic_up !== status.traffic_up)
       node.traffic_up = status.traffic_up
     if (node.traffic_down !== status.traffic_down)
@@ -351,6 +377,10 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_limit = client.traffic_limit
     if (node.traffic_limit_type !== client.traffic_limit_type)
       node.traffic_limit_type = client.traffic_limit_type as TrafficLimitType
+    if (node.traffic_reset_day !== client.traffic_reset_day)
+      node.traffic_reset_day = client.traffic_reset_day
+    if (node.traffic_reset_timezone !== client.traffic_reset_timezone)
+      node.traffic_reset_timezone = client.traffic_reset_timezone
     if (node.created_at !== client.created_at)
       node.created_at = client.created_at
     if (node.updated_at !== client.updated_at)

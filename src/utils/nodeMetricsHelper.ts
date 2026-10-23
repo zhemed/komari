@@ -1,5 +1,7 @@
 import type { NodeData } from '@/stores/nodes'
+import type { TrafficUsage } from '@/utils/trafficPeriod'
 import { getDaysUntilExpired } from '@/utils/tagHelper'
+import { resolveTrafficUsage } from '@/utils/trafficPeriod'
 
 export interface TopNodeMetric {
   node: NodeData
@@ -16,24 +18,52 @@ export function hasTrafficLimit(node: Pick<NodeData, 'traffic_limit'>): boolean 
   return (node.traffic_limit || 0) > 0
 }
 
-export function getTrafficUsed(node: Pick<NodeData, 'net_total_up' | 'net_total_down' | 'traffic_limit_type'>): number {
-  const { net_total_up = 0, net_total_down = 0, traffic_limit_type } = node
+/** 参与流量口径判定的字段集合（配置 + 实时状态） */
+export type TrafficUsageSource = Pick<NodeData, | 'traffic_limit'
+  | 'traffic_limit_type'
+  | 'traffic_reset_day'
+  | 'traffic_reset_timezone'
+  | 'net_total_up'
+  | 'net_total_down'
+  | 'net_period_up'
+  | 'net_period_down'
+  | 'period_started_at'>
 
-  switch (traffic_limit_type) {
-    case 'up': return net_total_up
-    case 'down': return net_total_down
-    case 'min': return Math.min(net_total_up, net_total_down)
-    case 'max': return Math.max(net_total_up, net_total_down)
-    case 'sum':
-    default: return net_total_up + net_total_down
-  }
+/**
+ * 流量口径与数值的**单一真源**：所有展示流量的地方都走这里，不要各算一遍。
+ * - 配置了周期（`traffic_reset_day >= 1`）且周期已开始 ⇒ 周期值；
+ * - 否则回落累计值。
+ * 具体语义见 `@/utils/trafficPeriod`。
+ */
+export function getTrafficUsage(node: TrafficUsageSource): TrafficUsage {
+  return resolveTrafficUsage(
+    {
+      traffic_reset_day: node.traffic_reset_day,
+      traffic_reset_timezone: node.traffic_reset_timezone,
+      traffic_limit: node.traffic_limit,
+      traffic_limit_type: node.traffic_limit_type,
+    },
+    {
+      net_total_up: node.net_total_up,
+      net_total_down: node.net_total_down,
+      net_period_up: node.net_period_up,
+      net_period_down: node.net_period_down,
+      period_started_at: node.period_started_at,
+    },
+  )
 }
 
-export function getTrafficUsedPercentage(node: Pick<NodeData, 'traffic_limit' | 'net_total_up' | 'net_total_down' | 'traffic_limit_type'>): number {
+/** 当前口径下的「已用」字节数（周期优先，回落累计） */
+export function getTrafficUsed(node: TrafficUsageSource): number {
+  return getTrafficUsage(node).usedBytes
+}
+
+/** 当前口径下的用量百分比（与 `getTrafficUsed` 同源） */
+export function getTrafficUsedPercentage(node: TrafficUsageSource): number {
   if (!hasTrafficLimit(node))
     return 0
 
-  return clampPercentage(getTrafficUsed(node) / node.traffic_limit * 100)
+  return clampPercentage(getTrafficUsage(node).percentage)
 }
 
 export function getRealtimeTotalSpeed(node: Pick<NodeData, 'net_in' | 'net_out'>): number {

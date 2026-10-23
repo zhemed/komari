@@ -83,6 +83,10 @@ export interface NodeInfo {
   hidden: boolean
   traffic_limit: number
   traffic_limit_type: string
+  /** 每月重置日（0/未配置 = 关闭周期；1..31 = 该日 00:00 归零） */
+  traffic_reset_day?: number
+  /** 周期时区（IANA 名称，空 = UTC） */
+  traffic_reset_timezone?: string
   created_at: string
   updated_at: string
 }
@@ -114,6 +118,11 @@ export interface RealtimeStatus {
     down: number
     totalUp: number
     totalDown: number
+    /** 本周期用量（服务端 0.0.22 起下发） */
+    periodUp?: number
+    periodDown?: number
+    /** 本周期起点；缺失/无效表示周期尚未开始 */
+    periodStartedAt?: string | null
   }
   connections: {
     tcp: number

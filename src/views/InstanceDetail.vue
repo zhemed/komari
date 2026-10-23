@@ -11,11 +11,12 @@ import { FlagIcon } from '@/components/ui/flag-icon'
 import { ProgressThin } from '@/components/ui/progress-thin'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNodeProviderMetadata } from '@/composables/useNodeProviderMetadata'
+import { formatResetNote, getTrafficPeriodText } from '@/constants/trafficPeriodText'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
 import { createLazyPanel } from '@/utils/lazyPanel'
-import { hasTrafficLimit as checkHasTrafficLimit, getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage } from '@/utils/nodeMetricsHelper'
+import { hasTrafficLimit as checkHasTrafficLimit, getDiskPercentage, getMemoryPercentage, getTrafficUsage, getTrafficUsed, getTrafficUsedPercentage } from '@/utils/nodeMetricsHelper'
 import { getOSImage, getOSName } from '@/utils/osImageHelper'
 import { hasRegion } from '@/utils/regionHelper'
 
@@ -132,6 +133,14 @@ const resourceMetrics = computed(() => {
   const diskPct = getDiskPercentage(node)
   const trafficPct = hasTrafficLimit.value ? getTrafficUsedPercentage(node) : 0
   const trafficUsedBytes = getTrafficUsed(node)
+  // 口径判定与数值同源（周期优先、回落累计），并给出标注与重置边界文案
+  const trafficUsage = getTrafficUsage(node)
+  const trafficText = getTrafficPeriodText()
+  const trafficResetNote = !trafficUsage.periodMode
+    ? ''
+    : trafficUsage.periodStarted
+      ? formatResetNote(trafficUsage.resetDay, trafficUsage.resetTimezone)
+      : trafficText.periodNotStarted
 
   interface ResourceMetric {
     key: string
@@ -141,6 +150,8 @@ const resourceMetrics = computed(() => {
     status: 'default' | 'info' | 'warning' | 'error'
     primaryText: string
     subText: string
+    /** 口径补充说明（如「每月 22 日 00:00（Asia/Shanghai）重置」） */
+    note?: string
   }
 
   const metrics: ResourceMetric[] = [
@@ -173,7 +184,7 @@ const resourceMetrics = computed(() => {
     },
     {
       key: 'traffic',
-      label: '流量',
+      label: trafficUsage.basis === 'period' ? `${trafficText.period}流量` : '流量',
       icon: METRIC_ICONS.traffic,
       percentage: trafficPct,
       status: trafficStatus.value,
@@ -181,6 +192,7 @@ const resourceMetrics = computed(() => {
       subText: hasTrafficLimit.value
         ? `${formatBytes(trafficUsedBytes)} / ${formatBytes(node.traffic_limit)}`
         : `已用 ${formatBytes(trafficUsedBytes)}`,
+      note: trafficResetNote || undefined,
     },
   ]
 
@@ -420,6 +432,9 @@ const deviceInfoFields = computed(() => {
             <ProgressThin :percentage="metric.percentage" :status="metric.status" :height="4" class="mt-2.5" />
             <div class="mt-1.5 truncate text-[11px] text-muted-foreground">
               {{ metric.subText }}
+            </div>
+            <div v-if="metric.note" class="mt-0.5 truncate text-[10px] text-muted-foreground/80">
+              {{ metric.note }}
             </div>
           </div>
         </div>

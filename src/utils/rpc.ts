@@ -104,6 +104,10 @@ export interface Client {
   hidden: boolean
   traffic_limit: number
   traffic_limit_type: string
+  /** 每月重置日（0/未配置 = 关闭周期；1..31 = 该日 00:00 归零） */
+  traffic_reset_day?: number
+  /** 周期时区（IANA 名称，空 = UTC） */
+  traffic_reset_timezone?: string
   created_at: string
   updated_at: string
 }
@@ -188,6 +192,11 @@ export interface NodeStatus {
   process: number
   connections: number
   connections_udp: number
+  /** 服务端自算的「本周期」用量（0.0.22 起下发；未配置周期时缺省/为 0） */
+  net_period_up?: number
+  net_period_down?: number
+  /** 本周期起点（ISO 串）；无效或缺失表示周期尚未开始 */
+  period_started_at?: string | null
   online: boolean
   uptime: number
   message?: string
