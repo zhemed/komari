@@ -20,11 +20,15 @@ CLI 绑定见 `cmd/root.go:39-40`（`--db-type` / `--database`，默认 `./data/
   - 首次见到节点用计数器做**基线**，不重复累加当次增量；
   - 增量可能为 0（计数器没变），此时跳过写库但**不要**把行删掉；
   - 读路径是内存快照（`GetAllTrafficTotals`），重启时由 `InitTrafficTotals()` 重新加载。
-  - **周期字段**（`PeriodUp` / `PeriodDown` / `PeriodStartedAt` / `NeedsRebaseline`，实现中）是**附加**口径，
+  - **周期字段**（`PeriodUp` / `PeriodDown` / `PeriodStartedAt` / `NeedsRebaseline`）是**附加**口径，
     不改变上面的累计语义。改这条链路必须保持的不变量：累计只增不回退；只有跨周期边界才归零周期值，
     计数器归零（重启/换机）不归零；再基线只更新基线、不加增量；`TrafficResetDay = 0`（禁用）时行为与
     改动前零差异。窗口计算与非法配置（越界/非法时区）**拒绝保存**的语义见
     `docs/MAINTAINING.md`「流量周期」。
+  - **出口与面板口径**（2026-10-23 起）：`getNodesLatestStatus` 必须继续输出 `net_period_up` /
+    `net_period_down` / `period_started_at`（面板「本周期」取它们），`net_total_up/down` 语义与取值不变；
+    面板与限额判定已切到周期值，未配置周期时回落累计（见 `docs/MAINTAINING.md`「面板口径」）。
+    改这条链路别只跑后端测试：口径是前后端契约，回归要用 `frontend/src/utils/trafficPeriod.ts` 对照。
   - 测试要求（`go test ./database/... -run Traffic`）：边界计算（UTC / Asia/Shanghai / 小月 31 日 / 跨年）；
     非法配置（`-1`、`32`、`Not/AZone`）报错且不落库；跨边界累加（周期归零、累计不回退）；
     计数器归零不归零周期；再基线（切换后首次 `delta = 0`）；禁用配置回归。
@@ -250,5 +254,7 @@ the administrator guide, rather than being changed during startup"）。
    新连接是可见的（SQLite 保证），所以正常情况下外部读不会落后。但升级重启过程中出现过
    `komari.db-wal` 被 unlink、进程仍持有其 fd 的偶发状态，此时外部读会停在升级前——
    **先重启一次服务端再判断**，别急着下"数据丢了"的结论（详见 `docs/MAINTAINING.md` §7）。
+   2026-10-23 又实测复现一次：**外部 sqlite 访问生产库后**要查 `/proc/<pid>/fd` 里是否出现 `(deleted)`，
+   有 ⇒ WAL 已孤儿化、外部读到的是冻结数据，且**只有重启才恢复**。
 2. **不要用 `cp` 直接拷 `komari.db` 当备份**：WAL 里的写入可能不在主文件里。
    面板的备份走 `VACUUM INTO`（`web/api/admin/download.go:119`）拿到一致性快照。

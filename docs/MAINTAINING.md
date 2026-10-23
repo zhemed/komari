@@ -354,7 +354,7 @@ metricstore 不反向依赖 `database/*`。
 
 ##### 流量周期（服务端算，2026-10-23 方案 B）
 
-**累计语义不变**：`client_traffic_totals` 仍跨重启只增；面板卡片与限额进度继续读它（**面板本轮不改**）。
+**累计语义不变**：`client_traffic_totals` 仍跨重启只增，并作为「累计（历史）」保留展示（面板展示口径见下）。
 周期值是**附加**产物，另存 `client_traffic_totals` 的 `PeriodUp` / `PeriodDown` / `PeriodStartedAt`：
 
 - 节点级配置：`TrafficResetDay`（`0` = 禁用；`1..31` = 每月重置日）与 `TrafficResetTimezone`
@@ -376,6 +376,24 @@ metricstore 不反向依赖 `database/*`。
 **改库与生效时机**：面板读的是内存缓存（`InitTrafficTotals` 启动时载入）。直接改库后，**下一次上报会把
 库中状态读回并回写缓存**，此时面板即与库一致；若该节点**不再上报**，则必须**重启服务端**才能生效。
 **升级/回滚**：新列由 AutoMigrate 追加，旧行零值即禁用（行为不变）；回滚 = 换回旧二进制，**不删列**。
+
+##### 面板口径：本周期 / 累计（2026-10-23 起改，前端 `f672d9f`）
+
+- 面板的「已用」取**本周期值**：卡片、节点详情、进度条、表格统一用 RPC `net_period_up` / `net_period_down` /
+  `period_started_at`；`net_total_up/down` 语义与取值**不变**，保留并标注「**累计（历史）**」。
+  周期模式还显示重置边界（`每月 N 日 00:00（时区）重置`）；`period_started_at` 为空 ⇒ 显示「本周期尚未开始」并按 0。
+- **限额判定同口径**：`traffic_limit` + `traffic_limit_type`（`sum`/`up`/`down`/`max`/`min`）现在组合的是
+  **周期值**；告警配色（`UsageBar`：60 橘 / 80 红）随周期百分比。
+- **未配置周期**（`traffic_reset_day = 0`，或服务端未给周期字段）⇒ **回落累计口径**，与升级前逐项一致
+  （同一公式、同一 `?? "sum"` 兜底、同一「未知类型 ⇒ 0%」；口径单一来源 `frontend/src/utils/trafficPeriod.ts`）。
+- **存量超额节点**（按累计已超额、按周期未超额）⇒ 以**周期**为准，卡片一次性显示「**口径已切换**」徽标
+  （`basisSwitched` 是派生值、不是持久状态；节点详情与表格不加此徽标）。
+- **仓库内没有流量「阻断」逻辑**：限额只影响 `UsageBar` 的 60/80 配色与百分比，不会停节点、停上报或限速——
+  别写成「超额会被断网/封禁」。
+- **改周期配置没有面板入口**：只能走 `admin:editClient`（`POST /api/admin/client/:uuid/edit`）或直接改库；
+  前端只**读** `traffic_reset_day` / `traffic_reset_timezone`。
+- **升级顺序**：`traffic_reset_day >= 1` 的节点若配的是**旧服务端**（不回 `period_*`），面板会显示
+  「本周期尚未开始」并按 0 ⇒ **先升服务端、再升前端产物**。
 
 ## 4. 与上游的解耦点
 
