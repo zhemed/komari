@@ -1,4 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue'
+import type { NodePingHistoryPoint } from '@/composables/useNodePingStats'
 import { computed, ref, toValue } from 'vue'
 import { useNodePingStats } from '@/composables/useNodePingStats'
 import { PING_SUMMARY_MAX_COUNT } from '@/constants/load'
@@ -20,6 +21,20 @@ export interface NodePingTaskLatencyItem {
   key: string
   valueText: string
   tooltip: string
+}
+
+// 首页卡片「按任务分行」的一行：左侧任务名（来自后台 ping 任务 name），
+// 右侧该任务自己的延迟/丢包，下方该任务自己的延迟历史点阵。
+// 行数据只做展示拼装，不改变跨任务聚合的既有导出（taskLatencyItems / latencyDisplay 等）。
+export interface NodePingRegionRow {
+  key: string
+  label: string
+  latencyText: string
+  lossText: string
+  lossApproximate: boolean
+  bars: NodePingBar[]
+  latencyTooltip: string
+  lossTooltip: string
 }
 
 const TASK_LATENCY_DISPLAY_LIMIT = 3
@@ -127,6 +142,49 @@ export function useNodePingDisplay(
     }))
   }
 
+  // 每任务历史点阵：复用全局色阶与既有 tooltip 口径（HH:mm:ss + ms），
+  // 不足 EMPTY_PING_BAR_COUNT 格时用灰色空格补齐，保证不同任务行点阵宽度一致。
+  function buildTaskHistoryBars(taskId: string, history: NodePingHistoryPoint[]): NodePingBar[] {
+    const bars = history.map((point, index) => {
+      const value = point.latency
+      const hasValue = typeof value === 'number' && Number.isFinite(value)
+
+      return {
+        key: `${taskId}-${point.time}-${index}`,
+        className: hasValue
+          ? getLatencyToneClass(value)
+          : 'bg-muted-foreground/15',
+        tooltip: hasValue
+          ? `${formatDateTime(point.time, 'HH:mm:ss')}\n${Math.round(value)} ms`
+          : `${formatDateTime(point.time, 'HH:mm:ss')}\n无采样数据`,
+      }
+    })
+
+    while (bars.length < EMPTY_PING_BAR_COUNT) {
+      bars.push({
+        key: `${taskId}-empty-${bars.length}`,
+        className: 'bg-muted-foreground/15',
+        tooltip: '无采样数据',
+      })
+    }
+
+    return bars
+  }
+
+  // 行顺序按 taskId 数字升序（线上任务 id 与后台 weight 顺序一致）；非数字 id 保持原相对顺序排到最后。
+  function getTaskOrderValue(taskId: string): number {
+    const numericTaskId = Number(taskId)
+    return Number.isFinite(numericTaskId) ? numericTaskId : Number.POSITIVE_INFINITY
+  }
+
+  function compareTaskId(left: string, right: string): number {
+    const leftValue = getTaskOrderValue(left)
+    const rightValue = getTaskOrderValue(right)
+    if (leftValue === rightValue)
+      return 0
+    return leftValue < rightValue ? -1 : 1
+  }
+
   const latencyBars = computed(() => buildPingBars('latency'))
   const lossBars = computed(() => buildPingBars('loss'))
   // 路由跳转/选中切换瞬间 enabled 变 false，会导致节点卡片 ping 数据被清空闪烁。
@@ -230,6 +288,47 @@ export function useNodePingDisplay(
   })
   const hasTaskLatencyItems = computed(() => taskLatencyItems.value.length > 0)
 
+  // 首页卡片按任务分行：最多 TASK_LATENCY_DISPLAY_LIMIT 行，按 taskId 数字升序（线上任务 id 即后台 weight 顺序）。
+  // 每行右侧是该任务自己的延迟/丢包，下方是该任务自己的延迟历史点阵（不足 20 格灰显补齐）。
+  const taskRegionRowsRaw = computed<NodePingRegionRow[]>(() => {
+    return [...pingStats.taskLatencies.value]
+      .sort((left, right) => compareTaskId(left.taskId, right.taskId))
+      .slice(0, TASK_LATENCY_DISPLAY_LIMIT)
+      .map((task) => {
+        const label = task.name?.trim() || `任务 ${task.taskId}`
+        const latencyText = typeof task.latency === 'number' && Number.isFinite(task.latency)
+          ? `${Math.round(task.latency)} ms`
+          : '--'
+        const loss = typeof task.loss === 'number' && Number.isFinite(task.loss) ? task.loss : null
+        // 与 PingChart 的任务统计口径一致：近似丢包率加 ≈ 标注；行内文本统一带「丢包 」前缀（对齐参考版式）。
+        const lossText = loss === null ? '-' : `丢包 ${task.lossApproximate ? '≈' : ''}${loss.toFixed(1)}%`
+
+        return {
+          key: task.taskId,
+          label,
+          latencyText,
+          lossText,
+          lossApproximate: task.lossApproximate === true,
+          bars: buildTaskHistoryBars(task.taskId, task.history ?? []),
+          latencyTooltip: `${label} ${latencyText}`,
+          lossTooltip: `${label} ${lossText}`,
+        }
+      })
+  })
+  // 与 lastTaskLatencyItems 同理：enabled 短暂变 false（如路由切换）时保留上一次的行数据，
+  // 避免整块列表闪成占位行；真正启用但确实没有任务数据时仍回到占位行。
+  const lastTaskRegionRows = ref<NodePingRegionRow[]>([])
+  const taskRegionRows = computed(() => {
+    if (taskRegionRowsRaw.value.length) {
+      lastTaskRegionRows.value = taskRegionRowsRaw.value
+      return taskRegionRowsRaw.value
+    }
+    return pingStatsEnabled.value ? [] : lastTaskRegionRows.value
+  })
+  const hasTaskRegionRows = computed(() => taskRegionRows.value.length > 0)
+  // 无任务级数据时的占位行点阵：沿用既有 loading / error / 未启用 的 tooltip 口径。
+  const taskRowPlaceholderBars = computed(() => buildEmptyPingBars('latency'))
+
   return {
     pingStats,
     pingStatsEnabled,
@@ -242,5 +341,8 @@ export function useNodePingDisplay(
     lossPanelTooltip,
     taskLatencyItems,
     hasTaskLatencyItems,
+    taskRegionRows,
+    hasTaskRegionRows,
+    taskRowPlaceholderBars,
   }
 }

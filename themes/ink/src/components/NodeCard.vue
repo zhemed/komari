@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { NodePingRegionRow } from '@/composables/useNodePingDisplay'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
@@ -80,20 +81,41 @@ const swapTooltip = computed(() => {
 const diskPercentage = computed(() => getDiskPercentage(props.node))
 const diskStatus = computed(() => getStatus(diskPercentage.value))
 
-// 直接复用 useNodePingDisplay 已有的真实历史采样点阵（latencyRenderBars/lossRenderBars）：
-// 每个色块对应一次真实 ping 采样，自带精确到秒的时间戳 + 数值 tooltip，5 档 signal 色阶
-// 已经过深浅色/色觉友好适配。避免另起一套「客户端累积近似历史 + 4 档色相」的展示，
-// 后者既没有真实时间戳，档位又粗，与列表视图（NodePingListCell）的展示语义不一致。
+// 直接复用 useNodePingDisplay 的按任务行数据（taskRegionRows）：每行 = 后台 ping 任务名
+// （如「地区+运营商」）+ 该任务自己的延迟/丢包 + 该任务自己的延迟历史点阵，整行点击打开监测弹窗。
+// 点阵沿用真实历史采样点（5 档 signal 色阶 + 色觉友好斜纹 + 精确到秒的 tooltip），与列表视图
+// （NodePingListCell）的展示语义一致，不另起一套近似历史。
 const {
   latencyDisplay,
   lossDisplay,
-  latencyRenderBars,
-  lossRenderBars,
-  latencyPanelTooltip,
-  lossPanelTooltip,
-  taskLatencyItems,
-  hasTaskLatencyItems,
+  taskRegionRows,
+  hasTaskRegionRows,
+  taskRowPlaceholderBars,
 } = useNodePingDisplay(() => props.node.uuid, { enabled: () => props.pingEnabled })
+
+// 有任务级数据时按任务分行；完全没有时保留一行占位（沿用 latencyDisplay/lossDisplay 的
+// 「加载中 / --」文本 + 空点阵），避免整块区域消失导致卡片高度/信息跳动。
+const pingRows = computed<NodePingRegionRow[]>(() => {
+  if (hasTaskRegionRows.value)
+    return taskRegionRows.value
+  return [{
+    key: 'ping-placeholder',
+    label: '',
+    latencyText: latencyDisplay.value,
+    lossText: lossDisplay.value,
+    lossApproximate: false,
+    bars: taskRowPlaceholderBars.value,
+    latencyTooltip: '',
+    lossTooltip: '',
+  }]
+})
+
+// 行可点击打开监测弹窗；带任务名时一并读出来，避免多行按钮的 aria-label 完全相同。
+function pingRowAriaLabel(row: NodePingRegionRow): string {
+  return row.label
+    ? `${props.node.name} ${row.label} 延迟与丢包监测`
+    : `${props.node.name} 延迟与丢包监测`
+}
 
 // 数值文字颜色与色块色阶保持同一套严重度阈值，仅在中高严重度提亮，常态仍为默认前景色
 function latencyTextClass(text: string): string {
@@ -107,7 +129,8 @@ function latencyTextClass(text: string): string {
   return 'text-foreground'
 }
 function lossTextClass(text: string): string {
-  const pct = Number.parseFloat(text)
+  // 行内丢包文本带「丢包 」前缀与「≈」近似标记，解析数值前先剥离，保证颜色阈值仍然生效。
+  const pct = Number.parseFloat(text.replace('丢包 ', '').replace('≈', ''))
   if (!Number.isFinite(pct))
     return 'text-foreground'
   if (pct > 9)
@@ -459,100 +482,42 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
         </div>
 
         <!--
-          三网：按 ping 任务分项展示延迟，不做跨任务平均。
-          后台可能只配置了 1 个任务，也可能配置了多个（如电信/联通/移动三网测速）——
-          这里最多取前 3 项，单任务节点这里就是一个数字、没有分隔点，多任务节点用 · 分隔。
-          只在存在任务级延迟数据时渲染，不占位、不影响其余节点的卡片高度。
-          纯数字展示，完整任务名放在 tooltip 里，悬浮查看对应线路。
+          按 ping 任务分行（任务名来自后台 ping 任务 name，如「地区+运营商」，不硬编码地区）：
+          每行 = 任务名 + 该任务延迟 ms + 该任务丢包% + 该任务自己的延迟历史点阵；
+          最多 3 行，按 taskId 数字升序。整行可点击打开监测弹窗；离线保留 blur/opacity。
+          没有任何任务级数据时保留一行占位（沿用 latencyDisplay/lossDisplay 的「加载中 / --」文本 + 空点阵），
+          避免整块区域消失导致卡片高度/信息跳动。
         -->
         <div
-          v-if="hasTaskLatencyItems"
-          class="flex items-center justify-between gap-2"
+          class="flex flex-col gap-0.5 rounded-lg bg-muted/50 p-1"
           :class="!props.node.online ? 'blur-xs opacity-50' : ''"
-          @click.stop
         >
-          <span class="text-xs font-normal text-muted-foreground">三网</span>
-          <div class="flex items-center gap-1 font-mono text-xs font-medium">
-            <template v-for="(item, index) in taskLatencyItems" :key="item.key">
-              <span v-if="index > 0" class="text-muted-foreground/50">·</span>
-              <DataTooltip :content="item.tooltip" placement="top" as="span" content-class="whitespace-nowrap">
-                <span :class="latencyTextClass(item.valueText)">{{ item.valueText }}</span>
-              </DataTooltip>
-            </template>
-          </div>
-        </div>
-
-        <!-- 延迟 + 丢包（真实历史采样点阵，与列表视图共用同一套展示逻辑，悬浮单格查看时间+数值） -->
-        <div class="grid grid-cols-2 gap-2">
           <div
-            class="group cursor-pointer rounded-lg bg-muted/50 p-2.5 transition-colors hover:bg-muted"
-            :class="!props.node.online ? 'blur-xs opacity-50' : ''"
+            v-for="row in pingRows"
+            :key="row.key"
+            class="group flex w-full min-w-0 cursor-pointer flex-col gap-0.5 rounded-md px-1 text-left transition-colors hover:bg-muted"
             role="button" tabindex="0"
-            :aria-label="`${props.node.name} 延迟与丢包监测`"
+            :aria-label="pingRowAriaLabel(row)"
             @click.stop="emit('pingClick')"
             @keydown.enter.stop.prevent="emit('pingClick')"
           >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-normal text-muted-foreground">延迟</span>
-              <DataTooltip
-                v-if="latencyPanelTooltip"
-                :content="latencyPanelTooltip"
-                placement="top"
-                as="span"
-                content-class="whitespace-nowrap"
-              >
-                <span class="font-mono text-xs font-bold" :class="latencyTextClass(latencyDisplay)">{{ latencyDisplay }}</span>
-              </DataTooltip>
-              <span v-else class="font-mono text-xs font-bold" :class="latencyTextClass(latencyDisplay)">{{ latencyDisplay }}</span>
+            <div class="flex min-w-0 items-center justify-between gap-2">
+              <span class="min-w-0 truncate text-xs text-muted-foreground">{{ row.label }}</span>
+              <span class="flex shrink-0 items-center gap-1.5 font-mono text-xs font-medium">
+                <DataTooltip :content="row.latencyTooltip" placement="top" as="span" content-class="whitespace-nowrap">
+                  <span :class="latencyTextClass(row.latencyText)">{{ row.latencyText }}</span>
+                </DataTooltip>
+                <DataTooltip :content="row.lossTooltip" placement="top" as="span" content-class="whitespace-nowrap">
+                  <span :class="lossTextClass(row.lossText)">{{ row.lossText }}</span>
+                </DataTooltip>
+              </span>
             </div>
             <div
-              class="mt-1 grid h-2.5 cursor-auto items-end gap-[1.5px] rounded-sm bg-muted/40 p-0.5"
-              :style="{ gridTemplateColumns: `repeat(${latencyRenderBars.length}, minmax(0, 1fr))` }"
+              class="grid h-2 cursor-auto items-end gap-[1.5px] rounded-sm bg-muted/40 p-0.5"
+              :style="{ gridTemplateColumns: `repeat(${row.bars.length}, minmax(0, 1fr))` }"
             >
               <DataTooltip
-                v-for="bar in latencyRenderBars"
-                :key="bar.key"
-                :content="bar.tooltip"
-                placement="top"
-                as="span"
-                class="h-full w-full"
-                content-class="whitespace-nowrap"
-              >
-                <span
-                  :aria-label="bar.tooltip"
-                  class="block h-full w-full rounded-[1px] transition-all group-hover:opacity-50 hover:scale-y-125 hover:opacity-100"
-                  :class="bar.className"
-                />
-              </DataTooltip>
-            </div>
-          </div>
-          <div
-            class="group cursor-pointer rounded-lg bg-muted/50 p-2.5 transition-colors hover:bg-muted"
-            :class="!props.node.online ? 'blur-xs opacity-50' : ''"
-            role="button" tabindex="0"
-            :aria-label="`${props.node.name} 丢包监测`"
-            @click.stop="emit('pingClick')"
-            @keydown.enter.stop.prevent="emit('pingClick')"
-          >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-normal text-muted-foreground">丢包</span>
-              <DataTooltip
-                v-if="lossPanelTooltip"
-                :content="lossPanelTooltip"
-                placement="top"
-                as="span"
-                content-class="whitespace-nowrap"
-              >
-                <span class="font-mono text-xs font-bold" :class="lossTextClass(lossDisplay)">{{ lossDisplay }}</span>
-              </DataTooltip>
-              <span v-else class="font-mono text-xs font-bold" :class="lossTextClass(lossDisplay)">{{ lossDisplay }}</span>
-            </div>
-            <div
-              class="mt-1 grid h-2.5 cursor-auto items-end gap-[1.5px] rounded-sm bg-muted/40 p-0.5"
-              :style="{ gridTemplateColumns: `repeat(${lossRenderBars.length}, minmax(0, 1fr))` }"
-            >
-              <DataTooltip
-                v-for="bar in lossRenderBars"
+                v-for="bar in row.bars"
                 :key="bar.key"
                 :content="bar.tooltip"
                 placement="top"
