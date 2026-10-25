@@ -2,7 +2,7 @@
 
 ## 主题（themes/ink）
 
-- 版本号 **由我们自己的 1.x 线管理，当前 `1.0.1`**。
+- 版本号 **由我们自己的 1.x 线管理，当前 `1.0.2`**。
 - **与上游 ink 的 0.6.x 无关**：上游 `jacob-bytes/komari-theme-ink` 0.6.14 只是我们这份代码的历史起点；
   从 0.0.1 起由本仓库单独发版、单独修复，不再跟随上游语义或版本号。
 - **唯一版本源**：`themes/ink/komari-theme.json` 的 `version` 字段。
@@ -30,7 +30,7 @@
 
 ## Git tag 约定（本地打并 push 到 origin，2026-10-25 起）
 
-- 主题：`theme-ink/v1.0.1`
+- 主题：`theme-ink/v1.0.2`
 - 服务端：`server/v0.0.24-own.1`
 - 一个可部署组合 = 主题 tag + 服务端 tag，记录在 `ops-dist/BUILD-INFO.txt`。
 
