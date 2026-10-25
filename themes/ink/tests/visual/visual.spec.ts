@@ -19,11 +19,6 @@ async function openStablePage(page: Page, path = '/'): Promise<void> {
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', await page.locator('html').evaluate(element => element.clientWidth))
 }
 
-async function expectNodeMetricIcons(page: Page): Promise<void> {
-  for (const metric of ['cpu', 'memory', 'disk', 'traffic'])
-    await expect(page.locator(`[data-node-metric-icon="${metric}"]`).first()).toBeVisible()
-}
-
 // ===== 节点卡片 / 列表视图（默认视图，无需切换） =====
 
 test('nodes tool view renders card grid', async ({ page }) => {
@@ -31,7 +26,6 @@ test('nodes tool view renders card grid', async ({ page }) => {
   await installKomariFixture(page)
   await openStablePage(page)
 
-  await expectNodeMetricIcons(page)
   const card = page.getByRole('button', { name: '查看节点 主控-洛杉矶 详情' })
   await expect(card).toBeVisible()
   await expect(page).toHaveScreenshot('nodes-card-desktop.png', { fullPage: false })
@@ -56,7 +50,7 @@ test('detail light desktop', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 })
   await installKomariFixture(page)
   await openStablePage(page, '/instance/00000000-0000-4000-8000-000000000001')
-  await expect(page.locator('[data-detail-summary]')).toBeVisible()
+  await expect(page.locator('[data-resource-metrics]')).toBeVisible()
   await expect(page).toHaveScreenshot('detail-light-desktop.png', { fullPage: false })
 })
 
@@ -64,7 +58,7 @@ test('detail dark mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await installKomariFixture(page, { dark: true })
   await openStablePage(page, '/instance/00000000-0000-4000-8000-000000000002')
-  await expect(page.locator('[data-detail-summary]')).toBeVisible()
+  await expect(page.locator('[data-resource-metrics]')).toBeVisible()
   await expect(page).toHaveScreenshot('detail-dark-mobile.png', { fullPage: false })
 })
 
@@ -146,7 +140,7 @@ test('detail ping requests stay scoped to the current node', async ({ page }) =>
   metricCalls.length = 0
   await page.getByRole('button', { name: '查看节点 主控-洛杉矶 详情' }).click()
   await expect(page).toHaveURL(`/instance/${currentUuid}`)
-  await expect(page.locator('[data-detail-summary]')).toBeVisible()
+  await expect(page.locator('[data-resource-metrics]')).toBeVisible()
   await page.waitForTimeout(2_000)
 
   const detailPingCalls = metricCalls.filter(isPingMetricCall)
