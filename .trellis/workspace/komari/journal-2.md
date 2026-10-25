@@ -369,3 +369,40 @@
 ### Next Steps
 
 - 后续（不在本任务）：更新 3 张视觉快照；评估防「后台更新/市场」覆盖主题的加固（改 manifest url 等）需另立任务
+
+
+## Session 71: 独立维护加固：ink 1.0.0 防后台覆盖 + 视觉快照/测试修复 + 部署 1.0.0 + push
+<!-- trellis-session: v=2 fp=e4b2f73ab718d069 -->
+
+**Date**: 2026-10-25
+**Task**: 独立维护加固：ink 1.0.0 防后台覆盖 + 视觉快照/测试修复 + 部署 1.0.0 + push
+**Branch**: `main`
+
+### Summary
+
+用户定调「独立维护」并要求维护三项遗留。①防覆盖：manifest version 0.0.2→1.0.0（高于官方市场 ink 0.6.14，市场前端 isVersionNewer 不再显示 Update）、url 置空（管理面板 UpdateTheme 在无 URL 且无请求参数时于 theme.go:614-617 提前 400，早于删目录，安全失败）；VERSION.md/INDEPENDENCE.md 同步 1.x 线与 tag push 新约定。②视觉快照：发现官方 visual.spec.ts 本就过期（[data-detail-summary] 已移除、默认档无 data-node-metric-icon），修复为 [data-resource-metrics] 并删除过期 helper；用临时 playwright 配置（chromium-1243 executablePath）跑官方套件 8/8 绿、--update-snapshots 0 重写；nodes-card-desktop 与 detail-dark-mobile 两张快照刷新，detail-light 逐像素未变。③部署+push：build.sh --skip-server 得 ink-build-774fe99.zip（包内 1.0.0、url 空、sha256 22d79303…），tag theme-ink/v1.0.0，deploy-theme.sh dry-run→正式部署（备份 theme-ink-0.0.2_20261025035409.tgz，759 条目）→ 线上 1.0.0/url 空/入口 index-D5CgwLuC.js/容器未重启/站点 200；git push origin main + theme-ink/v0.0.2 + theme-ink/v1.0.0 一次成功（2c235d0..774fe99），ls-remote 核对一致。
+
+### Main Changes
+
+- themes/ink/komari-theme.json：version 1.0.0、url 空；ops-docs/VERSION.md、INDEPENDENCE.md 同步 1.x 线与防覆盖说明、tag push 约定；tests/visual/visual.spec.ts 过期断言修复；2 张快照 PNG 刷新
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `774fe99` | chore(theme): 独立维护加固——ink 升 1.0.0、manifest 清空上游 url、视觉快照与过期断言修复 [task:10-25-theme-independent-hardening] |
+
+### Testing
+
+- [OK] [OK] 官方视觉套件 8/8 passed（Lead 复跑）；--update-snapshots 0 张重写
+- [OK] [OK] type-check + vite build 通过；zip 内 manifest=1.0.0、url=""、sidecar sha256 一致
+- [OK] [OK] 部署后线上 manifest=1.0.0/url=""、入口 index-D5CgwLuC.js、容器 Restarts=0/StartedAt 未变、/api/version 0.0.24、站点 / 与 /admin 200
+- [OK] [OK] push：main 2c235d0..774fe99，新 tag theme-ink/v0.0.2 与 theme-ink/v1.0.0，ls-remote 与本地一致
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选项（需授权）：视觉测试接入 CI（固定浏览器版本）；后台「主题→更新」安全失败与市场无 Update 的人工点验；agent 侧沿用上游暂不动

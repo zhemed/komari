@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 70
+- **Total Sessions**: 71
 - **Last Active**: 2026-10-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~371 | Active |
+| `journal-2.md` | ~408 | Active |
 | `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 71 | 2026-10-25 | 独立维护加固：ink 1.0.0 防后台覆盖 + 视觉快照/测试修复 + 部署 1.0.0 + push | `774fe99` | `main` |
 | 70 | 2026-10-25 | 发布 ink 主题 0.0.2：按 ping 任务分行版式（构建 + 部署，未 push） | `570b6ec` | `main` |
 | 69 | 2026-10-25 | ink 主题本地小样：首页节点卡片按 ping 任务分行（延迟+丢包+历史条，未部署） | `8688155` | `main` |
 | 68 | 2026-10-23 | 面板口径加固：渲染层断言入库 + 接入自检第 16 项 | `edc174e` | `main` |
