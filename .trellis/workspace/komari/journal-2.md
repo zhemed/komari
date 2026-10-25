@@ -446,3 +446,41 @@
 ### Next Steps
 
 - 人工（需登录管理端）：主题「更新」应下载自有最新版、主题市场只显示自有目录；内核默认常量待下次内核构建生效（本实例已由 DB 配置生效）
+
+
+## Session 73: ink 1.0.2：元信息自有化（author=zhemed）+ 新预览图 + catalog 修正，发布并部署
+<!-- trellis-session: v=2 fp=93a3817e37bfb2ac -->
+
+**Date**: 2026-10-25
+**Task**: ink 1.0.2：元信息自有化（author=zhemed）+ 新预览图 + catalog 修正，发布并部署
+**Branch**: `main`
+
+### Summary
+
+用户看市场截图后要求「还是改一下吧」：ink 在市场里仍显示上游作者 jacob-bytes、预览图是旧版 UI。落地：①manifest author→zhemed、version 1.0.2；②用当前版式重新生成 themes/ink/docs/preview.png（1280x720，mock 数据单卡展示新任务分行），构建打包；③自有 catalog 修正：版本 1.0.2、preview 路径改为实际存在的 themes/ink/docs/preview.png（原路径 404）、sha256 回填新资产 d908b923…；④VERSION.md/README.md 当前版本同步 1.0.2。构建 ink-build-08196e4.zip（3712782B，sha256 d908b923…，包内 1.0.2/author=zhemed/url 自有）→ tag theme-ink/v1.0.2 → 滚动 release theme-latest 覆盖（prerelease，资产 sha 与 catalog 一致）→ 部署线上（备份 theme-ink-1.0.1_20261025042012.tgz）→ 核对线上 manifest author=zhemed/version=1.0.2、容器未重启、站点 200。提交 08196e4/459afd8 与 tag 已 push。
+
+### Main Changes
+
+- themes/ink/komari-theme.json（author/version）；themes/ink/docs/preview.png（新 UI 预览）；deploy/theme-market/v1.json（1.0.2 + preview 路径 + sha）；ops-docs/VERSION.md、README.md
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `08196e4` | fix(theme): 元信息自有化（author=zhemed）与新版预览图，版本 1.0.2 [task:10-25-theme-owner-metadata-impl] |
+| `459afd8` | fix(theme): 自有 catalog 更新为 1.0.2（作者/预览路径/sha256） [task:10-25-theme-owner-metadata-impl] |
+
+### Testing
+
+- [OK] [OK] build.sh --skip-server：包内 1.0.2/author=zhemed；sha256 d908b923…；资产公网下载校验一致
+- [OK] [OK] catalog raw 200：版本 1.0.2、author=zhemed、preview URL 200（新版预览）、sha 与资产一致
+- [OK] [OK] 部署后：线上 manifest author=zhemed/version=1.0.2/url 自有；容器 Restarts=0/StartedAt 未变；/api/version 0.0.24；站点 200
+- [OK] [OK] push main（2b2496f..08196e4..459afd8）与 tag theme-ink/v1.0.2，ls-remote 一致
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 人工（管理端）：市场页强刷/等 10 分钟缓存后应只显示「自维护」源、ink 1.0.2、作者 zhemed、新预览图
