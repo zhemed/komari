@@ -78,3 +78,34 @@ git -c core.hooksPath=.githooks commit -m "… [task:<slug>]"
 ```
 
 - 闸门对子会话（teammate）并不总是豁免，遇到拒绝不要用 `--no-verify` 绕过（会被审计抓出），按上面两条处理。
+
+### 3. 主题发版：滚动更新通道 + 自有市场目录（2026-10-25 起）
+
+主题发版除构建/部署外，还需同步**自有更新通道**与**自有市场目录**：
+
+```bash
+# 1) 改 themes/ink/komari-theme.json 的 version（并确认 url 指向 theme-latest 资产）
+#    先提交，再构建：保证 zip 名与代码提交一致（构建不可复现，部署固定同一 zip）
+cd /root/ssh/komari-src && ./build.sh --skip-server --skip-install
+
+# 2) 取产物：ops-dist/theme/ink-build-<sha>.zip（+ .sha256）
+
+# 3) 覆盖滚动 release（tag 固定 theme-latest；必须 --prerelease）
+mkdir -p /tmp/ink-release && cp ops-dist/theme/ink-build-*.zip /tmp/ink-release/ink-theme.zip
+cp ops-dist/theme/ink-build-*.zip.sha256 /tmp/ink-release/ink-theme.zip.sha256
+gh release delete theme-latest --cleanup-tag -y || true
+gh release create theme-latest --prerelease \
+  --title 'ink theme rolling latest' \
+  --notes '自维护 ink 主题滚动发布通道：供面板「主题→更新」与自有主题市场下载最新版。' \
+  --target main /tmp/ink-release/ink-theme.zip /tmp/ink-release/ink-theme.zip.sha256
+
+# 4) 把该 zip 的 sha256 回填到 deploy/theme-market/v1.json 并提交
+
+# 5) 按 ops-docs/DEPLOY.md 部署主题；实例 configs.theme_market_sources 指向本仓 catalog
+```
+
+注意：
+- 滚动 release 资产名固定 `ink-theme.zip`（manifest 与 catalog 都引用稳定 URL）。
+- **不得把 theme-latest 改成正式 release**：会被 Komari 内核自升级误判为新版本（prerelease 才被过滤）。
+- `deploy/theme-market/v1.json` 是自有市场目录；`web/api/admin/theme_market.go` 的
+  `defaultThemeMarketURL` 默认指向它（内核重建后对未保存配置的实例生效）。

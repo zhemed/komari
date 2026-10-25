@@ -45,7 +45,7 @@ docker run -d --name komari-agent --restart always \
 
 | 路径 | 内容 |
 |---|---|
-| `themes/ink/` | 自维护的 ink 状态页主题源码（**版本线 0.0.1**，与上游主题 0.6.x 无关） |
+| `themes/ink/` | 自维护的 ink 状态页主题源码（**版本线 1.x，当前 1.0.1**；更新通道与市场目录均指向本仓，与上游主题 0.6.x 无关） |
 | `deploy/` | 部署脚本：`deploy-theme.sh`（静态部署，支持 `--dry-run`）、版本化启动脚本、`Dockerfile.local` |
 | `ops-docs/` | 构建 / 部署 / 回滚 / 版本规则说明 |
 | `build.sh` | 一键构建：内核二进制 + 本地镜像 + 主题 zip（含 sha256） |
@@ -54,7 +54,8 @@ docker run -d --name komari-agent --restart always \
 
 - **内核代码路径保持与上游一致**，以便持续 merge 上游更新；自维护内容集中在上述新目录；
 - 主题版本以 `themes/ink/komari-theme.json` 为唯一版本源；
+- **主题更新/市场源均指向本仓**：更新走滚动 release `theme-latest` 资产 `ink-theme.zip`；市场目录为 `deploy/theme-market/v1.json`（实例配置与内核默认源都指向其 raw URL），不再引用上游目录；
 - 构建产物（`bin/`、`ops-dist/`、`themes/ink/dist`、`themes/ink/node_modules`）一律不入库；
 - 详细规则见 `ops-docs/VERSION.md`、`ops-docs/BUILD.md`、`ops-docs/DEPLOY.md`、`ops-docs/ROLLBACK.md`。
 - **动本仓前先看** `ops-docs/BUILD.md` 末尾「运维经验」：① GitHub 推送首推常 408，需 HTTP/1.1 + 单线程并预期重试；② 提交必须带 `[task:<slug>]`（全局钩子更严时用 `git -c core.hooksPath=.githooks` 单次覆盖）。
-- **权威来源**：本仓即我们自维护的权威来源（内核 + 主题 0.0.1 + 部署/构建脚本）；主题不再跟随任何上游，可选的内核上游同步流程见 `ops-docs/VERSION.md`。
+- **权威来源**：本仓即我们自维护的权威来源（内核 + 主题 1.x + 部署/构建脚本）；主题不再跟随任何上游，可选的内核上游同步流程见 `ops-docs/VERSION.md`。

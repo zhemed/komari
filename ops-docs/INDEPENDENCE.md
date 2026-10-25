@@ -21,7 +21,7 @@
 |---|---|---|---|
 | 内核（`server`） | `0.0.24+own.N` | 前缀（`0.0.24`）**是我们最后一次对齐的上游版本**，用于追溯基线；`N` 是自维护迭代号，从 1 起递增 | `server/v0.0.24-own.N` |
 | Docker 镜像 tag | `komari-own:0.0.24-own.N` | tag 不允许 `+`，故用 `-` 代替语义版本的元数据分隔符 | — |
-| 主题（`themes/ink`） | `1.x` | 完全自有线，**与上游主题 0.6.x 无语义关系**（0.6.14 只是历史起点）；1.0.0 起为独立维护线，manifest `url` 置空以防后台「更新」覆盖（见 `VERSION.md`） | `theme-ink/v1.x` |
+| 主题（`themes/ink`） | `1.x` | 完全自有线，**与上游主题 0.6.x 无语义关系**（0.6.14 只是历史起点）；1.0.0 起独立维护，更新通道（滚动 release `theme-latest`）与市场目录（`deploy/theme-market/v1.json`）均由本仓提供（见 `VERSION.md`） | `theme-ink/v1.x` |
 
 发布动作（每次发版固定四步）：改版本源（内核 `scripts/version.env` / 主题 `themes/ink/komari-theme.json`）→
 `./build.sh` → 打标签 → 按 `ops-docs/DEPLOY.md` 部署并验证。

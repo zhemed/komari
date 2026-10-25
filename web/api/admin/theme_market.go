@@ -22,7 +22,8 @@ import (
 )
 
 const (
-	defaultThemeMarketURL = "https://raw.githubusercontent.com/komari-monitor/theme-market/main/v1.json"
+	// 自维护（2026-10-25 起）：默认市场源指向本仓自有 catalog，不再跟随上游 komari-monitor/theme-market。
+	defaultThemeMarketURL = "https://raw.githubusercontent.com/zhemed/komari/main/deploy/theme-market/v1.json"
 	marketCatalogMaxSize  = 2 << 20
 	marketPackageMaxSize  = 100 << 20
 	marketCacheTTL        = 10 * time.Minute

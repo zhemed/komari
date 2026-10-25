@@ -2,19 +2,23 @@
 
 ## 主题（themes/ink）
 
-- 版本号 **由我们自己的 1.x 线管理，当前 `1.0.0`**。
+- 版本号 **由我们自己的 1.x 线管理，当前 `1.0.1`**。
 - **与上游 ink 的 0.6.x 无关**：上游 `jacob-bytes/komari-theme-ink` 0.6.14 只是我们这份代码的历史起点；
   从 0.0.1 起由本仓库单独发版、单独修复，不再跟随上游语义或版本号。
 - **唯一版本源**：`themes/ink/komari-theme.json` 的 `version` 字段。
   > 说明：上游仓库规则明确「不要给 package.json 加顶层 version」（见 `themes/ink/AGENTS.md`），
   > 因此本仓库沿用该规则，**只改 manifest**；不新增 package.json 版本字段以免破坏上游构建/发布契约。
-- 发版动作：改 manifest 的 `version` → `./build.sh` → 得到 `ops-dist/theme/ink-build-<sha>.zip` 与 `.sha256` → 部署。
-- **防后台覆盖（2026-10-25）**：
-  - manifest `url` 置空 → 管理面板「主题→更新」无原始 URL 可下载，安全失败、不会覆盖；
-  - 版本号 1.0.0 高于官方主题市场的 ink 0.6.14（市场只读本地 manifest 版本比较），市场卡片不再显示 Update；
-  - 结论：不要用面板「更新」/市场安装覆盖本主题；后续版本只需在 1.x 线继续递增。
-  > 实现依据：`web/api/admin/theme.go` 的更新流程只有拿到 themeData 后才会调 `extractAndValidateTheme`
-  > （该函数才会删除旧主题目录）；无 URL 时提前安全失败。
+- **更新通道（自有，2026-10-25 起）**：manifest `url` 指向本仓滚动发布资产
+  `https://github.com/zhemed/komari/releases/download/theme-latest/ink-theme.zip`；
+  release tag `theme-latest` **必须标 prerelease**，每次主题发版覆盖上传 `ink-theme.zip` + `.sha256`。
+  面板「主题→更新」从我们自己的仓库下载最新主题包（不再引用上游）。
+  > prerelease 是硬约束：Komari 自升级（`internal/upgrade.StableReleases` 与前端更新提示）只认非 prerelease，
+  > 主题通道若标成正式 release 会被误判为内核新版本。
+- **发行方式**：改 manifest 版本 → 提交 → `./build.sh --skip-server --skip-install` →
+  覆盖滚动 release（资产名固定 `ink-theme.zip`）→ 回填 `deploy/theme-market/v1.json` 的 sha256（提交）→ 部署。
+- **主题市场（自有目录）**：`deploy/theme-market/v1.json` 是本仓自有 catalog；实例配置
+  `configs.theme_market_sources` 指向其 raw URL，内核默认值 `web/api/admin/theme_market.go` 的
+  `defaultThemeMarketURL` 同为此地址；官方目录不再使用。
 
 ## 服务端（本仓库内核部分）
 
@@ -26,7 +30,7 @@
 
 ## Git tag 约定（本地打并 push 到 origin，2026-10-25 起）
 
-- 主题：`theme-ink/v1.0.0`
+- 主题：`theme-ink/v1.0.1`
 - 服务端：`server/v0.0.24-own.1`
 - 一个可部署组合 = 主题 tag + 服务端 tag，记录在 `ops-dist/BUILD-INFO.txt`。
 
