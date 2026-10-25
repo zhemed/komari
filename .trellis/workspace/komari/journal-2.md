@@ -333,3 +333,39 @@
 ### Next Steps
 
 - 待用户审阅截图：确认版式后决定是否更新视觉快照、bump manifest 与部署（部署需另行授权）
+
+
+## Session 70: 发布 ink 主题 0.0.2：按 ping 任务分行版式（构建 + 部署，未 push）
+<!-- trellis-session: v=2 fp=b91596a99ea56fa3 -->
+
+**Date**: 2026-10-25
+**Task**: 发布 ink 主题 0.0.2：按 ping 任务分行版式（构建 + 部署，未 push）
+**Branch**: `main`
+
+### Summary
+
+按主仓任务 10-25-theme-release-versioning 的用户授权（选择「发主题 0.0.2 并部署」）：manifest 0.0.1→0.0.2、同步 VERSION.md → 提交 570b6ec → ./build.sh --skip-server --skip-install 构建出 ops-dist/theme/ink-build-570b6ec.zip（sha256 1bc49901…，包内 manifest 0.0.2，zip 名与 HEAD 一致）→ 本地 annotated tag theme-ink/v0.0.2 → deploy-theme.sh --dry-run → 正式部署到唯一服务器（备份 theme-ink-0.0.1_20261025031052.tgz，759 条目；解包 767，替换后 759 文件）。未重建 Komari 服务端/镜像/容器，未 push。
+
+### Main Changes
+
+- themes/ink/komari-theme.json version 0.0.1→0.0.2；ops-docs/VERSION.md 当前版本同步 0.0.2；主题产物 ops-dist/theme/ink-build-570b6ec.zip（+sha256、BUILD-INFO）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `570b6ec` | chore(theme): 发布 ink 主题 0.0.2（首页节点卡片按 ping 任务分行） [task:10-25-theme-002-release] |
+
+### Testing
+
+- [OK] [OK] build.sh --skip-server --skip-install：type-check + vite build 通过；包内 manifest=0.0.2；sidecar sha256 一致
+- [OK] [OK] dry-run 计划正常；正式部署完成：上传→远端 sha256 一致→备份 759 条目→解包 767→manifest 0.0.2
+- [OK] [OK] 部署后只读核对：主题入口 index-08OsQRET.js → index-CwsnpWBc.js；容器 Restarts=0、StartedAt 未变；/api/version 仍 0.0.24+own.4；站点 / 与 /admin 均 200；真实页面 3 行版式正常
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 后续（不在本任务）：更新 3 张视觉快照；评估防「后台更新/市场」覆盖主题的加固（改 manifest url 等）需另立任务
