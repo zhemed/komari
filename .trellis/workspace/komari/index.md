@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 71
+- **Total Sessions**: 72
 - **Last Active**: 2026-10-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~408 | Active |
+| `journal-2.md` | ~448 | Active |
 | `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 72 | 2026-10-25 | 治本：ink 更新源与主题市场源改自有仓库（1.0.1 发布 + 实例市场源切换 + push） | `376c48e`, `99b03b1` | `main` |
 | 71 | 2026-10-25 | 独立维护加固：ink 1.0.0 防后台覆盖 + 视觉快照/测试修复 + 部署 1.0.0 + push | `774fe99` | `main` |
 | 70 | 2026-10-25 | 发布 ink 主题 0.0.2：按 ping 任务分行版式（构建 + 部署，未 push） | `570b6ec` | `main` |
 | 69 | 2026-10-25 | ink 主题本地小样：首页节点卡片按 ping 任务分行（延迟+丢包+历史条，未部署） | `8688155` | `main` |

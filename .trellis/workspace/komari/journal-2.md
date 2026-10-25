@@ -406,3 +406,43 @@
 ### Next Steps
 
 - 可选项（需授权）：视觉测试接入 CI（固定浏览器版本）；后台「主题→更新」安全失败与市场无 Update 的人工点验；agent 侧沿用上游暂不动
+
+
+## Session 72: 治本：ink 更新源与主题市场源改自有仓库（1.0.1 发布 + 实例市场源切换 + push）
+<!-- trellis-session: v=2 fp=6291e48ecbbfafd3 -->
+
+**Date**: 2026-10-25
+**Task**: 治本：ink 更新源与主题市场源改自有仓库（1.0.1 发布 + 实例市场源切换 + push）
+**Branch**: `main`
+
+### Summary
+
+用户不接受「url 置空 + 版本压制」的界面级加固，要求把主题更新与市场源改为自有仓库。落地：①manifest version 1.0.0→1.0.1、url → 自有滚动 release 资产 https://github.com/zhemed/komari/releases/download/theme-latest/ink-theme.zip（tag theme-latest，prerelease，资产名固定 ink-theme.zip，避免污染内核自升级检测）；②新增 deploy/theme-market/v1.json 自有 catalog（ink 1.0.1，sha256=资产实算）；③内核默认市场源 defaultThemeMarketURL 改为自有 catalog raw URL（go build 通过，未重建容器）；④文档 VERSION.md/INDEPENDENCE.md/README.md/BUILD.md 同步。构建 ink-build-376c48e.zip（3755251B，sha256 eeca9836…，包内 1.0.1），打 tag theme-ink/v1.0.1，发布滚动 prerelease 并公开下载校验 sha 一致；提交 376c48e（代码/文档）与 99b03b1（catalog），push main+tag 一次成功。
+
+### Main Changes
+
+- themes/ink/komari-theme.json（1.0.1 + 自有 release url）；deploy/theme-market/v1.json（新增）；web/api/admin/theme_market.go（默认市场源）；ops-docs/VERSION.md、INDEPENDENCE.md、BUILD.md、README.md
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `376c48e` | feat(theme): 主题更新与市场源改为自有仓库（manifest 1.0.1 + 内核默认市场源） [task:10-25-theme-own-repo-impl] |
+| `99b03b1` | feat(theme): 新增自有主题市场目录（catalog ink 1.0.1 + 滚动资产 sha256） [task:10-25-theme-own-repo-impl] |
+
+### Testing
+
+- [OK] [OK] go build ./web/api/admin 通过；gofmt 无差异
+- [OK] [OK] build.sh --skip-server 通过：包内 manifest 1.0.1、url 自有 release；sha256 eeca9836…
+- [OK] [OK] 滚动 release theme-latest：prerelease=true、资产 ink-theme.zip（sha 与 catalog 一致），公网下载校验一致
+- [OK] [OK] 部署主题 1.0.1（备份 theme-ink-1.0.0_20261025040618.tgz）；线上 manifest 1.0.1/url 自有；容器 Restarts=0；站点 200
+- [OK] [OK] 实例 configs.theme_market_sources 已切自有 catalog（先备份 DB）；服务器拉取 catalog 200 + 资产 sha 校验一致
+- [OK] [OK] push main（3cc324c..376c48e..99b03b1）与 tag theme-ink/v1.0.1，ls-remote 核对一致
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 人工（需登录管理端）：主题「更新」应下载自有最新版、主题市场只显示自有目录；内核默认常量待下次内核构建生效（本实例已由 DB 配置生效）
