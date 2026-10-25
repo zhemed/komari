@@ -298,3 +298,38 @@
 ### Next Steps
 
 - 可选：浏览器交互层（悬停气泡/移动端/暗色）用常驻 bw 做一次真实页面快照断言；esbuild 若不再被 vite 依赖需提升为 devDependency 并同步 lock
+
+
+## Session 69: ink 主题本地小样：首页节点卡片按 ping 任务分行（延迟+丢包+历史条，未部署）
+<!-- trellis-session: v=2 fp=ffe57a564bfc7dee -->
+
+**Date**: 2026-10-25
+**Task**: ink 主题本地小样：首页节点卡片按 ping 任务分行（延迟+丢包+历史条，未部署）
+**Branch**: `main`
+
+### Summary
+
+主仓任务 10-25-komari-theme-region-format 的本地小样：用户要求把「三网」行与延迟/丢包两聚合卡改成按 ping 任务分行（任务名+延迟 ms+丢包%+该任务 20 格延迟历史点阵），先看小样不部署。实现：useNodePingStats 增加每任务 loss/lossApproximate/history（metric+legacy 双路径，缓存 v10）、useNodePingDisplay 新增 NodePingRegionRow 行数据、NodeCard 用行列表替换旧版式；保留点击弹窗/离线态/色觉友好斜杠纹。type-check、eslint、build-only 通过；用 Playwright(chromium-1243 executablePath，环境无 1248 headless-shell) 渲染 mock 数据截图核对 comfortable/compact/cvf 三档。未部署、未改服务器。
+
+### Main Changes
+
+- themes/ink/src 3 文件：NodeCard.vue、useNodePingDisplay.ts、useNodePingStats.ts（+207/−111）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8688155` | feat(theme): 首页节点卡片按 ping 任务分行显示延迟/丢包/历史条（本地小样，未部署） [task:10-25-region-rows-prototype] |
+
+### Testing
+
+- [OK] bun run type-check 通过；bunx eslint 3 文件通过；bun run build-only 通过（4.3s）
+- [OK] Playwright 本地渲染截图：3 行任务名 + 延迟 + 丢包 + 每行历史点阵，comfortable/compact/cvf 均正常
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 待用户审阅截图：确认版式后决定是否更新视觉快照、bump manifest 与部署（部署需另行授权）

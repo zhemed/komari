@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 68
-- **Last Active**: 2026-10-23
+- **Total Sessions**: 69
+- **Last Active**: 2026-10-25
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~300 | Active |
+| `journal-2.md` | ~335 | Active |
 | `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 69 | 2026-10-25 | ink 主题本地小样：首页节点卡片按 ping 任务分行（延迟+丢包+历史条，未部署） | `8688155` | `main` |
 | 68 | 2026-10-23 | 面板口径加固：渲染层断言入库 + 接入自检第 16 项 | `edc174e` | `main` |
 | 67 | 2026-10-23 | 面板/限额口径切到周期值 + 流水线心跳与健壮性 → 0.0.24 | `2330f80` | `main` |
 | 66 | 2026-10-23 | 0.0.23 发布（WARN 去重）+ 收尾决策 | `267acbe` | `main` |
