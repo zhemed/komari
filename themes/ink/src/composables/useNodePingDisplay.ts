@@ -49,16 +49,19 @@ interface UseNodePingDisplayOptions {
 
 const EMPTY_PING_BAR_COUNT = 20
 
-function getLatencyToneClass(latency: number): string {
+// 延迟色阶（5 档 signal 色）。色觉友好模式下，历史条默认附加 ping-signal-pattern-* 纹理；
+// 三网行（每任务历史条）需要实线色块，用 options.pattern = false 关闭纹理（默认开启，保持原行为）。
+function getLatencyToneClass(latency: number, options: { pattern?: boolean } = {}): string {
+  const withPattern = options.pattern !== false
   if (latency <= 60)
     return 'bg-signal-1'
   if (latency <= 100)
     return 'bg-signal-2'
   if (latency <= 160)
-    return 'bg-signal-3 ping-signal-pattern-2'
+    return withPattern ? 'bg-signal-3 ping-signal-pattern-2' : 'bg-signal-3'
   if (latency <= 200)
-    return 'bg-signal-4 ping-signal-pattern-3'
-  return 'bg-signal-5 ping-signal-pattern-4'
+    return withPattern ? 'bg-signal-4 ping-signal-pattern-3' : 'bg-signal-4'
+  return withPattern ? 'bg-signal-5 ping-signal-pattern-4' : 'bg-signal-5'
 }
 
 function getLossToneClass(loss: number): string {
@@ -142,7 +145,7 @@ export function useNodePingDisplay(
     }))
   }
 
-  // 每任务历史点阵：复用全局色阶与既有 tooltip 口径（HH:mm:ss + ms），
+  // 每任务历史点阵（实线色块）：复用全局色阶与既有 tooltip 口径（HH:mm:ss + ms），
   // 不足 EMPTY_PING_BAR_COUNT 格时用灰色空格补齐，保证不同任务行点阵宽度一致。
   function buildTaskHistoryBars(taskId: string, history: NodePingHistoryPoint[]): NodePingBar[] {
     const bars = history.map((point, index) => {
@@ -151,8 +154,10 @@ export function useNodePingDisplay(
 
       return {
         key: `${taskId}-${point.time}-${index}`,
+        // 三网行历史条按用户要求使用实线色块（pattern: false 关闭色觉友好纹理）；
+        // 聚合条/图表仍由 buildPingBars 走默认色阶，保留纹理。
         className: hasValue
-          ? getLatencyToneClass(value)
+          ? getLatencyToneClass(value, { pattern: false })
           : 'bg-muted-foreground/15',
         tooltip: hasValue
           ? `${formatDateTime(point.time, 'HH:mm:ss')}\n${Math.round(value)} ms`

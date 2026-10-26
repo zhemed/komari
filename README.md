@@ -45,7 +45,7 @@ docker run -d --name komari-agent --restart always \
 
 | 路径 | 内容 |
 |---|---|
-| `themes/ink/` | 自维护的 ink 状态页主题源码（**版本线 1.x，当前 1.0.2**；更新通道与市场目录均指向本仓，与上游主题 0.6.x 无关） |
+| `themes/ink/` | 自维护的 ink 状态页主题源码（**版本线 1.x，当前 1.0.3**；更新通道与市场目录均指向本仓，与上游主题 0.6.x 无关） |
 | `deploy/` | 部署脚本：`deploy-theme.sh`（静态部署，支持 `--dry-run`）、版本化启动脚本、`Dockerfile.local` |
 | `ops-docs/` | 构建 / 部署 / 回滚 / 版本规则说明 |
 | `build.sh` | 一键构建：内核二进制 + 本地镜像 + 主题 zip（含 sha256） |
