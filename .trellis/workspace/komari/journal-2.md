@@ -484,3 +484,42 @@
 ### Next Steps
 
 - 人工（管理端）：市场页强刷/等 10 分钟缓存后应只显示「自维护」源、ink 1.0.2、作者 zhemed、新预览图
+
+
+## Session 74: ink 1.0.3：三网行历史条改为实线（保留其它色觉辅助纹理），发布并部署
+<!-- trellis-session: v=2 fp=c0dd1cc7e32f81f5 -->
+
+**Date**: 2026-10-26
+**Task**: ink 1.0.3：三网行历史条改为实线（保留其它色觉辅助纹理），发布并部署
+**Branch**: `main`
+
+### Summary
+
+用户要求三网行里移动的虚线改成和电信/联通一样的实线，并提醒核对字体。只读核对：真实面板三行字体一致（Inter 12/400 + 等宽 12/500）；纹理来自色觉友好模式的 ping-signal-pattern-*，三行都有（155ms pattern-2，171/183ms pattern-3）。按用户选择「只改三网行」实施：getLatencyToneClass 增加 {pattern} 选项，buildTaskHistoryBars 传 pattern:false；buildPingBars/聚合/列表/图表保持默认纹理。版本 1.0.3；构建 ink-build-c5fad21.zip（sha256 ac4ac76f…，包内 1.0.3）→ tag theme-ink/v1.0.3 → 滚动 release 覆盖并校验 sha → catalog 更新 1.0.3（bec6659）→ 部署（备份 theme-ink-1.0.2_20261026131047.tgz）。线上实测：三行 20 格均无 pattern 类、background-image none（实线）；字体与改前一致；列表视图仍有 22 个纹理元素（色觉辅助保留）；官方视觉套件 8/8 通过（标准模式快照未变）；容器未重启，站点 200。
+
+### Main Changes
+
+- themes/ink/src/composables/useNodePingDisplay.ts（色阶加 pattern 开关、三网行实线）；manifest 1.0.3；VERSION.md/README.md；deploy/theme-market/v1.json（1.0.3 + sha）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c5fad21` | feat(theme): 三网行历史条改为实线（保留其它色觉辅助纹理），版本 1.0.3 [task:10-26-ink-solid-rows-impl] |
+| `bec6659` | fix(theme): 自有 catalog 更新为 1.0.3（三网行实线） [task:10-26-ink-solid-rows-impl] |
+
+### Testing
+
+- [OK] [OK] type-check / eslint（无 --fix）/ build-only 通过
+- [OK] [OK] 线上 computed style：三行 patternClassCount=0、barBg=none；字体 label Inter 12/400、value mono 12/500 与改前一致
+- [OK] [OK] 列表视图仍有 22 个 repeating-linear-gradient 纹理元素（其它色觉辅助未被移除）
+- [OK] [OK] 官方视觉套件 8/8 passed（标准模式快照无变化）
+- [OK] [OK] 部署 1.0.3：远端 manifest 1.0.3/zhemed、容器 Restarts=0/StartedAt 未变、站点 200；滚动 release 与 catalog sha 一致
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 人工强刷面板确认三网行实线；如需回归可另立任务加色觉友好模式视觉用例

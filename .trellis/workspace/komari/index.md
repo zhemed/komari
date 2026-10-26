@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 73
-- **Last Active**: 2026-10-25
+- **Total Sessions**: 74
+- **Last Active**: 2026-10-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~486 | Active |
+| `journal-2.md` | ~525 | Active |
 | `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 74 | 2026-10-26 | ink 1.0.3：三网行历史条改为实线（保留其它色觉辅助纹理），发布并部署 | `c5fad21`, `bec6659` | `main` |
 | 73 | 2026-10-25 | ink 1.0.2：元信息自有化（author=zhemed）+ 新预览图 + catalog 修正，发布并部署 | `08196e4`, `459afd8` | `main` |
 | 72 | 2026-10-25 | 治本：ink 更新源与主题市场源改自有仓库（1.0.1 发布 + 实例市场源切换 + push） | `376c48e`, `99b03b1` | `main` |
 | 71 | 2026-10-25 | 独立维护加固：ink 1.0.0 防后台覆盖 + 视觉快照/测试修复 + 部署 1.0.0 + push | `774fe99` | `main` |
