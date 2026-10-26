@@ -1,17 +1,17 @@
 {
   "schema": 1,
-  "updated_at": "2026-10-25T04:19:30Z",
+  "updated_at": "2026-10-26T13:07:50Z",
   "themes": [
     {
       "name": "ink",
       "short": "ink",
       "description": "A minimal ink theme for Komari（自维护版本：首页节点卡片按 ping 任务分行显示延迟/丢包/历史条）",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "author": "zhemed",
       "url": "https://github.com/zhemed/komari/tree/main/themes/ink",
       "preview": "https://raw.githubusercontent.com/zhemed/komari/main/themes/ink/docs/preview.png",
       "download": "https://github.com/zhemed/komari/releases/download/theme-latest/ink-theme.zip",
-      "sha256": "d908b923b5736d142759d0652a55f52911910071402fba6e89f3eb4eea57ebdd"
+      "sha256": "ac4ac76ff43dab4e85ff214f1752e2af013487338d2d188bdf2317871cb1684d"
     }
   ]
 }
