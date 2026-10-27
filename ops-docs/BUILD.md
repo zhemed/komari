@@ -38,7 +38,7 @@
 体积略大、行为一致。若需要与官方一致的静态形态：
 
 ```bash
-cd server && KOMARI_STATIC=1 ./scripts/build-komari.sh   # 需 zig（未装则不静默降级，会明确报错）
+cd server && KOMARI_STATIC=1 ./scripts/build-komari.sh   # 需 zig（0.16.0 已解压于 .build/tools/；缺失时不静默降级，会明确报错）
 ```
 
 ## 运维经验（踩坑记录，照做即可）

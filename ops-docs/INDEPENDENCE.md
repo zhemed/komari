@@ -176,7 +176,7 @@ cd themes/ink && bun audit          # 本机 bun 1.4.2 已带该子命令
 ### 6.6 覆盖补齐（2026-10-23，trivy + frontend + agent）
 
 **新增工具**：`trivy v0.76.1`（GitHub release 二进制 → `/usr/local/bin/trivy`）；既有 `go1.26.10`、`govulncheck v1.9.0`、`bun 1.4.2`、`npm`。
-未装 `grype`/`syft`（trivy 已覆盖同类能力，避免重复）；未装 `zig`（本机走 glibc 构建路径，不需要 alpine 静态构建）。
+未装 `grype`/`syft`（trivy 已覆盖同类能力，避免重复）。`zig 0.16.0` 已解压到 `.build/tools/`（2026-10-27 发布 0.0.25 时引入，**仅发版静态构建用**；日常构建仍可走 glibc 路径，不需要它）。
 
 #### a) frontend（内核自带 React 管理端，npm 生态）
 
