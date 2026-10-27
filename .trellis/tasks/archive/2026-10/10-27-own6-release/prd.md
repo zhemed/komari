@@ -42,3 +42,14 @@ GitHub release `0.0.25` 18 个资产），主题 `1.0.4`（重建 admin-app + �
 - [ ] GitHub release 0.0.25 存在且 18 个资产齐全；`theme-latest` 资产更新；tag 全部推送。
 - [ ] 市场目录 v1.json 与发布资产 sha256 一致并已提交。
 - [ ] 工作区 CLEAN；journal + 任务归档完成。
+
+## 验收结果（2026-10-27 回填）
+
+- [x] 版本字面量一致：check-repo 第 1 项全绿（0.0.25 / own.6 / REPO_TAG / agent pin / 文档口径 / 已发布区间）。
+- [x] 产物：2 个静态服务端二进制 + `komari-SHA256SUMS`；14 平台 agent + `komari-agent-SHA256SUMS`；
+      主题 zip + sha256（见 `findings.md` 第三节）。
+- [x] `check-repo.sh --full` 16 项全部通过。
+- [x] ghcr 两套镜像 0.0.25 + latest 推送成功，匿名 manifest 200。
+- [x] GitHub Release `0.0.25`：18 资产齐全、Latest；`theme-latest` 资产更新（1.0.4）、市场目录 sha 一致。
+- [x] tag 推送：`0.0.25`、`server/v0.0.25-own.6`、`theme-ink/v1.0.4`、`theme-latest`。
+- [x] 工作区 CLEAN；journal + 任务归档完成（本任务）。

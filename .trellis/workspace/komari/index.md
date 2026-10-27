@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 76
+- **Total Sessions**: 77
 - **Last Active**: 2026-10-27
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~605 | Active |
+| `journal-2.md` | ~647 | Active |
 | `journal-1.md` | ~1963 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 77 | 2026-10-27 | 发版 0.0.25+own.6 与主题 1.0.4（移除远程控制后的正式发布） | `942bb4a`, `5c9142e`, `d4ab363` | `main` |
 | 76 | 2026-10-27 | 仓库自检既有失败清零：.env 出库、hooks 安装、Trellis 历史审计基线前移 | `c77bee4` | `main` |
 | 75 | 2026-10-27 | 移除 Web 终端与远程执行（WebSSH + RCE）：三层裁剪并部署 own.5 | `6fa338b`, `cdaa025` | `main` |
 | 74 | 2026-10-26 | ink 1.0.3：三网行历史条改为实线（保留其它色觉辅助纹理），发布并部署 | `c5fad21`, `bec6659` | `main` |

@@ -603,3 +603,45 @@
 ### Next Steps
 
 - 可选：跑 ./scripts/check-repo.sh --full 复核 Go/离线构建/agent 门禁；后续新提交仍受两仓闸门约束
+
+
+## Session 77: 发版 0.0.25+own.6 与主题 1.0.4（移除远程控制后的正式发布）
+<!-- trellis-session: v=2 fp=04695fb08d4a7d6c -->
+
+**Date**: 2026-10-27
+**Task**: 发版 0.0.25+own.6 与主题 1.0.4（移除远程控制后的正式发布）
+**Branch**: `main`
+
+### Summary
+
+按 VERSION.md/MAINTAINING §3.4 完成正式发行：版本线 0.0.24→0.0.25（own 计数连续为 own.6），同步 4 处面向用户字面量与 README/MAINTAINING/VERSION.md 口径；主题 1.0.3→1.0.4。构建：zig 0.16.0（官方 sha 校验）解压至 .build/tools；服务端静态 amd64/arm64 + komari-SHA256SUMS；agent 14 平台 + 校验和；主题 zip 3,612,364 bytes。发布前 check-repo --full 16 项全绿。推送：main d4ab363、tag 0.0.25/server/v0.0.25-own.6/theme-ink/v1.0.4、theme-latest 滚动 tag 前移；ghcr komari:0.0.25 与 komari-agent:0.0.25 多架构推送成功（匿名 manifest 200）。GitHub Release 0.0.25（Latest，18 资产，匿名下载校验和一致）；theme-latest prerelease 覆盖 ink-theme.zip + .sha256（sha=137a0d2f…）；市场目录 v1.json 更新 1.0.4 并推送。二进制 VersionHash=942bb4a，与 tag 一致（先提交后构建）。生产部署/DB 清理/浏览器验收由主仓任务记录。
+
+### Main Changes
+
+- 版本与文档：version.env 0.0.25/own.6、install-komari/install-agent(.ps1) 字面量、README/MAINTAINING/VERSION.md、主题 manifest 1.0.4
+- 构建产物：dist/komari-linux-{amd64,arm64}（静态）+ sums、dist/agent/*（14 平台）+ sums、ops-dist/theme/ink-build-942bb4a.zip
+- 新增 deploy/komari-v0.0.25-own.6-listen-local.sh（默认 IMAGE=ghcr.io/zhemed/komari:0.0.25）；DEPLOY.md 示例同步
+- 发布：tag 与 GitHub release 0.0.25（18 资产）；theme-latest 滚动资产更新；ghcr 两镜像推送
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `942bb4a` | chore(release): 版本线 0.0.24→0.0.25（own.6）与主题 1.0.4 [task:own6-release] |
+| `5c9142e` | chore(theme): 市场目录更新到 1.0.4（admin-app 同步移除远程控制入口） [task:own6-release] |
+| `d4ab363` | docs(release): 记录 zig 0.16.0 已装入 .build/tools（仅发版静态构建用） [task:own6-release] |
+
+### Testing
+
+- [OK] check-repo.sh --full：16 项全部通过（版本/闸门/Go 门禁/离线构建/agent 门禁/前端哈希等）
+- [OK] 匿名下载 komari-SHA256SUMS 与本地一致；匿名 ghcr manifest：komari/komari-agent 0.0.25 均 200
+- [OK] GitHub Release 0.0.25：18 资产、Latest；theme-latest：ink-theme.zip 3,612,364 bytes、sha256 与目录一致
+- [OK] 远端标签 SHA 核对通过；远端 main = d4ab363；二进制内 VersionHash=942bb4a
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 主仓继续：生产已部署 0.0.25 镜像 + agent 0.0.25 + 主题 1.0.4；浏览器验收与 DB 旧表清理记录见主仓任务
