@@ -1,6 +1,6 @@
-# 维护本仓库（komari 自维护版 · 当前 0.0.24）
+# 维护本仓库（komari 自维护版 · 当前 0.0.25）
 
-本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.24**），
+本仓库是由 **zhemed 独立维护的 komari 发行版**：版本线从 **0.0.1** 起步（当前 **0.0.25**），
 服务端、面板前端与 agent 的**源码都在本仓库内**，构建不克隆上游、可离线构建。
 上游 komari 只作为 1.4.3 的历史来源，**不是本仓库的发行方**。
 
@@ -16,11 +16,11 @@
 
 ## 1. 版本与固定点
 
-**当前版本：`0.0.24`**（唯一默认值在 `scripts/version.env`；发版时同步下表三处字面量）。
+**当前版本：`0.0.25`**（唯一默认值在 `scripts/version.env`；发版时同步下表三处字面量）。
 
 | 组件 | 固定值 | 说明 |
 |---|---|---|
-| 项目版本 | `0.0.24`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
+| 项目版本 | `0.0.25`（唯一默认值在 `scripts/version.env`） | 构建时由 `scripts/build-komari.sh` 以 ldflags 注入 `CurrentVersion`；agent 用同一版本号 |
 | 后端代码来源 | 上游 tag `1.4.3` → `bf6b45ec3abfc56bba5e9223650a47a72f665371` | 主干分支 `komari-1.4.3`（分支名保留历史来源，不代表版本号） |
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
@@ -36,8 +36,8 @@
 
 **发版本规则**：递增三段中的 patch 位（`0.0.2`、`0.0.3`…）。
 
-> **发版前先查"这个号发过没有"**：已发布 `0.0.1`…`0.0.23`（0.0.18 是 2026-09-20 重新构建的
-> 无 compose 版）；**本次发 `0.0.24`**（面板/限额口径切到服务端周期值 + 报告流水线心跳与批处理健壮性）。直接重发一个已存在的号会与线上
+> **发版前先查"这个号发过没有"**：已发布 `0.0.1`…`0.0.24`（0.0.18 是 2026-09-20 重新构建的
+> 无 compose 版）；**本次发 `0.0.25`**（彻底移除 Web 终端/远程执行（WebSSH + RCE）三侧能力；详见 §11.7 与 GitHub release notes）。直接重发一个已存在的号会与线上
 > tag/release 撞号或产出与已发布资产不一致的内容。
 > 查法：`gh release list -R zhemed/komari --limit 5` 与 `git tag --list | tail`。
 > 另注：已发布的 0.0.18 用的是**当时的** `install-komari.sh`（含后来被回滚的那套容器安装脚本与
@@ -752,7 +752,7 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
 - **不算损失**（我们这条血统根本调不到这些能力）：文件访问 `server/files.go`（1152 行）、
   终端会话重连、文件上传链路修复 —— 这三项是上游 1.5 线才引入的，本仓库的服务器与前端
   **从来没有**文件管理/文件读写功能；WebSSH 与远程执行在 1.4.3 血统里原本存在，
-  但已在 own.5 发行从服务器、前端、agent 三侧彻底移除（§11.7）。因此节点 root 二进制里
+  但已在 own.5 构建起（首个正式发版 `0.0.25-own.6`）从服务器、前端、agent 三侧彻底移除（§11.7）。因此节点 root 二进制里
   不再有任何终端与远程执行实现，攻击面更小。
 - **真实损失**：3 个检测修复（AMD GPU 在 `rocm-smi` 缺失时读 sysfs、Android FUSE 磁盘识别、
   macOS `nullfs` 去重）、安装脚本两处改进（无 bash 环境可装、snapshot 通道）。
@@ -772,14 +772,14 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
 这不是入侵痕迹，而是 agent 自己写的"你这台机器上远程控制是开着的"提示，内容说的就是
 WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没有**这段注入逻辑，
 只在 Web 终端的 shell 前置脚本里**读**一次 `/etc/motd`（`terminal/terminal_unix.go`）；
-该 `terminal` 包已在 own.5 发行整体删除（§11.7），own.5 及以后连这次读取也不再存在。
+该 `terminal` 包已在 own.5 构建起整体删除（§11.7），此后连这次读取也不再存在。
 
 排查这类提示的正确姿势：`journalctl -u komari-agent | grep -i "remote control"`，
 以及确认 agent 的启动日志里 `Github Repo:` 指向 `zhemed/komari`（不是上游仓库）。
 
-### 11.7 远程控制（WebSSH + 远程执行）已在 own.5 发行彻底移除
+### 11.7 远程控制（WebSSH + 远程执行）已彻底移除（own.5 起，首个正式发版 0.0.25-own.6）
 
-用户 2026-10-27 授权：own.5 发行（`0.0.24-own.5`）起，本仓库**不再包含任何远程控制能力**。
+用户 2026-10-27 授权：自 own.5 构建起（首个正式发版 `0.0.25-own.6`），本仓库**不再包含任何远程控制能力**。
 
 - **agent 侧**：删除 agent 的终端实现包（Unix PTY / Windows ConPTY 实现与 shell 前置脚本，原目录已删）、
   删除 `agent/server/task.go` 的远程执行实现（`NewTask` / `runTaskCommand` / `buildTaskCommand` /

@@ -23,8 +23,9 @@
 
 ```bash
 ./build.sh --skip-theme                                  # 产出本地镜像
-docker save komari-own:<版本>-own.1 | ssh <host> docker load
-ssh <host> 'bash -s' < deploy/komari-v0.0.24-own.1-listen-local.sh
+docker save komari-own:0.0.25-own.6 | ssh <host> docker load
+ssh <host> 'bash -s' < deploy/komari-v0.0.25-own.6-listen-local.sh
+# 或直接用已发布镜像：服务器上 docker pull ghcr.io/zhemed/komari:0.0.25 后执行同一启动脚本（脚本默认 IMAGE 即该 tag）
 ```
 
 启动脚本约定了三件事：`--restart always`、`--network host`、`KOMARI_LISTEN=127.0.0.1:25774`（可用环境变量覆盖）。
