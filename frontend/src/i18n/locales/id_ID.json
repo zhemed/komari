@@ -95,7 +95,6 @@
       "customColumns": "Kolom Kustom",
       "deleting": "Menghapus...",
       "disableAutoUpdate": "Nonaktifkan Pembaruan Otomatis",
-      "disableWebSsh": "Nonaktifkan Kontrol Jarak Jauh",
       "dragToReorder": "Tekan lama dan seret untuk mengurutkan ulang",
       "editNodePrice": "Ubah Harga",
       "emptyGuide": {
@@ -233,9 +232,6 @@
     "tomato": "Merah Tomat",
     "violet": "Violet",
     "yellow": "Kuning"
-  },
-  "command_clipboard": {
-    "title": "Papan Klip Perintah"
   },
   "dashboard": {
     "title": "Dasbor",
@@ -414,31 +410,6 @@
     "accept": "Saya telah membaca dan menyetujui",
     "reject": "Saya tidak menerima",
     "title": "Pemberitahuan Hukum dan Panduan Kepatuhan"
-  },
-  "exec": {
-    "allCompleted": "Semua tugas telah selesai dieksekusi",
-    "command": "Perintah",
-    "commandPlaceholder": "whoami (gunakan Shift+Enter untuk baris baru)",
-    "description": "Eksekusi perintah jarak jauh pada node yang dipilih",
-    "errors": {
-      "emptyCommand": "Perintah tidak boleh kosong.",
-      "executionFailed": "Eksekusi gagal",
-      "noNodes": "Silakan pilih minimal satu node."
-    },
-    "execute": "Eksekusi Jarak Jauh",
-    "executing": "Sedang mengeksekusi",
-    "pollingTimeout": "Waktu tunggu eksekusi tugas habis",
-    "results": "Hasil eksekusi",
-    "selectedNodes": "Node terpilih",
-    "selectNodes": "Pilih node tujuan",
-    "status": {
-      "polling": "Mengambil status eksekusi terbaru...",
-      "running": "Sedang berjalan",
-      "timeout": "Waktu habis"
-    },
-    "stopPolling": "Hentikan pemantauan",
-    "taskStarted": "Tugas telah dimulai.",
-    "title": "Eksekusi Jarak Jauh"
   },
   "go_to_home": "Kembali ke Beranda",
   "install": {
@@ -1147,36 +1118,11 @@
       "target": "Basis data tujuan",
       "target_description": "Gunakan SQLite lokal atau kirim data metrik ke MariaDB / MySQL / PostgreSQL jarak jauh.",
       "title": "Peningkatan basis data pemantauan"
-    },
-    "xtermjs": {
-      "convert_eol": "Konversi EOL",
-      "cursor_blink": "Kedip Kursor",
-      "custom_css": "CSS Kustom",
-      "custom_css_description": "Gunakan prefiks .terminal-page atau .terminal-xterm-host saat menulis aturan.",
-      "font_family": "Keluarga Font",
-      "font_size": "Ukuran Font",
-      "reset_defaults": "Pulihkan default lokal",
-      "scrollback": "Scrollback",
-      "terminal_padding": "Padding Terminal",
-      "theme_json": "JSON Tema",
-      "theme_json_description": "Hanya terminalOptions.theme yang diedit. Key yang tidak dikenal akan difilter saat disimpan.",
-      "theme_json_filtered": "JSON tema difilter",
-      "theme_json_invalid": "JSON tema tidak valid",
-      "theme_json_must_be_object": "JSON tema harus berupa objek JSON",
-      "title": "XtermJS",
-      "transparent_background": "Latar Transparan",
-      "transparent_hint": "Aktifkan transparansi hanya jika latar kontainer juga transparan.",
-      "transparent_theme_hint": "Latar tema masih opak. Gunakan rgba(...) atau hsla(...)."
     }
   },
   "status_settings": "Pengaturan Status",
   "system": {
     "title": "Sistem"
-  },
-  "terminal": {
-    "disconnect": "Terputus",
-    "no_active_connection": "Tidak ada koneksi aktif",
-    "title": "Terminal"
   },
   "theme": {
     "active": "Aktif",

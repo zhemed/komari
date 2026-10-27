@@ -95,7 +95,6 @@
       "customColumns": "Custom columns",
       "deleting": "Delete...",
       "disableAutoUpdate": "Disable auto update",
-      "disableWebSsh": "Disable remote control",
       "dragToReorder": "Long press and drag to reorder",
       "editNodePrice": "Edit Price",
       "emptyGuide": {
@@ -233,9 +232,6 @@
     "tomato": "Tomato",
     "violet": "Violet",
     "yellow": "Yellow"
-  },
-  "command_clipboard": {
-    "title": "Command Clipboard"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -414,31 +410,6 @@
     "accept": "I have read and accept",
     "reject": "I do not accept",
     "title": "Legal Notice and Compliance Guide"
-  },
-  "exec": {
-    "allCompleted": "All tasks executed successfully",
-    "command": "Execute command",
-    "commandPlaceholder": "whoami (use Shift+Enter to start a new line)",
-    "description": "Remotely execute commands on selected nodes",
-    "errors": {
-      "emptyCommand": "The command cannot be empty.",
-      "executionFailed": "Execution failed",
-      "noNodes": "Please select at least one node."
-    },
-    "execute": "Remote Exec",
-    "executing": "Executing",
-    "pollingTimeout": "Task execution timed out",
-    "results": "Execute result",
-    "selectedNodes": "Selected node",
-    "selectNodes": "Select target node",
-    "status": {
-      "polling": "Fetching the latest execution status...",
-      "running": "Running",
-      "timeout": "Timeout"
-    },
-    "stopPolling": "Stop polling",
-    "taskStarted": "The task has been initiated.",
-    "title": "Remote Exec"
   },
   "go_to_home": "Go to home",
   "install": {
@@ -1147,36 +1118,11 @@
       "target": "Target database",
       "target_description": "Use local SQLite or send metric data to remote MariaDB / MySQL / PostgreSQL.",
       "title": "Monitoring database upgrade"
-    },
-    "xtermjs": {
-      "convert_eol": "Convert EOL",
-      "cursor_blink": "Cursor Blink",
-      "custom_css": "Custom CSS",
-      "custom_css_description": "Prefer a .terminal-page or .terminal-xterm-host prefix when writing rules.",
-      "font_family": "Font Family",
-      "font_size": "Font Size",
-      "reset_defaults": "Restore local defaults",
-      "scrollback": "Scrollback",
-      "terminal_padding": "Terminal Padding",
-      "theme_json": "Theme JSON",
-      "theme_json_description": "Only terminalOptions.theme is edited. Unknown keys are filtered on save.",
-      "theme_json_filtered": "Theme JSON filtered",
-      "theme_json_invalid": "Invalid theme JSON",
-      "theme_json_must_be_object": "Theme JSON must be a JSON object",
-      "title": "XtermJS",
-      "transparent_background": "Transparent Background",
-      "transparent_hint": "Enable transparency only if the container background is also transparent.",
-      "transparent_theme_hint": "Theme background is still opaque. Use rgba(...) or hsla(...)."
     }
   },
   "status_settings": "Status Settings",
   "system": {
     "title": "System"
-  },
-  "terminal": {
-    "disconnect": "Disconnected",
-    "no_active_connection": "No active connection",
-    "title": "Terminal"
   },
   "theme": {
     "active": "Active",

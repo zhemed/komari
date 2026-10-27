@@ -54,13 +54,13 @@ Token string `json:"token,omitempty" gorm:"type:varchar(255);unique;not null"`
 既有约定：
 
 - 字符串**显式写长度**：`type:varchar(N)`；长文本 `type:longtext`；大整数 `type:bigint`；百分比 `type:decimal(5,2)`（`database/models/notification.go:21`）。
-- 主键：字符串用 `gorm:"primaryKey"`（`database/models/models.go:12`、`:49`）；整型用 `gorm:"primaryKey;autoIncrement"`（`database/models/log.go:6`、`database/models/clipboard.go:6`、`database/models/notification.go:17`、`database/models/pingTask.go:16`）。
+- 主键：字符串用 `gorm:"primaryKey"`（`database/models/models.go:12`、`:49`）；整型用 `gorm:"primaryKey;autoIncrement"`（`database/models/log.go:6`、`database/models/notification.go:17`、`database/models/pingTask.go:16`）。
 - 复合索引写成命名索引 + priority：`index:idx_logs_msg_type_time,priority:1`（`database/models/log.go:10`）与 `priority:2`（`database/models/log.go:11`）。
 - 默认值写在 **gorm tag**（数据库层默认），不只靠 Go 零值：`gorm:"default:false"`（`database/models/models.go:35`、`:40`）、`gorm:"type:varchar(20);default:'$'"`（`database/models/models.go:36`）、`gorm:"type:varchar(10);default:'max'"`（`database/models/models.go:42`）、`gorm:"type:boolean;default:false"`（`database/models/notification.go:9`）。
-- 外键在父结构体上声明子切片，子表反向引用同款 tag：`Sessions []Session `json:"sessions,omitempty" gorm:"foreignKey:UUID;references:UUID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"``（`database/models/models.go:55`；同类见 `database/models/pingTask.go:7`、`:9`、`database/models/task.go:9`、`database/models/notification.go:7`）。
-- 可空时间用 `*time.Time` + `gorm:"type:timestamp"`（`database/models/models.go:37`、`database/models/task.go:18`）。
+- 外键在父结构体上声明子切片，子表反向引用同款 tag：`Sessions []Session `json:"sessions,omitempty" gorm:"foreignKey:UUID;references:UUID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"``（`database/models/models.go:55`；同类见 `database/models/pingTask.go:7`、`:9`、`database/models/notification.go:7`）。
+- 可空时间用 `*time.Time` + `gorm:"type:timestamp"`（`database/models/models.go:37`）。
 - 列名与 json 键不一致时显式 `column:`：`DefaultOn bool `json:"default_on" gorm:"column:all_clients;not null;default:false"``（`database/models/pingTask.go:20`）——改列名时保持 json 键不变，前端契约不破。
-- 变长数组字段存 JSON 文本列：`Clients StringArray `json:"clients" gorm:"type:longtext"``（`database/models/pingTask.go:19`、`database/models/task.go:7`、`database/models/notification.go:19`）。
+- 变长数组字段存 JSON 文本列：`Clients StringArray `json:"clients" gorm:"type:longtext"``（`database/models/pingTask.go:19`、`database/models/notification.go:19`）。
 - 结构化配置同样存 JSON 字符串列：`Addition string `json:"addition" gorm:"type:longtext" default:"{}"``（`database/models/oauth.go:5`；通知系统的 `messageSender.go` 已在 0.0.3 删除）、`Data string `json:"data" gorm:"type:longtext" default:"{}"``（`database/models/theme.go:68`）。
 
 `TableName()` 全仓库**只有三处**（都在 configs 相关）：`internal/config/config.go:20-22` → `"configs"`、
@@ -73,15 +73,14 @@ Token string `json:"token,omitempty" gorm:"type:varchar(255);unique;not null"`
 
 ## 2. AutoMigrate 注册（`database/dbcore/dbcore.go`）
 
-三批调用，**容错强度不同**：
+两批调用，**容错强度不同**：
 
 | 批次 | 位置 | 行为 |
 |---|---|---|
-| 主批次 | `database/dbcore/dbcore.go:448-460` | 失败即 `return fmt.Errorf("failed to create tables: %w", err)`（`:461-463`） |
-| Session | `database/dbcore/dbcore.go:464-468` | 失败只记 `Errorf`，理由注释 "it may already exist" |
-| Task / TaskResult | `database/dbcore/dbcore.go:469-474` | 同上 |
+| 主批次 | `database/dbcore/dbcore.go:448-457` | 失败即 `return fmt.Errorf("failed to create tables: %w", err)`（`:458-460`） |
+| Session | `database/dbcore/dbcore.go:461-464` | 失败只记 `Errorf`，理由注释 "it may already exist" |
 
-主批次清单：`User`、`Client`、`Log`、`Clipboard`、`LoadNotification`、`OfflineNotification`、
+主批次清单：`User`、`Client`、`Log`、`LoadNotification`、`OfflineNotification`、
 `TrafficReportNotification`、`PingTask`、`OidcProvider`、`MessageSenderProvider`、`ThemeConfiguration`。
 
 **`Record` / `GPURecord` / `PingRecord` 已不在注册列表**，原因写在 `database/dbcore/dbcore.go:441-446`：
@@ -91,7 +90,7 @@ Token string `json:"token,omitempty" gorm:"type:varchar(255);unique;not null"`
 `configs` 表**不在这里**迁移，而是由 `config.SetDb` 自己 `AutoMigrate(&ConfigItem{})`
 （`internal/config/config.go:26-31`，失败直接 panic），唯一调用点是 `database/dbcore/dbcore.go:433`。
 
-新增一张表 → 建 `database/models/<name>.go` + 在 `database/dbcore/dbcore.go:448-460` 登记（见 `directory-structure.md` §4）。
+新增一张表 → 建 `database/models/<name>.go` + 在 `database/dbcore/dbcore.go:448-456` 登记（见 `directory-structure.md` §4）。
 
 ## 3. 启动顺序（`doInitialize`，`database/dbcore/dbcore.go:341-477`）
 

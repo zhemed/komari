@@ -59,7 +59,6 @@ const (
 	CustomBodyKey             = "custom_body"
 
 	UpdatedAtKey          = "updated_at"
-	XtermjsSettingsKey    = "xtermjs_settings"
 	ThemeMarketSourcesKey = "theme_market_sources"
 
 	// 面板一键升级（见 internal/upgrade）：开关与目标仓库用扁平的独立键，

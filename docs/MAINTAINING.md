@@ -420,8 +420,8 @@ metricstore 不反向依赖 `database/*`。
 |---|---|---|
 | `web/public/defaultTheme/` | vendor 进仓库 | 让后端无网络/无 Node 也可构建（见第 1 节） |
 | `web/public/.gitignore` | 取消忽略 `defaultTheme/*` | 上游默认忽略该注入目录，不改则 vendor 产物根本提交不进去 |
-| `frontend/`（源码内联） | 更新检查指向 `zhemed/komari`、构建时间可用 `SOURCE_DATE_EPOCH` 覆盖、删除插件系统、去掉非 HTTPS 告警横幅、删除通知系统、安装命令与镜像指向本仓库 | 这些原本是补丁 0001–0006，源码 vendor 化后**已内联进 `frontend/`**，见第 4 节与第 11 节 |
-| `agent/`（源码内联） | 自更新指向本仓库 + 资产过滤 + 容器内跳过 + 默认关自动更新 | 原本是 patches-agent 0001–0003，已内联进 `agent/`；理由见第 11 节（含实测证据） |
+| `frontend/`（源码内联） | 更新检查指向 `zhemed/komari`、构建时间可用 `SOURCE_DATE_EPOCH` 覆盖、删除插件系统、去掉非 HTTPS 告警横幅、删除通知系统、安装命令与镜像指向本仓库、own.5 起删除 Web 终端（WebSSH）与远程执行页面/入口 | 这些原本是补丁 0001–0006，源码 vendor 化后**已内联进 `frontend/`**，见第 4 节与第 11 节 |
+| `agent/`（源码内联） | 自更新指向本仓库 + 资产过滤 + 容器内跳过 + 默认关自动更新、own.5 起删除 terminal/exec（WebSSH + RCE）能力 | 原本是 patches-agent 0001–0003，已内联进 `agent/`；理由见第 11 节（含实测证据）与 §11.7 |
 | `install-komari.sh` | 指向自有仓库并锁定 tag；`curl -f` + 先下临时文件再替换 | 不再安装上游 1.5.x；失败时不写入错误页、不截断运行中的二进制 |
 | `.gitignore` | 忽略 `/.build/`、`/bin/`；把上游 `komari` 规则锚定为 `/komari` | 后者原为未锚定规则，会连带忽略 `.trellis/workspace/komari/`，使跨会话记忆无法提交 |
 | `Dockerfile` | `ARG TARGETOS/TARGETARCH` 给出默认值 `linux/amd64` | 让普通 `docker build`（非 buildx）也能定位上下文里的二进制 |
@@ -540,7 +540,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
   `scripts/build-agent-image.sh` 验证）。二进制产物本身一直是可复现的。
 - **已装在别处的上游 agent 无法被我们改写**：见 §11.4。
 - **agent 自带测试里的 3 个外网用例已改为默认跳过**（2026-09-17，仓库体检）：
-  `agent/server/task_test.go` 的 `TestICMPPing` / `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的
+  `agent/server/ping_test.go` 的 `TestICMPPing` / `TestTCPPing` / `TestHTTPPing` 会 ping 硬编码的
   外部目标，在无外网或目标不可达的机器上必然失败（当时实测本机 34s 后 3 个全红）。现在这三个用例
   开头调用 `requireOnlineTests(t)`：未设置环境变量时 `t.Skip`，所以离线 `go test ./...` 也能全绿；
   要验真实链路时显式打开：
@@ -624,7 +624,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 | 环节 | 事实 |
 |---|---|
 | 源码 | **在本仓库**：`agent/`（上游 `komari-monitor/komari-agent@1186aafb…`，2026-08-07 的快照 + 我们内联的改动；溯源见 `scripts/agent-build.env`） |
-| 我们对源码做的改动 | 自更新目标改指本仓库、`selfupdate` 加资产过滤、容器内跳过自更新、自动更新默认关闭、`--enable-auto-update` 新参数；安装脚本见下表 |
+| 我们对源码做的改动 | 自更新目标改指本仓库、`selfupdate` 加资产过滤、容器内跳过自更新、自动更新默认关闭、`--enable-auto-update` 新参数；**own.5 起移除 terminal/exec（WebSSH + RCE）能力与 `--disable-web-ssh` 参数（§11.7）**；安装脚本见下表 |
 | 构建 | `./scripts/build-agent.sh`：在 `agent/` 里纯 Go 交叉编译（`CGO_ENABLED=0`，不需要 zig/gcc），一次出 **14** 个平台；用 `-buildvcs=false`，让产物只取决于源码与注入的版本号 |
 | 资产名 | `komari-agent-<os>-<arch>[.exe]`，与上游一致（安装脚本与自更新都按这个名字找资产） |
 | 版本号 | 与我们同一条 `0.0.x` 线（`scripts/version.env`），不沿用上游 agent 的 1.x |
@@ -750,8 +750,10 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
 停在 1.4.3 同期实际付出的代价（逐条核对过）：
 
 - **不算损失**（我们这条血统根本调不到这些能力）：文件访问 `server/files.go`（1152 行）、
-  终端会话重连、文件上传链路修复 —— 服务器与前端都没有这些功能，agent 里有也永远不会被调用；
-  反过来，回退后节点上的 root 二进制里少掉整个文件读写实现，攻击面更小。
+  终端会话重连、文件上传链路修复 —— 这三项是上游 1.5 线才引入的，本仓库的服务器与前端
+  **从来没有**文件管理/文件读写功能；WebSSH 与远程执行在 1.4.3 血统里原本存在，
+  但已在 own.5 发行从服务器、前端、agent 三侧彻底移除（§11.7）。因此节点 root 二进制里
+  不再有任何终端与远程执行实现，攻击面更小。
 - **真实损失**：3 个检测修复（AMD GPU 在 `rocm-smi` 缺失时读 sysfs、Android FUSE 磁盘识别、
   macOS `nullfs` 去重）、安装脚本两处改进（无 bash 环境可装、snapshot 通道）。
   需要时按 §7 的 backport 政策单独 cherry-pick，不要整条线跟上去。
@@ -769,10 +771,29 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
 
 这不是入侵痕迹，而是 agent 自己写的"你这台机器上远程控制是开着的"提示，内容说的就是
 WebSSH / 远程执行本身的能力。1.4.3 同期的 agent（0.0.5 起）**没有**这段注入逻辑，
-只在 Web 终端的 shell 前置脚本里**读**一次 `/etc/motd`（`terminal/terminal_unix.go`）。
+只在 Web 终端的 shell 前置脚本里**读**一次 `/etc/motd`（`terminal/terminal_unix.go`）；
+该 `terminal` 包已在 own.5 发行整体删除（§11.7），own.5 及以后连这次读取也不再存在。
 
 排查这类提示的正确姿势：`journalctl -u komari-agent | grep -i "remote control"`，
 以及确认 agent 的启动日志里 `Github Repo:` 指向 `zhemed/komari`（不是上游仓库）。
+
+### 11.7 远程控制（WebSSH + 远程执行）已在 own.5 发行彻底移除
+
+用户 2026-10-27 授权：own.5 发行（`0.0.24-own.5`）起，本仓库**不再包含任何远程控制能力**。
+
+- **agent 侧**：删除 agent 的终端实现包（Unix PTY / Windows ConPTY 实现与 shell 前置脚本，原目录已删）、
+  删除 `agent/server/task.go` 的远程执行实现（`NewTask` / `runTaskCommand` / `buildTaskCommand` /
+  `uploadTaskResult`）；`agent/server/websocket.go` 不再广告 `exec` / `terminal` 能力，
+  legacy `terminal` / `exec` 消息与 v2 `agent.exec` / `agent.terminal.request` 事件分支一并删除；
+  `--disable-web-ssh` 参数、`DisableWebSsh` 字段与 `WarnKomariRunning` 告警线程移除
+  （Windows `--show-warning` 的 Toast 提醒保留）。agent 现在只做采集上报与 ping。
+- **服务端 / 前端**：Web 终端页面、terminal 路由与 WebSocket 子系统、远程执行页面与任务队列一并删除；
+  这些接口在服务器上直接 404。
+- **文件管理**：本血统**从来不存在**文件管理/文件读写功能（上游 1.5 线的 `server/files.go`
+  从未进入本仓库），agent 侧现在也没有任何文件读写实现。
+
+因此：`server/files.go`、agent 原终端目录这类路径在本仓库查不到是**预期结果**，
+不要再按旧经验认为"agent 里还有终端/文件实现"。
 
 ## 13. 上报协议：v1 / v2 与"1.4 时期"的口径
 

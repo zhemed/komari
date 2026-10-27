@@ -1,6 +1,6 @@
 # Fake Agent
 
-`fake_agent.py` creates a test-only Komari v2 client that reports generated system metrics. It only advertises and processes `agent.ping`; it does not connect to, advertise, or process terminal or command-execution requests.
+`fake_agent.py` creates a test-only Komari v2 client that reports generated system metrics. It only advertises and processes `agent.ping`; it does not connect to, advertise, or process remote-control requests.
 
 Create and persist a new client locally:
 

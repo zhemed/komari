@@ -143,7 +143,7 @@ class FakeAgent:
 
     def run(self) -> None:
         self.upload_basic_info()
-        logging.info("connected as %s; terminal and exec are deliberately unsupported", self.uuid)
+        logging.info("connected as %s; remote-control requests are deliberately unsupported", self.uuid)
         threading.Thread(target=self.pull_loop, name="event-pull", daemon=True).start()
         while not self.stop_event.is_set():
             try:

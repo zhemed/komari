@@ -95,7 +95,6 @@
       "customColumns": "カスタム列",
       "deleting": "削除中...",
       "disableAutoUpdate": "自動更新を無効にする",
-      "disableWebSsh": "リモートコントロールを無効にする",
       "dragToReorder": "長押ししてドラッグで再配置",
       "editNodePrice": "請求書を編集",
       "emptyGuide": {
@@ -233,9 +232,6 @@
     "tomato": "トマト",
     "violet": "バイオレット",
     "yellow": "黄色"
-  },
-  "command_clipboard": {
-    "title": "コマンドクリップボード"
   },
   "dashboard": {
     "title": "ダッシュボード",
@@ -414,31 +410,6 @@
     "accept": "よく読んで同意します",
     "reject": "同意しません",
     "title": "法的通知とコンプライアンスガイド"
-  },
-  "exec": {
-    "allCompleted": "すべてのタスクが完了しました",
-    "command": "コマンドを実行",
-    "commandPlaceholder": "whoami（Shift+Enter で改行）",
-    "description": "選択したノードでリモートコマンドを実行",
-    "errors": {
-      "emptyCommand": "コマンドは空にできません",
-      "executionFailed": "実行に失敗しました",
-      "noNodes": "少なくとも1つのノードを選択してください"
-    },
-    "execute": "コマンドを実行",
-    "executing": "実行中...",
-    "pollingTimeout": "タスクの実行がタイムアウトしました",
-    "results": "実行結果",
-    "selectedNodes": "選択されたノード",
-    "selectNodes": "ターゲットノードを選択",
-    "status": {
-      "polling": "最新の実行状態を取得しています...",
-      "running": "実行中",
-      "timeout": "タイムアウト"
-    },
-    "stopPolling": "ポーリングを停止",
-    "taskStarted": "タスクが開始されました",
-    "title": "リモート実行"
   },
   "go_to_home": "ホームに戻る",
   "install": {
@@ -1147,36 +1118,11 @@
       "target": "移行先データベース",
       "target_description": "ローカル SQLite を使用するか、メトリクスをリモート MariaDB / MySQL / PostgreSQL に保存します。",
       "title": "監視データベースのアップグレード"
-    },
-    "xtermjs": {
-      "convert_eol": "EOL を変換",
-      "cursor_blink": "カーソル点滅",
-      "custom_css": "カスタム CSS",
-      "custom_css_description": "ルールを書くときは .terminal-page または .terminal-xterm-host の接頭辞を推奨します。",
-      "font_family": "フォントファミリー",
-      "font_size": "フォントサイズ",
-      "reset_defaults": "ローカルの既定値に戻す",
-      "scrollback": "スクロールバック",
-      "terminal_padding": "ターミナルの余白",
-      "theme_json": "テーマ JSON",
-      "theme_json_description": "ここでは terminalOptions.theme のみ編集します。未知のキーは保存時にフィルターされます。",
-      "theme_json_filtered": "フィルタ済みテーマ JSON",
-      "theme_json_invalid": "無効なテーマ JSON",
-      "theme_json_must_be_object": "テーマ JSON は JSON オブジェクトである必要があります",
-      "title": "XtermJS",
-      "transparent_background": "透明背景",
-      "transparent_hint": "コンテナ背景も透明な場合にのみ透明化を有効にしてください。",
-      "transparent_theme_hint": "テーマ背景はまだ不透明です。rgba(...) または hsla(...) を使用してください。"
     }
   },
   "status_settings": "ステータス表示設定",
   "system": {
     "title": "システム"
-  },
-  "terminal": {
-    "disconnect": "接続が切断されました",
-    "no_active_connection": "アクティブな接続はありません",
-    "title": "ターミナル"
   },
   "theme": {
     "active": "現在使用中",

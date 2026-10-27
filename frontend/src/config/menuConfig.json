@@ -21,11 +21,6 @@
           "icon": "Activity"
         },
         {
-          "labelKey": "exec.title",
-          "path": "/admin/exec",
-          "icon": "Code"
-        },
-        {
           "labelKey": "sessions.title",
           "path": "/admin/sessions",
           "icon": "Users"
@@ -68,11 +63,6 @@
           "labelKey": "settings.sign_on.title",
           "path": "/admin/settings/sign-on",
           "icon": "CircleArrowRight"
-        },
-        {
-          "labelKey": "settings.xtermjs.title",
-          "path": "/admin/settings/xtermjs",
-          "icon": "Terminal"
         },
         {
           "labelKey": "settings.metrics.title",

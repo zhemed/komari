@@ -93,7 +93,7 @@ func DebugContext / InfoContext / WarnContext / ErrorContext(ctx, component, mes
 | `scheduler` | 2 | `internal/scheduler/scheduler.go:206` |
 | `clients` | 2 | `database/clients/*` |
 | `audit` | 2 | `database/auditlog/log.go:21`、`:34` |
-| `terminal` / `reload` / `install` / `database` / `admin-api` | 各 1 | `web/api/terminal/request.go:49`、`internal/server/reload.go:63`、`web/install/install.go:105`、`web/api/admin/archive_upload.go:42` |
+| `reload` / `install` / `database` / `admin-api` | 各 1 | `internal/server/reload.go:63`、`web/install/install.go:105`、`web/api/admin/archive_upload.go:42` |
 
 由 `utils/log` 自己使用的固定组件名（不要在外面复用）：
 `gin`（`utils/log/gin.go:25-29`）、`http`（`utils/log/gin.go:38`）、`gorm`（`utils/log/gorm.go:41-73`）、`mysql`（`utils/log/log.go:139`）。

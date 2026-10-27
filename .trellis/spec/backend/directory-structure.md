@@ -13,7 +13,7 @@
 | `cmd/` | cobra 命令与启动流程编排；只做串联与错误上报 | `cmd/root.go:31-36`、`cmd/server.go:34-120` |
 | `internal/` | **进程内**基础设施：配置、生命周期阶段、调度器、SQLite 调优、启动迁移、metric store 门面 | `internal/server/app.go:17-30` |
 | `pkg/` | 可独立复用的库：RPC 协议内核、metric 存储引擎、JS 运行时、时间工具 | `pkg/rpc/rpc.go:1-5`、`pkg/metric/store.go:20-23` |
-| `database/` | 业务数据访问层：GORM 模型 + 各资源的读写函数 | `database/dbcore/dbcore.go:448-460` |
+| `database/` | 业务数据访问层：GORM 模型 + 各资源的读写函数 | `database/dbcore/dbcore.go:448-456` |
 | `web/` | HTTP/RPC 接入层：路由、REST handler、RPC2 方法、WS、静态前端 | `web/router/router.go:18-30` |
 | `protocol/` | 与 agent 通信的线协议结构体（v1 上报、v2 JSON-RPC/网络测试） | `protocol/v1/report.go:1-3`、`protocol/v2/jsonrpc.go:1-6` |
 | `utils/` | 通用工具：日志、通知、消息发送、GeoIP、续费提醒 | `utils/log/log.go:1-2` |
@@ -48,9 +48,9 @@ cmd → internal/server → web/router → web/rpc/jsonrpc + web/api/*
 
 ### 3.1 RPC2 方法文件按「命名空间.主题」命名
 
-`web/rpc/jsonrpc/` 下 30 个 Go 文件遵循 `namespace.topic.go`：
+`web/rpc/jsonrpc/` 下 20 个 Go 文件遵循 `namespace.topic.go`：
 
-- `admin.client.go`、`admin.ping.go`、`admin.notification.go`、`admin.xtermjs.go`
+- `admin.client.go`、`admin.ping.go`、`admin.notification.go`
 - `public.metric.go`、`public.audit.go`
 - `common.record.go`
 - 无主题的聚合文件直接叫 `common.go`、`client.go`
@@ -74,7 +74,7 @@ cmd → internal/server → web/router → web/rpc/jsonrpc + web/api/*
 
 ### 3.4 模型只放 `database/models/`
 
-GORM 结构体集中在 `database/models/`（13 个文件）。RPC handler 里出现的匿名 `struct` 只用于**参数绑定与响应拼装**（如 `web/rpc/jsonrpc/common.go:218-220` 的 `params`），不落库。
+GORM 结构体集中在 `database/models/`（6 个模型文件）。RPC handler 里出现的匿名 `struct` 只用于**参数绑定与响应拼装**（如 `web/rpc/jsonrpc/common.go:218-220` 的 `params`），不落库。
 
 ### 3.5 嵌入资源用 `data/theme/` 占位目录
 
@@ -86,8 +86,8 @@ GORM 结构体集中在 `database/models/`（13 个文件）。RPC handler 里�
 |---|---|---|
 | 一个新的 JSON 接口 | `web/router/router.go` 里 `jsonRpc.Bind(...)` + 一个 `web/rpc/jsonrpc/<ns>.<topic>.go` 方法 | `web/router/router.go:44-51` |
 | 二进制/流/重定向/特殊鉴权接口 | `web/api/{admin,client,public}/` 保留为 REST handler | `web/router/router.go:85-101` |
-| 一个新的数据库读写函数 | `database/<资源包>/`，用 `dbcore.GetDBInstance()` | `database/tasks/tasks.go:3-10` |
-| 一张新表 | `database/models/<name>.go` + 在 `dbcore.go` 的 `AutoMigrate` 列表登记 | `database/dbcore/dbcore.go:448-460` |
+| 一个新的数据库读写函数 | `database/<资源包>/`，用 `dbcore.GetDBInstance()` | `database/tasks/ping.go:9-14` |
+| 一张新表 | `database/models/<name>.go` + 在 `dbcore.go` 的 `AutoMigrate` 列表登记 | `database/dbcore/dbcore.go:448-456` |
 | 新的配置项 | `internal/config/settings.go` 的结构体字段（`json` + `default` tag） | 见 `database-guidelines.md` §4 |
 | 可复用的算法/存储引擎 | `pkg/<name>/`，自带 `*_test.go` | `pkg/metric/`、`pkg/timeutil/` |
 | 启动期一次性数据修补 | `internal/migrations/`（不删表，见 `database-guidelines.md`） | `internal/migrations/migrations.go:92-93` |

@@ -76,8 +76,8 @@ func (sc *SafeConn) GetConn() *websocket.Conn {
 	return sc.conn
 }
 
-// SetCloseHandler forwards to the underlying connection (used by the
-// terminal sessions to clean up on close).
+// SetCloseHandler forwards to the underlying connection (used by WebSocket
+// sessions to clean up on close).
 func (sc *SafeConn) SetCloseHandler(h func(code int, text string) error) {
 	sc.conn.SetCloseHandler(h)
 }
