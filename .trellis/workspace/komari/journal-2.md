@@ -564,3 +564,42 @@
 ### Next Steps
 
 - 如需对外生效：按 INDEPENDENCE §3 走发版（version.env 递增 + tag + release 资产 + 镜像推送），需用户授权；可选清理旧 DB 表 tasks/task_results/clipboards
+
+
+## Session 76: 仓库自检既有失败清零：.env 出库、hooks 安装、Trellis 历史审计基线前移
+<!-- trellis-session: v=2 fp=8930572d424a9c28 -->
+
+**Date**: 2026-10-27
+**Task**: 仓库自检既有失败清零：.env 出库、hooks 安装、Trellis 历史审计基线前移
+**Branch**: `main`
+
+### Summary
+
+用户授权主仓上一轮风险第 5 项。修三件事：1) themes/ink/.env 移出 git 索引（本地保留），新增 .env.example 说明 VITE_API_BASE 默认兜底，themes/ink/.gitignore 显式忽略 .env；2) 运行 install-git-hooks.sh 把 core.hooksPath 指向本仓 .githooks（pre-commit/commit-msg 可执行）；3) check-trellis-gate.sh 审计基线从 06d91ab 前移到 b34d353（2026-10-23 subtree 并入 ink 主题完整历史的落地提交）——其前 177 个无锚点提交属外部导入历史，不重写；其后 21 个改动提交全部带锚点。脚本头部与 trellis-gate-guide.md 补「基线前移」规则与判别性要求。验证：check-trellis-gate.sh 通过、check-repo.sh 快速模式全部通过、临时 clone 构造无锚点提交被审计报红（exit=1，不污染主仓）。
+
+### Main Changes
+
+- themes/ink/.env 移出索引 + .env.example + .gitignore 显式忽略（构建默认值不变）
+- 安装本仓 git hooks（core.hooksPath=.githooks）
+- .trellis/gates/enforce-from 前移至 b34d353；check-trellis-gate.sh 与 trellis-gate-guide.md 补基线维护规则
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c77bee4` | chore(hygiene): 仓库自检既有失败清零（.env 出库、hooks 安装、历史审计基线前移） [task:repo-hygiene-fix] |
+
+### Testing
+
+- [OK] check-trellis-gate.sh：hooks 已装 + b34d353..HEAD 21 个改动提交 0 违规
+- [OK] check-repo.sh 快速模式：全部通过（此前 2 项既有失败清零）
+- [OK] 判别性测试：临时 clone 无锚点提交被审计报红 exit=1；主仓审计仍通过
+- [OK] git check-ignore themes/ink/.env 命中；git ls-files themes/ink/.env = 0；工作区 CLEAN
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 可选：跑 ./scripts/check-repo.sh --full 复核 Go/离线构建/agent 门禁；后续新提交仍受两仓闸门约束

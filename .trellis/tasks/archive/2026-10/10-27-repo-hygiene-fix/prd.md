@@ -44,3 +44,13 @@
 
 - 轻量任务：PRD-only。
 - 上一轮授权来源：主仓任务 `10-27-komari-repo-hygiene-fix` 的 directive（用户原话「授权第五项未做与风险，开始维护」）。
+
+## 验收结果（2026-10-27 回填）
+
+- [x] `themes/ink/.env` 已移出索引（本地文件保留）；新增 `themes/ink/.env.example`；`themes/ink/.gitignore` 显式忽略 `.env`（`git check-ignore` 命中 `.gitignore:32:.env`；`git ls-files` 为 0）。
+- [x] `core.hooksPath=.githooks`，pre-commit / commit-msg 均可执行；本提交起走本仓闸门。
+- [x] `.trellis/gates/enforce-from` 前移至 `b34d353`（subtree 落地提交）；`check-trellis-gate.sh` 通过：b34d353..HEAD 共 21 个改动提交全部带锚点。
+- [x] `./scripts/check-repo.sh` 快速模式「全部通过」；`--full` 由主仓会话另行记录结果。
+- [x] 判别性测试：临时 clone 中构造无锚点提交，审计报红（exit=1，逐条列出违规 SHA）；主仓审计仍通过，说明闸门未被关掉。
+- [x] 变更提交 `c77bee4`（锚点 `[task:repo-hygiene-fix]`）；工作区 CLEAN。
+
