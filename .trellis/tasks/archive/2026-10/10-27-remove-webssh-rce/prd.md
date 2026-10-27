@@ -29,8 +29,18 @@ terminal 包与 exec 能力；重建服务端镜像与 agent 并部署到唯一�
 
 ## Acceptance Criteria
 
-- [ ] 三层移除完成，`go build ./...`（根模块 + agent 模块）通过，前端 `npm run build` 通过。
-- [ ] 全仓残留检索：非文档/非 `.trellis` 处无 `xterm`、`admin:exec`、`MethodAgentExec`、`disable-web-ssh` 引用。
-- [ ] 服务端镜像 `komari-own:0.0.24-own.5` 构建成功并部署运行；面板 200、节点在线。
-- [ ] 被删接口在服务器上 404；agent 服务 active。
-- [ ] 提交完成、工作区干净。
+- [x] 三层移除完成，`go build ./...`（根模块 + agent 模块）通过，前端 `npm run build` 通过。
+- [x] 全仓残留检索：非文档/非 `.trellis` 处无 `xterm`、`admin:exec`、`MethodAgentExec`、`disable-web-ssh` 引用。
+- [x] 服务端镜像 `komari-own:0.0.24-own.5` 构建成功并部署运行；面板 200、节点在线。
+- [x] 被删接口在服务器上 404；agent 服务 active。
+- [x] 提交完成、工作区干净。
+
+## 验收结果（2026-10-27 回填）
+
+- 代码提交：`6fa338b`（主移除，411 文件 +1920/−7019）、`cdaa025`（admin-app 桥接修复）。
+- 部署：镜像 `komari-own:0.0.24-own.5` 已在唯一服务器运行（RestartCount=0，`/api/version` hash=6fa338b…）；
+  agent 已替换（linux/amd64，sha256 3acd0868…）且 active、v2 已连接；admin-app 已二次更新部署。
+- 验证：`/api/nodes` 返回节点、`/api/recent` 最新记录距检查约 30s（数据持续上报）；POST 被删路由 404；
+  GET 被删路由落到 SPA 兜底（二进制中路由字符串 0 命中）；`/admin` 与 `/admin-app/index.html` 内 terminal 0 次。
+- 未做（超出授权）：GitHub 发版/推送；旧 DB 表清理；详细见 `findings.md` §五。
+

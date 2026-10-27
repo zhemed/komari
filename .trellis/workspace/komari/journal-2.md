@@ -523,3 +523,44 @@
 ### Next Steps
 
 - 人工强刷面板确认三网行实线；如需回归可另立任务加色觉友好模式视觉用例
+
+
+## Session 75: 移除 Web 终端与远程执行（WebSSH + RCE）：三层裁剪并部署 own.5
+<!-- trellis-session: v=2 fp=e0cbab55deb5b884 -->
+
+**Date**: 2026-10-27
+**Task**: 移除 Web 终端与远程执行（WebSSH + RCE）：三层裁剪并部署 own.5
+**Branch**: `main`
+
+### Summary
+
+用户授权 L4 彻底移除远程控制能力。三层裁剪：前端删 terminal/exec/xtermjs 页面与入口、TerminalContext/useXtermjsSettings/命令剪贴板、@xterm 依赖与 5 语言词条；服务端删 terminal 中继、admin:exec 任务子系统、Task/TaskResult 与 Clipboard 模型/CRUD/AutoMigrate、xterm 设置、protocol/v2 exec/terminal 常量；agent 删 terminal 包、远程执行、capabilities 与 --disable-web-ssh，ping 实现迁至 agent/server/ping.go。重建默认主题（哈希 f2cf7927，417 文件）与 ink admin-app（413 文件，桥接去掉 /terminal）。版本 own.5：镜像 komari-own:0.0.24-own.5 已部署到唯一服务器并重启面板（RestartCount=0），agent 已替换并 active/v2 连接，admin-app 二次更新部署。验证：/api/nodes 正常、recent 数据 30s 内更新；被删 POST 路由 404、GET 落 SPA 兜底；二进制中路由/方法字符串 0 命中；/admin 与 /admin-app 内 terminal 0 次。未做 GitHub 发版（未授权），旧 DB 表保留未删。
+
+### Main Changes
+
+- 服务端删 terminal/exec/task/xterm/clipboard 子系统（21 删 + 11 改，含路由/AutoMigrate/protocol/README）
+- 前端删终端/远程执行/xtermjs 页面与入口、@xterm 依赖、5 语言词条；重建 defaultTheme 与 ink admin-app
+- agent 删 terminal 包与远程执行，ping 迁至 agent/server/ping.go，go mod tidy 离线移除 pty/conpty
+- 部署：KOMARI_OWN_SUFFIX=own.5 + 新启动脚本；镜像与 agent 已上服务器，admin-app 已替换
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6fa338b` | feat(security): 彻底移除 Web 终端与远程执行（WebSSH + RCE） [task:remove-webssh-rce] |
+| `cdaa025` | fix(theme): admin-app 桥接脚本不再恢复 /terminal 路由 [task:remove-webssh-rce] |
+
+### Testing
+
+- [OK] 根模块 go build/vet/test 全过；agent 模块 build/vet/test + linux/windows/darwin 交叉编译通过
+- [OK] 前端离线构建两次一致；defaultTheme 哈希经 scripts/check-repo.sh 第 6 项校验通过
+- [OK] 服务器只读验证：容器 running/restarts=0、version hash=6fa338b、节点与 recent 数据正常、agent active
+- [OK] 残留检索：二进制 strings 中 /api/clients/terminal、xtermjs、admin:exec、agent.exec、agent.terminal.request 均 0
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 如需对外生效：按 INDEPENDENCE §3 走发版（version.env 递增 + tag + release 资产 + 镜像推送），需用户授权；可选清理旧 DB 表 tasks/task_results/clipboards
