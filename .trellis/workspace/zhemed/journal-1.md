@@ -372,3 +372,40 @@
 ### Next Steps
 
 - 旧容器 komari-rollback-0.0.25 与旧镜像清理待用户确认；生产已与 0.0.26 发布状态一致
+
+
+## Session 11: 三网行丢包条改实线色块（主题 1.0.6，本机+生产更新）
+<!-- trellis-session: v=2 fp=efaf6d67a7a712d4 -->
+
+**Date**: 2026-11-12
+**Task**: 三网行丢包条改实线色块（主题 1.0.6，本机+生产更新）
+**Branch**: `main`
+
+### Summary
+
+用户反馈生产节点卡片右侧丢包条出现黄/蓝斜纹，与左侧延迟条不一致。根因：getLossToneClass 无 pattern 选项，loss>3% 固定附加 ping-signal-pattern-* 纹理；该 CSS 仅在 html.color-vision-friendly 下生效，生产 colorVisionMode=色觉友好 才可见（标准模式看不到，故本机此前未复现）。修复：getLossToneClass 增加 options.pattern（默认 true 保持聚合条/图表原行为），三网行丢包分支改传 pattern:false，与延迟条一致；注释同步。主题版本 1.0.5→1.0.6，重建 zip + 内置包，README 同步。验证：lint/build 通过；构建 JS 中延迟/丢包两分支均 pattern:!1；本机临时切色觉友好模式验证后还原；theme-latest 更新为 1.0.6（sha256 1e6c4600…，匿名下载一致）；生产备份 1.0.5 后原子替换 1.0.6，站点 200、截图确认丢包条实线；check-repo --full 17 项全绿。
+
+### Main Changes
+
+- themes/ink/src/composables/useNodePingDisplay.ts：getLossToneClass 支持 pattern:false，三网行丢包条改实线
+- themes/ink/komari-theme.json 1.0.6；web/public/builtinThemes/ink.zip 重建；README 主题版本 1.0.6
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9788c6e` | fix(theme): 三网行丢包条改实线色块（去掉色觉友好斜纹） [task:loss-bars-solid] |
+
+### Testing
+
+- [OK] bun run lint + build.sh --skip-server --skip-install 通过；构建产物两处 pattern:!1
+- [OK] 本机（色觉友好模式）与生产首页丢包条均为实线色块（截图）；生产 manifest 1.0.6、站点 200
+- [OK] theme-latest 1.0.6 匿名下载 sha256 一致；check-repo --full 17 项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 0.0.26 二进制内置主题仍 1.0.5，下次服务端发版内置 1.0.6；生产旧主题备份 theme-1.0.5-20261112T133954Z 可回滚
