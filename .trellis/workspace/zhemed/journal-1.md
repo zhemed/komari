@@ -444,3 +444,37 @@
 ### Next Steps
 
 - 0.0.26 内置主题仍 1.0.5，下次服务端发版内置 1.0.7
+
+
+## Session 13: 事故与修复：外部 SQLite 连接删掉 WAL 导致写入不落盘（本机+生产）
+<!-- trellis-session: v=2 fp=d4b49180bcaec4a9 -->
+
+**Date**: 2026-11-12
+**Task**: 事故与修复：外部 SQLite 连接删掉 WAL 导致写入不落盘（本机+生产）
+**Branch**: `main`
+
+### Summary
+
+为读主题设置直接用 python sqlite3 连运行中的 data/komari.db；外部连接成为最后连接时 SQLite checkpoint 并删除 -wal/-shm，服务端继续向已删除 WAL 写入 → 新写入不落盘（本机与生产均中招）。处置：cp /proc/<pid>/fd/7 抢救孤儿 WAL（1MB）→ 隔离容器 komari-waltest 验证回放无损（无 malformed、节点/主题设置完整）→ 生产 docker stop → 放回 komari.db-wal（不恢复 shm）→ docker start（停机约 5 秒）→ 验证日志无错、fds 正常、/api/version=0.0.26、站点 200、WAL 15s 内 65952→86552 字节；本机同步修复并验证 POST 设置→读回一致。抢救文件归档 /root/backups/wal-recovery-20261112T140200Z/ 与 /root/komari-local/wal-recovery-20261112T140201Z/。教训写入 ops 工作区 .trellis/spec/ops/safety.md（禁止对运行中实例开外部 SQLite 连接；读数据走 API 或停服务读副本）与生产运行手册变更记录。
+
+### Main Changes
+
+- 无仓库代码改动（纯运维修复）；生产运行手册与 ops safety.md 已更新
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `69eb9a5` | chore: record journal |
+
+### Testing
+
+- [OK] 生产 WAL 正常增长、无 deleted fd、站点 200、主题设置/节点完整；本机写入持久化验证通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 禁止外部 sqlite3 直连运行中实例；读设置走 API
