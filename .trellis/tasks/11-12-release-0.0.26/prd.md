@@ -41,8 +41,8 @@
 
 ## Acceptance Criteria
 
-- [ ] GitHub release `0.0.26` 存在，4 个资产齐全且 `komari-SHA256SUMS` 校验通过。
-- [ ] `theme-latest` prerelease 的 `ink-theme.zip` = 主题 1.0.5 构建产物（sha256 一致）。
-- [ ] `ghcr.io/zhemed/komari:0.0.26` 与 `komari-agent:0.0.26` 可匿名拉取（linux/amd64）。
-- [ ] 发布二进制 `/api/version` 报 `0.0.26` 且 hash 与 tag 指向的提交一致。
-- [ ] `check-repo.sh --full` 17 项全绿；生产未动。
+- [x] GitHub release `0.0.26` 存在，4 个资产齐全且 `komari-SHA256SUMS` 校验通过。
+- [x] `theme-latest` prerelease 的 `ink-theme.zip` = 主题 1.0.5 构建产物（sha256 一致）。
+- [x] `ghcr.io/zhemed/komari:0.0.26` 与 `komari-agent:0.0.26` 可匿名拉取（linux/amd64）。
+- [x] 发布二进制 `/api/version` 报 `0.0.26` 且 hash 与 tag 指向的提交一致。
+- [x] `check-repo.sh --full` 17 项全绿；生产未动。
