@@ -181,3 +181,42 @@
 ### Next Steps
 
 - 若第二张图的双条版式是目标设计，另开主题任务改造；生产主题更新需 0.0.26 发版
+
+
+## Session 6: ink 主题三网行双条版式（按参考图）+ 主题构建 RPC 基址修复
+<!-- trellis-session: v=2 fp=00df7e02ab4647b6 -->
+
+**Date**: 2026-11-12
+**Task**: ink 主题三网行双条版式（按参考图）+ 主题构建 RPC 基址修复
+**Branch**: `main`
+
+### Summary
+
+按用户确认的参考图（第二张截图），把节点卡片三网行改为双条版式：左列=任务名+延迟值+延迟历史条，右列=丢包值+丢包历史条；丢包文字去掉「丢包」前缀（tooltip 保留口径），占位行同样双列；数据层复用 NodePingHistoryPoint 的 latency/loss，未改接口。实现：useNodePingDisplay 增加 lossBars / buildTaskHistoryBars(metric) / taskRowPlaceholderLossBars；NodeCard 模板改双列。同时修复构建坑：干净克隆 bun run build 时 VITE_API_BASE 未设置导致 rpc.ts 退回 /rpc2（服务端是 /api/rpc2）→ 面板全量 RPC 404；修复为 rpc.ts 默认 '/api' + build.sh 显式注入 VITE_API_BASE=/api + .env.example 注释同步。验证：bun run lint/build 通过；构建产物 RPC 基址 /api；bun run test:visual 8 项通过；check-repo.sh --full 16 项全通过；本机实例部署后截图确认双条版式。主题版本保持 1.0.4 未发布，生产未动。
+
+### Main Changes
+
+- themes/ink/src/composables/useNodePingDisplay.ts: 三网行数据增加 lossBars，历史条构建支持 latency/loss
+- themes/ink/src/components/NodeCard.vue: 三网行改左右双列（延迟列 + 丢包列）
+- themes/ink/src/utils/rpc.ts: RPC 基址默认对齐 '/api'；build.sh: 构建主题注入 VITE_API_BASE=/api；.env.example 同步
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `23f0dca` | feat(theme): 三网行改为双条版式（延迟条 + 丢包条） [task:theme-region-dual-bars] |
+
+### Testing
+
+- [OK] bun run lint / bun run build（干净环境）通过；产物 RPC 基址 const n="/api"；ink-build-5237564.zip 3.45MB
+- [OK] bun run test:visual：8 项全部通过
+- [OK] check-repo.sh --full：16 项全部通过
+- [OK] 本机实例部署新主题：首页 200，节点卡片显示双条版式（截图）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 主题未发布（版本仍 1.0.4）；确认版式后按 docs §3.4.2 发布 theme-latest + 回填市场目录；生产未动
