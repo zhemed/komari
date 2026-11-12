@@ -99,19 +99,17 @@ cp ops-dist/theme/ink-build-*.zip.sha256 /tmp/ink-release/ink-theme.zip.sha256
 gh release delete theme-latest --cleanup-tag -y || true
 gh release create theme-latest --prerelease \
   --title 'ink theme rolling latest' \
-  --notes '自维护 ink 主题滚动发布通道：供面板「主题→更新」与自有主题市场下载最新版。' \
+  --notes '自维护 ink 主题滚动发布通道：供面板「主题→更新」下载最新版（主题市场已于 2026-11-12 移除）。' \
   --target main /tmp/ink-release/ink-theme.zip /tmp/ink-release/ink-theme.zip.sha256
 
-# 4) 把该 zip 的 sha256 回填到 deploy/theme-market/v1.json 并提交
-
-# 5) 按 ops-docs/DEPLOY.md 部署主题；实例 configs.theme_market_sources 指向本仓 catalog
+# 4) 按 ops-docs/DEPLOY.md 部署主题（现有实例走面板「主题→更新」）
 ```
 
 注意：
 - **内置主题包**：`build.sh` 构建主题后会把 zip 同步到 `web/public/builtinThemes/ink.zip`，
   它随**服务端发版**生效（首次启动自动安装到 `data/theme/ink`，新库默认激活）；
   只发主题、不动服务端时，内置包保持旧版本（现有实例走主题更新通道即可）。
-- 滚动 release 资产名固定 `ink-theme.zip`（manifest 与 catalog 都引用稳定 URL）。
+- 滚动 release 资产名固定 `ink-theme.zip`（manifest 引用稳定 URL）。
 - **不得把 theme-latest 改成正式 release**：会被 Komari 内核自升级误判为新版本（prerelease 才被过滤）。
-- `deploy/theme-market/v1.json` 是自有市场目录；`web/api/admin/theme_market.go` 的
-  `defaultThemeMarketURL` 默认指向它（内核重建后对未保存配置的实例生效）。
+- **主题市场已于 2026-11-12 移除**：`deploy/theme-market/`、后端市场 API/路由、后台市场入口均已删除；
+  不要再回填市场目录。

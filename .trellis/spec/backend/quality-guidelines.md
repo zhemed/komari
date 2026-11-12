@@ -205,7 +205,7 @@ if apiResponse.Code != http.StatusNotFound { ... }
 以下都是本 fork 与上游的差异点，违反会直接破坏可构建性（详细理由见 `build-and-pinning.md`）：
 
 1. **不要重新引入插件系统**。`internal/plugin/`、插件市场、插件 RPC、`/api/plugin/*`、
-   前端插件页面均已删除，升级上游代码时若被带回必须剔除。**保留物只有**：主题系统与主题市场、
+   前端插件页面均已删除，升级上游代码时若被带回必须剔除。**保留物只有**：主题系统（主题市场已于 2026-11-12 移除）、
    数据库里的历史插件表（孤儿表）。`pkg/jsruntime/` 与 `utils/messageSender/` 已在 0.0.3
    随通知系统一并删除，不要再按"插件专用例外"的旧结论去找它们。
 2. **不要把 `web/public/defaultTheme/` 排除出 git**。它被 `//go:embed` 引用

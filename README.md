@@ -54,7 +54,7 @@ docker run -d --name komari-agent --restart always \
 
 - **内核代码路径保持与上游一致**，以便持续 merge 上游更新；自维护内容集中在上述新目录；
 - 主题版本以 `themes/ink/komari-theme.json` 为唯一版本源；
-- **主题更新/市场源均指向本仓**：更新走滚动 release `theme-latest` 资产 `ink-theme.zip`；市场目录为 `deploy/theme-market/v1.json`（实例配置与内核默认源都指向其 raw URL），不再引用上游目录；
+- **主题更新指向本仓**：更新走滚动 release `theme-latest` 资产 `ink-theme.zip`，不再引用上游目录；**主题市场已于 2026-11-12 移除**（ink 已内置为唯一主题，后台不再有市场入口/API，`deploy/theme-market/` 已删除）；
 - **开箱即用**：ink 主题构建产物内置在二进制里（`web/public/builtinThemes/ink.zip`），全新部署首次启动自动安装并激活，无需再手动装主题；
 - 构建产物（`bin/`、`ops-dist/`、`themes/ink/dist`、`themes/ink/node_modules`）一律不入库；
 - 详细规则见 `ops-docs/VERSION.md`、`ops-docs/BUILD.md`、`ops-docs/DEPLOY.md`、`ops-docs/ROLLBACK.md`。

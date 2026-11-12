@@ -83,7 +83,7 @@ func DeleteTheme(c *gin.Context) {
 	}
 
 	// 校验主题短名称，防止路径穿越（如 ../）导致删除工作目录外的任意文件
-	if !isValidMarketShort(req.Short) {
+	if !isValidThemeShort(req.Short) {
 		api.RespondError(c, http.StatusBadRequest, "无效的主题名称")
 		return
 	}
@@ -116,7 +116,7 @@ func SetTheme(c *gin.Context) {
 	// 如果不是default主题，检查主题是否存在
 	if themeName != "default" {
 		// 校验主题名称，防止路径穿越（如 ../）访问工作目录外的文件
-		if !isValidMarketShort(themeName) {
+		if !isValidThemeShort(themeName) {
 			api.RespondError(c, http.StatusBadRequest, "无效的主题名称")
 			return
 		}
@@ -285,14 +285,14 @@ func validateThemeManifest(themeInfo models.Theme) error {
 	if !models.IsLocalizedText(themeInfo.Name) || themeInfo.Short == "" {
 		return fmt.Errorf("主题配置缺少必填字段（name、short）")
 	}
-	if !isValidMarketShort(themeInfo.Short) {
+	if !isValidThemeShort(themeInfo.Short) {
 		return fmt.Errorf("主题short字段格式无效，只允许字母、数字、下划线和连字符")
 	}
 	return themeInfo.ValidateConfiguration()
 }
 
-// isValidMarketShort validates a theme market entry short name.
-func isValidMarketShort(short string) bool {
+// isValidThemeShort validates a theme short name（主题安装/激活时的目录名）。
+func isValidThemeShort(short string) bool {
 	if short == "" || short == "default" {
 		return false
 	}
@@ -309,11 +309,11 @@ func isValidMarketShort(short string) bool {
 
 // downloadThemeFromURL 从URL下载主题文件
 // blockPrivateEndpoints 决定“后台触发的下载”是否必须拒绝私网/内网地址
-// （主题安装 URL、主题市场源；见 downloadThemeFromURL 与 downloadMarketURL）。
+// （主题安装 URL；见 downloadThemeFromURL）。
 //
-// 本仓库面向自托管/内网使用，默认**不拦截**：默认主题市场源在部分网络下会被 DNS
+// 本仓库面向自托管/内网使用，默认**不拦截**：部分网络下域名会被 DNS
 // 解析到私网地址（或被污染、解析失败），旧的 fail-closed 行为会把请求直接拦掉并抛
-// "requests to private or internal addresses are not allowed"，让市场完全不可用。
+// "requests to private or internal addresses are not allowed"，让主题安装不可用。
 // 需要恢复该防护时设置环境变量 KOMARI_BLOCK_PRIVATE_ENDPOINTS=1。
 func blockPrivateEndpoints() bool {
 	return os.Getenv("KOMARI_BLOCK_PRIVATE_ENDPOINTS") == "1"
@@ -501,7 +501,7 @@ func UpdateTheme(c *gin.Context) {
 	}
 
 	// 校验主题短名称，防止路径穿越（如 ../）访问工作目录外的文件
-	if !isValidMarketShort(req.Short) {
+	if !isValidThemeShort(req.Short) {
 		api.RespondError(c, http.StatusBadRequest, "无效的主题名称")
 		return
 	}

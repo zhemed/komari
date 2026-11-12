@@ -15,10 +15,9 @@
   > prerelease 是硬约束：Komari 自升级（`internal/upgrade.StableReleases` 与前端更新提示）只认非 prerelease，
   > 主题通道若标成正式 release 会被误判为内核新版本。
 - **发行方式**：改 manifest 版本 → 提交 → `./build.sh --skip-server --skip-install` →
-  覆盖滚动 release（资产名固定 `ink-theme.zip`）→ 回填 `deploy/theme-market/v1.json` 的 sha256（提交）→ 部署。
-- **主题市场（自有目录）**：`deploy/theme-market/v1.json` 是本仓自有 catalog；实例配置
-  `configs.theme_market_sources` 指向其 raw URL，内核默认值 `web/api/admin/theme_market.go` 的
-  `defaultThemeMarketURL` 同为此地址；官方目录不再使用。
+  覆盖滚动 release（资产名固定 `ink-theme.zip`）→ 部署（现有实例走面板「主题→更新」）。
+- **主题市场已移除（2026-11-12）**：ink 已内置为唯一主题，`deploy/theme-market/`、后端市场 API/
+  路由/配置键、后台市场入口均已删除；主题更新通道（`theme-latest`）保留。
 
 ## 服务端（本仓库内核部分）
 

@@ -36,11 +36,6 @@
           "labelKey": "theme.title",
           "path": "/admin/themes",
           "icon": "Palette"
-        },
-        {
-          "labelKey": "market.themes",
-          "path": "/admin/market/themes",
-          "icon": "Store"
         }
       ]
     },
