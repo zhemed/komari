@@ -454,7 +454,9 @@ export class RpcClient {
   private wsConnectPromise: Promise<void> | null = null
 
   constructor(options: RpcClientOptions = {}) {
-    const apiBase = import.meta.env.VITE_API_BASE || ''
+    // 与 utils/api.ts 的默认值保持一致：未显式配置 VITE_API_BASE 时用 '/api'。
+    // 若退回同源 '/rpc2'，而 Komari 服务端路由是 '/api/rpc2'，面板会全量 RPC 404。
+    const apiBase = import.meta.env.VITE_API_BASE || '/api'
     this.baseUrl = options.baseUrl || `${apiBase}/rpc2`
     this.timeout = options.timeout || NETWORK_CONFIG.timeout.request
     this.useWebSocket = options.useWebSocket || false

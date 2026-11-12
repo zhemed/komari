@@ -61,7 +61,9 @@ if [ "$SKIP_THEME" = "0" ]; then
   cd themes/ink
   if [ "$SKIP_INSTALL" = "0" ]; then bun install --frozen-lockfile >/dev/null; fi
   rm -f ink-build-*.zip
-  bun run build >/dev/null
+  # RPC 基址必须注入 /api：未设置时 rpc.ts 会退回同源 /rpc2，而服务端路由是 /api/rpc2，
+  # 面板会全量 RPC 404（2026-11-12 干净克隆实测）。发布产物固定 /api，不依赖未入库的 .env。
+  VITE_API_BASE=/api bun run build >/dev/null
   ZIP="$(ls ink-build-*.zip | head -1)"
   [ -n "$ZIP" ] || { echo "主题构建未产出 zip" >&2; exit 1; }
   ZIP_PATH="$ROOT/ops-dist/theme/$ZIP"

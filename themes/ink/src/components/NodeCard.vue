@@ -91,9 +91,10 @@ const {
   taskRegionRows,
   hasTaskRegionRows,
   taskRowPlaceholderBars,
+  taskRowPlaceholderLossBars,
 } = useNodePingDisplay(() => props.node.uuid, { enabled: () => props.pingEnabled })
 
-// 有任务级数据时按任务分行；完全没有时保留一行占位（沿用 latencyDisplay/lossDisplay 的
+// 有任务级数据时按任务分行（双条版式）；完全没有时保留一行占位（沿用 latencyDisplay/lossDisplay 的
 // 「加载中 / --」文本 + 空点阵），避免整块区域消失导致卡片高度/信息跳动。
 const pingRows = computed<NodePingRegionRow[]>(() => {
   if (hasTaskRegionRows.value)
@@ -105,6 +106,7 @@ const pingRows = computed<NodePingRegionRow[]>(() => {
     lossText: lossDisplay.value,
     lossApproximate: false,
     bars: taskRowPlaceholderBars.value,
+    lossBars: taskRowPlaceholderLossBars.value,
     latencyTooltip: '',
     lossTooltip: '',
   }]
@@ -129,7 +131,8 @@ function latencyTextClass(text: string): string {
   return 'text-foreground'
 }
 function lossTextClass(text: string): string {
-  // 行内丢包文本带「丢包 」前缀与「≈」近似标记，解析数值前先剥离，保证颜色阈值仍然生效。
+  // 行内丢包文本只显示数值（对齐参考版式）；兼容旧口径的「丢包 」前缀与「≈」近似标记，
+  // 解析数值前先剥离，保证颜色阈值仍然生效。
   const pct = Number.parseFloat(text.replace('丢包 ', '').replace('≈', ''))
   if (!Number.isFinite(pct))
     return 'text-foreground'
@@ -483,7 +486,7 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
 
         <!--
           按 ping 任务分行（任务名来自后台 ping 任务 name，如「地区+运营商」，不硬编码地区）：
-          每行 = 任务名 + 该任务延迟 ms + 该任务丢包% + 该任务自己的延迟历史点阵；
+          双条版式——每行左列 = 任务名 + 该任务延迟 ms + 延迟历史条；右列 = 丢包值 + 丢包历史条。
           最多 3 行，按 taskId 数字升序。整行可点击打开监测弹窗；离线保留 blur/opacity。
           没有任何任务级数据时保留一行占位（沿用 latencyDisplay/lossDisplay 的「加载中 / --」文本 + 空点阵），
           避免整块区域消失导致卡片高度/信息跳动。
@@ -501,36 +504,64 @@ const customTags = computed(() => parseTags(props.node.tags).flatMap(t => t.text
             @click.stop="emit('pingClick')"
             @keydown.enter.stop.prevent="emit('pingClick')"
           >
-            <div class="flex min-w-0 items-center justify-between gap-2">
-              <span class="min-w-0 truncate text-xs text-muted-foreground">{{ row.label }}</span>
-              <span class="flex shrink-0 items-center gap-1.5 font-mono text-xs font-medium">
-                <DataTooltip :content="row.latencyTooltip" placement="top" as="span" content-class="whitespace-nowrap">
-                  <span :class="latencyTextClass(row.latencyText)">{{ row.latencyText }}</span>
-                </DataTooltip>
-                <DataTooltip :content="row.lossTooltip" placement="top" as="span" content-class="whitespace-nowrap">
-                  <span :class="lossTextClass(row.lossText)">{{ row.lossText }}</span>
-                </DataTooltip>
-              </span>
-            </div>
-            <div
-              class="grid h-2 cursor-auto items-end gap-[1.5px] rounded-sm bg-muted/40 p-0.5"
-              :style="{ gridTemplateColumns: `repeat(${row.bars.length}, minmax(0, 1fr))` }"
-            >
-              <DataTooltip
-                v-for="bar in row.bars"
-                :key="bar.key"
-                :content="bar.tooltip"
-                placement="top"
-                as="span"
-                class="h-full w-full"
-                content-class="whitespace-nowrap"
-              >
-                <span
-                  :aria-label="bar.tooltip"
-                  class="block h-full w-full rounded-[1px] transition-all group-hover:opacity-50 hover:scale-y-125 hover:opacity-100"
-                  :class="bar.className"
-                />
-              </DataTooltip>
+            <div class="flex min-w-0 items-end gap-2">
+              <!-- 左列：延迟（任务名 + 延迟值 + 延迟历史条） -->
+              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <div class="flex min-w-0 items-center justify-between gap-1">
+                  <span class="min-w-0 truncate text-xs text-muted-foreground">{{ row.label }}</span>
+                  <DataTooltip :content="row.latencyTooltip" placement="top" as="span" content-class="whitespace-nowrap">
+                    <span class="shrink-0 font-mono text-xs font-medium" :class="latencyTextClass(row.latencyText)">{{ row.latencyText }}</span>
+                  </DataTooltip>
+                </div>
+                <div
+                  class="grid h-2 cursor-auto items-end gap-[1.5px] rounded-sm bg-muted/40 p-0.5"
+                  :style="{ gridTemplateColumns: `repeat(${row.bars.length}, minmax(0, 1fr))` }"
+                >
+                  <DataTooltip
+                    v-for="bar in row.bars"
+                    :key="bar.key"
+                    :content="bar.tooltip"
+                    placement="top"
+                    as="span"
+                    class="h-full w-full"
+                    content-class="whitespace-nowrap"
+                  >
+                    <span
+                      :aria-label="bar.tooltip"
+                      class="block h-full w-full rounded-[1px] transition-all group-hover:opacity-50 hover:scale-y-125 hover:opacity-100"
+                      :class="bar.className"
+                    />
+                  </DataTooltip>
+                </div>
+              </div>
+              <!-- 右列：丢包（丢包值 + 丢包历史条） -->
+              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <div class="flex min-w-0 items-center justify-end gap-1">
+                  <DataTooltip :content="row.lossTooltip" placement="top" as="span" content-class="whitespace-nowrap">
+                    <span class="shrink-0 font-mono text-xs font-medium" :class="lossTextClass(row.lossText)">{{ row.lossText }}</span>
+                  </DataTooltip>
+                </div>
+                <div
+                  class="grid h-2 cursor-auto items-end gap-[1.5px] rounded-sm bg-muted/40 p-0.5"
+                  :style="{ gridTemplateColumns: `repeat(${row.lossBars.length}, minmax(0, 1fr))` }"
+                >
+                  <DataTooltip
+                    v-for="bar in row.lossBars"
+                    :key="bar.key"
+                    :content="bar.tooltip"
+                    placement="top"
+                    as="span"
+                    class="h-full w-full"
+                    content-class="whitespace-nowrap"
+                  >
+                    <span
+                      :aria-label="bar.tooltip"
+                      class="block h-full w-full rounded-[1px] transition-all group-hover:opacity-50 hover:scale-y-125 hover:opacity-100"
+                      :class="bar.className"
+                    />
+                  </DataTooltip>
+                </div>
+              </div>
             </div>
           </div>
         </div>
