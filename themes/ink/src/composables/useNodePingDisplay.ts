@@ -65,16 +65,17 @@ function getLatencyToneClass(latency: number, options: { pattern?: boolean } = {
   return withPattern ? 'bg-signal-5 ping-signal-pattern-4' : 'bg-signal-5'
 }
 
-function getLossToneClass(loss: number): string {
+function getLossToneClass(loss: number, options: { pattern?: boolean } = {}): string {
+  const withPattern = options.pattern !== false
   if (loss <= 1)
     return 'bg-signal-1'
   if (loss <= 3)
     return 'bg-signal-2'
   if (loss <= 6)
-    return 'bg-signal-3 ping-signal-pattern-2'
+    return withPattern ? 'bg-signal-3 ping-signal-pattern-2' : 'bg-signal-3'
   if (loss <= 9)
-    return 'bg-signal-4 ping-signal-pattern-3'
-  return 'bg-signal-5 ping-signal-pattern-4'
+    return withPattern ? 'bg-signal-4 ping-signal-pattern-3' : 'bg-signal-4'
+  return withPattern ? 'bg-signal-5 ping-signal-pattern-4' : 'bg-signal-5'
 }
 
 export function useNodePingDisplay(
@@ -155,12 +156,12 @@ export function useNodePingDisplay(
 
       return {
         key: `${taskId}-${metric}-${point.time}-${index}`,
-        // 三网行历史条按用户要求使用实线色块（pattern: false 关闭色觉友好纹理）；
+        // 三网行历史条按用户要求使用实线色块（延迟条与丢包条都传 pattern: false 关闭色觉友好纹理）；
         // 聚合条/图表仍由 buildPingBars 走默认色阶，保留纹理。
         className: hasValue
           ? (metric === 'latency'
               ? getLatencyToneClass(value, { pattern: false })
-              : getLossToneClass(value))
+              : getLossToneClass(value, { pattern: false }))
           : 'bg-muted-foreground/15',
         tooltip: hasValue
           ? `${formatDateTime(point.time, 'HH:mm:ss')}\n${metric === 'latency' ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`}`
