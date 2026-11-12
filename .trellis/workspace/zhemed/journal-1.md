@@ -117,3 +117,38 @@
 ### Next Steps
 
 - 修复随下次发版（0.0.26）生效；生产面板届时才具备主题更新能力；本机实例已是修复版
+
+
+## Session 4: 本机注册为本地实例节点（komari-agent 0.0.25）+ ink 主题部署与主题导入 bug 修复落地
+<!-- trellis-session: v=2 fp=5e12b4ad79750e82 -->
+
+**Date**: 2026-11-12
+**Task**: 本机注册为本地实例节点（komari-agent 0.0.25）+ ink 主题部署与主题导入 bug 修复落地
+**Branch**: `main`
+
+### Summary
+
+接续上一段：本地实例（/opt/komari，0.0.25）此前只有内置默认主题；本次部署 ink 1.0.4（release theme-latest 的 ink-theme.zip，解压到 data/theme/ink + set 接口激活，首页已是 ink 渲染）。随后用 admin:addClient 注册节点 ubuntu-dsh，下载 release 0.0.25 的 komari-agent-linux-amd64（sha256 校验）装到 /opt/komari-agent + komari-agent.service（-e 本机实例 -t token，Restart=always、开机自启）；日志 Basic info uploaded successfully，admin:listClients 与 /api/nodes 均可见，首页节点卡片渲染真实数据。另：上一任务的修复版二进制已部署到实例（hash 664efff），主题更新/导入在本机实测 200；旧二进制备份保留。凭据只在本机 600 文件，未进对话/仓库；生产未动。三网行待配 ping 任务。
+
+### Main Changes
+
+- 本机实例（仓库外）：ink 主题 1.0.4 部署激活；komari-agent 0.0.25 安装并注册节点 ubuntu-dsh；运行手册补充主题与节点章节
+- 仓库内仅 .trellis 任务记录（local-node-agent 归档 + journal）
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 主题：/themes/ink/komari-theme.json 200、/assets/* 200、/admin-app/index.html 200、首页 200；截图确认 ink 渲染
+- [OK] agent：sha256 OK、statically linked、服务 enabled+active、Basic info uploaded successfully
+- [OK] 节点：admin:listClients → ubuntu-dsh/0.0.25；/api/nodes 返回；首页节点卡片有 CPU/内存/流量数据
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 三网行需在后台加 3 个 ping 任务（电信/联通/移动 目标）；修复随 0.0.26 发版生效到生产
