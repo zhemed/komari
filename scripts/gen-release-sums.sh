@@ -2,7 +2,10 @@
 #
 # 生成服务端二进制的校验和资产 dist/komari-SHA256SUMS。
 #
-# 为什么单独一个脚本：两个平台的静态构建是两次独立的 build-komari.sh 调用，
+# 2026-11-12 起只维护自有服务器目标平台 linux/amd64；arm64 条目注释停用
+# （恢复时取消注释，并同步 docs/MAINTAINING.md §3.4 的发布步骤）。
+#
+# 为什么单独一个脚本：多个平台的静态构建是多次独立的 build-komari.sh 调用，
 # 在构建脚本里"追加一行"会在失败/重跑时留下过期条目；这里按最终产物整体重算，
 # 缺文件就报错，不会生成半份清单。
 #
@@ -16,7 +19,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DIST_DIR="${1:-${REPO_ROOT}/dist}"
 
-ASSETS=(komari-linux-amd64 komari-linux-arm64)
+ASSETS=(
+    komari-linux-amd64
+    # komari-linux-arm64   # 2026-11-12 起只维护 linux/amd64，注释停用
+)
 for f in "${ASSETS[@]}"; do
     if [ ! -f "${DIST_DIR}/${f}" ]; then
         echo "[gen-release-sums] 缺少 ${DIST_DIR}/${f}（先跑 KOMARI_OUTPUT=... ./scripts/build-komari.sh）" >&2

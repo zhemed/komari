@@ -4,10 +4,11 @@
 #
 # 源码就在本仓库的 agent/ 目录里（上游 komari-agent 的快照 + 我们内联的改动，见
 # docs/MAINTAINING.md §11），**不再克隆上游、不再打补丁**。纯 Go（CGO_ENABLED=0），
-# 交叉编译只需要 Go，不需要 zig/gcc，一次可出 14 个平台。
+# 交叉编译只需要 Go，不需要 zig/gcc。2026-11-12 起只维护自有服务器目标 linux/amd64，
+# 其余平台在下方矩阵中注释停用（取消注释即可恢复）。
 #
 # 用法：
-#   ./scripts/build-agent.sh                        # 全部 14 个平台 → dist/agent/
+#   ./scripts/build-agent.sh                        # 只构建维护目标（linux/amd64）→ dist/agent/
 #   ./scripts/build-agent.sh --only linux/amd64     # 单平台（开发时快跑）
 #   KOMARI_VERSION=0.0.18 ./scripts/build-agent.sh   # 下一版本（见 scripts/version.env）
 #   KOMARI_AGENT_OUTPUT=/tmp/agent ./scripts/build-agent.sh
@@ -90,9 +91,22 @@ else
   log "注意：KOMARI_VERSION=${KOMARI_VERSION} 与仓库默认版本 ${PINNED_VERSION} 不同，跳过安装脚本版本一致性校验"
 fi
 
-# ---------- 2. 构建矩阵（与上游 build_all.sh 一致：14 个平台） ----------
-OS_LIST=(windows linux darwin freebsd)
-ARCH_LIST=(amd64 arm64 386 arm loong64)
+# ---------- 2. 构建矩阵（2026-11-12 起只维护自有服务器目标 linux/amd64） ----------
+# 用户定稿：只维护我们服务器对应的版本，其余目标全部注释掉。
+# 恢复某个平台时取消对应行的注释即可（下面的排除项与上游 build_all.sh 一致）。
+OS_LIST=(
+  # windows
+  linux
+  # darwin
+  # freebsd
+)
+ARCH_LIST=(
+  amd64
+  # arm64
+  # 386
+  # arm
+  # loong64
+)
 LDFLAGS="-X github.com/komari-monitor/komari-agent/update.CurrentVersion=${KOMARI_VERSION} -X github.com/komari-monitor/komari-agent/update.Repo=${KOMARI_AGENT_UPDATE_REPO}"
 
 rm -rf "${OUTPUT_DIR}"

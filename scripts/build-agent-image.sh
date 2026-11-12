@@ -4,7 +4,8 @@
 #
 # 用法：
 #   ./scripts/build-agent-image.sh                 # 本地单平台（linux/amd64）构建，不推送
-#   ./scripts/build-agent-image.sh --push          # 三平台构建并推送 :<版本> 与 :latest
+#   ./scripts/build-agent-image.sh --push          # 单平台 linux/amd64 构建并推送 :<版本> 与 :latest
+#                                                  # （2026-11-12 起只维护自有服务器目标平台）
 #   KOMARI_VERSION=0.0.5 ./scripts/build-agent-image.sh --push
 #
 # 前提：先跑 ./scripts/build-agent.sh 产出 dist/agent/（脚本会检查所需平台的产物是否齐全）。
@@ -27,7 +28,9 @@ die() { printf '[build-agent-image] ERROR: %s\n' "$*" >&2; exit 1; }
 IMAGE="${KOMARI_AGENT_IMAGE:-ghcr.io/zhemed/komari-agent}"
 AGENT_DIR="${KOMARI_AGENT_OUTPUT:-${REPO_ROOT}/dist/agent}"
 PUSH=0
-PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
+# 2026-11-12 起只维护自有服务器目标平台：arm64 / armv7 注释停用，恢复时取消下一行注释。
+PLATFORMS="linux/amd64"
+# PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -42,7 +45,7 @@ command -v docker >/dev/null 2>&1 || die "未找到 docker"
 docker buildx version >/dev/null 2>&1 || die "未找到 docker buildx"
 
 # 上下文：Dockerfile.agent 只 COPY 同名产物 + 标记文件，所以把三者放一起
-# （没有任何 RUN 步骤 → 多架构构建不需要 QEMU/binfmt）
+# （没有任何 RUN 步骤 → 多架构构建不需要 QEMU/binfmt；2026-11-12 起单平台，仅作历史说明）
 CTX="${REPO_ROOT}/.build/agent-image"
 rm -rf "${CTX}"
 mkdir -p "${CTX}"
@@ -50,13 +53,14 @@ cp -f "${REPO_ROOT}/Dockerfile.agent" "${CTX}/Dockerfile"
 # 容器标记文件（Dockerfile.agent 刻意不写 RUN，改为 COPY 这个空文件）
 : > "${CTX}/komari-agent-container"
 
-# 需要的产物：按目标平台映射到 GOOS/GOARCH（linux/arm/v7 → linux-arm）
+# 需要的产物：按目标平台映射到 GOOS/GOARCH（2026-11-12 起只维护 linux/amd64）
 need_arch() {
   case "$1" in
     linux/amd64)   echo "komari-agent-linux-amd64" ;;
-    linux/arm64)   echo "komari-agent-linux-arm64" ;;
-    linux/arm/v7)  echo "komari-agent-linux-arm" ;;
-    *) die "镜像暂不支持的平台：$1（产物矩阵里有，但镜像只发 amd64/arm64/armv7）" ;;
+    # 2026-11-12 起只维护 linux/amd64，arm64 / armv7 注释停用：
+    # linux/arm64)   echo "komari-agent-linux-arm64" ;;
+    # linux/arm/v7)  echo "komari-agent-linux-arm" ;;
+    *) die "镜像暂不支持的平台：$1（2026-11-12 起只维护 linux/amd64）" ;;
   esac
 }
 

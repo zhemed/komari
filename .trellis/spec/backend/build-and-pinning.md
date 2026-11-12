@@ -89,8 +89,9 @@ chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变�
   **不要**把上游 agent main 整条覆盖进来（那会带进 1.5 行为：motd 安全告警注入、文件访问、
   v2-only 协议，见 `docs/MAINTAINING.md` §11.5）；跟进上游请按 §11.3 手工挑改动。
   溯源与构建参数在 `scripts/agent-build.env`；`scripts/patches-agent/` 已删除。
-- 构建：`scripts/build-agent.sh` 纯 Go 交叉编译（`CGO_ENABLED=0`），**不需要 zig/gcc**，
-  矩阵与上游 `build_all.sh` 一致 = **14** 个平台（排除 windows/arm、darwin/{386,arm}、非 linux 的 loong64）。
+- 构建：`scripts/build-agent.sh` 纯 Go 交叉编译（`CGO_ENABLED=0`），**不需要 zig/gcc**。
+  2026-11-12 起只维护自有服务器目标 **linux/amd64**；原 14 平台矩阵（与上游 `build_all.sh` 一致，
+  排除 windows/arm、darwin/{386,arm}、非 linux 的 loong64）在脚本里注释保留，取消注释即可恢复。
 - 资产名必须是 `komari-agent-<os>-<arch>[.exe]`：安装脚本、前端生成的命令、agent 自更新的资产匹配
   三者都按这个名字找。
 - **自更新必须带资产过滤** `Filters: []string{"^komari-agent-"}`：`go-github-selfupdate` 按
@@ -109,11 +110,12 @@ chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变�
 ./scripts/build-frontend.sh                # 重新构建前端产物（改了 frontend/ 才需要，需 Node + 网络）
 KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh
 KOMARI_STATIC=1 ./scripts/build-komari.sh                      # 发布用：linux/amd64 静态（需 zig）
-KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
-./scripts/build-agent.sh                    # agent：14 个平台 → dist/agent/（源码在 agent/，纯 Go，无需 zig）
+# 2026-11-12 起只维护自有服务器目标平台，arm64 静态构建注释停用：
+# KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
+./scripts/build-agent.sh                    # agent：只维护 linux/amd64 → dist/agent/（源码在 agent/，纯 Go，无需 zig）
 ./scripts/build-agent.sh --only linux/amd64 # agent：单平台 + 两道门禁校验（改 agent 补丁后必跑）
 ./scripts/build-agent-image.sh              # agent 镜像：本地单平台构建（--push 才推 ghcr）
-./scripts/build-server-image.sh             # 服务器镜像：同上（跨架构需 QEMU/binfmt，见 MAINTAINING §12）
+./scripts/build-server-image.sh             # 服务器镜像：同上（2026-11-12 起单平台 linux/amd64，不再需要 QEMU/binfmt）
 ```
 
 **静态构建是发布的前提**：`Dockerfile` 基于 `alpine:3.21`（musl），glibc 动态二进制在其中

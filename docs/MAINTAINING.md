@@ -25,7 +25,7 @@
 | 前端源码 | **在本仓库**：`frontend/`（上游 tag `1.4.3` → `4a74e8a8…` 的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/frontend-build.env` |
 | 前端产物 | `web/public/defaultTheme/`（已提交进仓库） | 目录树哈希记录于 `scripts/frontend-build.env` |
 | agent 源码 | **在本仓库**：`agent/`（上游 commit `1186aafb…`，2026-08-07，**1.4.3 同期**的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/agent-build.env`；见第 11 节 |
-| agent 资产 | `komari-agent-<os>-<arch>`（14 个平台） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
+| agent 资产 | `komari-agent-<os>-<arch>`（只维护 linux/amd64；其余平台 2026-11-12 起注释停用） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
 | agent 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` / `:latest` | 由 `scripts/build-agent-image.sh --push` 推送 |
 
 **为什么前端源码/产物都在仓库里**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
@@ -172,7 +172,8 @@ gh run list -R zhemed/komari --workflow=trellis-gate.yml --limit 5
 
 ```bash
 KOMARI_STATIC=1 ./scripts/build-komari.sh                      # linux/amd64 静态（需 zig）
-KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静态
+# 2026-11-12 起只维护自有服务器目标平台，arm64 静态构建注释停用：
+# KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静态
 ```
 
 - zig 缺失或不可用时脚本**明确报错**，不会静默退化为动态链接（否则 alpine 部署会在运行期才失败）。
@@ -180,7 +181,8 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 
 ### 3.4 发布一个版本
 
-一次发布 = **整套栈**：服务器静态产物 + 14 个 agent 资产 + agent 镜像。
+一次发布 = **整套栈**：服务器静态产物（linux/amd64）+ 1 个 agent 资产 + agent 镜像。
+2026-11-12 起只维护自有服务器目标平台，其余平台构建已注释停用（恢复时取消对应注释并同步本步骤）。
 
 1. 同步版本字面量（`scripts/version.env` 的 `KOMARI_VERSION`、`install-komari.sh` 的 `REPO_TAG`、
    `install-agent.sh` 的 `default_agent_version`、`install-agent.ps1` 的 `$DefaultAgentVersion`）。
@@ -190,12 +192,13 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
 2. 服务器静态产物（需 zig）：
    ```bash
    KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
-   KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
+   # 2026-11-12 起只维护自有服务器目标平台，arm64 注释停用（恢复时取消下一行注释）：
+   # KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
    ```
-3. agent 全平台（14 个，纯 Go）：`./scripts/build-agent.sh`
+3. agent 只维护 linux/amd64（纯 Go；其余 13 个平台在 `scripts/build-agent.sh` 里注释停用）：`./scripts/build-agent.sh`
 3.5 生成服务端校验和资产（面板一键升级按它校验下载内容，0.0.8 起必需）：
    ```bash
-   ./scripts/gen-release-sums.sh        # 产出 dist/komari-SHA256SUMS（两行：amd64/arm64）
+   ./scripts/gen-release-sums.sh        # 产出 dist/komari-SHA256SUMS（一行：amd64；arm64 条目已注释停用）
    ```
 4. 自检：`./scripts/check-repo.sh --full` 必须全绿（含第 8 项 Trellis 流程闸门、版本字面量一致性、
    文档锚点、`go build/vet/test`、离线构建、agent 三道门禁、前端产物哈希、第 12 项自检自测）。
@@ -203,12 +206,13 @@ KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # linux/arm64 静
    `scripts/build-agent.sh` 默认写的就是 `dist/agent` 并会先清空该目录，别拿它当临时构建用。
 5. `git tag <版本> && git push origin <版本>`
 6. `gh release create <版本> -R zhemed/komari --title "<版本>" --notes-file <说明.md> \
-      dist/komari-linux-amd64 dist/komari-linux-arm64 dist/komari-SHA256SUMS \
-      dist/komari-agent-SHA256SUMS dist/agent/komari-agent-*`
-   （共 18 个资产：服务端 2 + `komari-SHA256SUMS` + agent 14 + `komari-agent-SHA256SUMS`。
-   0.0.8 起服务端也有校验和资产——面板一键升级与 `install-komari.sh` 都按它校验；
-   缺该资产的旧 release（≤0.0.7）在升级界面里会被明确拒绝："请用 install-komari.sh 升级"）
+      dist/komari-linux-amd64 dist/komari-SHA256SUMS \
+      dist/komari-agent-SHA256SUMS dist/agent/komari-agent-linux-amd64`
+   （2026-11-12 起共 4 个资产：服务端 1 + `komari-SHA256SUMS` + agent 1 + `komari-agent-SHA256SUMS`；
+   GitHub 页面另加 2 个自动源码包，显示 6 个。0.0.8 起服务端也有校验和资产——面板一键升级与
+   `install-komari.sh` 都按它校验。恢复多平台时同步本命令与第 2、3 步。）
 7. 推送镜像：`./scripts/build-server-image.sh --push && ./scripts/build-agent-image.sh --push`
+   （2026-11-12 起两个镜像都只推 linux/amd64）
 
 > **顺序很重要**：服务器二进制的版本 hash 来自构建时的 `git rev-parse HEAD`，
 > 且 Go 会把 VCS 信息也编进去。所以**先提交、后构建**，否则 release 里的二进制
@@ -631,7 +635,7 @@ VITE_KOMARI_UPDATE_REPO=owner/repo ./scripts/build-frontend.sh
 | 自更新目标 | `update.Repo = zhemed/komari`（源码默认值 + 构建期 `-X` 双保险） |
 | 自更新默认 | **关闭**；开启用 `--enable-auto-update` 或 `AGENT_ENABLE_AUTO_UPDATE=1`（旧的 `-autoUpdate` 仍表示开启） |
 | 安装脚本 | `install-agent.sh` / `install-agent.ps1`（放在仓库根，前端的安装命令直指这里）：默认装脚本 pin 的版本，`--install-version latest` 可装最新 |
-| 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`（多架构 amd64/arm64/armv7），`./scripts/build-agent-image.sh --push`；`Dockerfile.agent` **刻意不含任何 RUN**，否则没有 QEMU/binfmt 的机器上多架构构建会 `exec format error` |
+| 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` 与 `:latest`（2026-11-12 起只推 linux/amd64；原多架构 amd64/arm64/armv7 注释停用），`./scripts/build-agent-image.sh --push`；`Dockerfile.agent` **刻意不含任何 RUN**，否则没有 QEMU/binfmt 的机器上多架构构建会 `exec format error`（多平台时期记录） |
 
 ### 11.1 为什么必须给自更新加资产过滤（发布前实测过的坑）
 
@@ -681,26 +685,28 @@ agent 可能把自己刷成**服务器二进制**。
 
 ## 12. 容器镜像
 
-两个镜像都发布在 ghcr.io 下，公开可拉：
+两个镜像都发布在 ghcr.io 下，公开可拉。2026-11-12 起只维护自有服务器目标平台 linux/amd64
+（arm64 / armv7 在 `scripts/build-*-image.sh` 里注释停用，恢复时取消注释并同步本表）：
 
 | 镜像 | 内容 | 平台 | 构建脚本 |
 |---|---|---|---|
-| `ghcr.io/zhemed/komari` | 服务器（alpine + 静态二进制） | amd64、arm64 | `scripts/build-server-image.sh --push` |
-| `ghcr.io/zhemed/komari-agent` | agent | amd64、arm64、armv7 | `scripts/build-agent-image.sh --push` |
+| `ghcr.io/zhemed/komari` | 服务器（alpine + 静态二进制） | linux/amd64 | `scripts/build-server-image.sh --push` |
+| `ghcr.io/zhemed/komari-agent` | agent | linux/amd64 | `scripts/build-agent-image.sh --push` |
 
 发布时（§3.4 第 7 步）：
 
 ```bash
 gh auth token | docker login ghcr.io -u zhemed --password-stdin
-./scripts/build-server-image.sh --push    # 依赖 dist/komari-linux-{amd64,arm64}，且必须静态链接
-./scripts/build-agent-image.sh --push     # 依赖 dist/agent/komari-agent-linux-{amd64,arm64,arm}
+./scripts/build-server-image.sh --push    # 依赖 dist/komari-linux-amd64，且必须静态链接
+./scripts/build-agent-image.sh --push     # 依赖 dist/agent/komari-agent-linux-amd64
 ```
 
 - 版本号取自 `scripts/version.env`；`:latest` 与 `:<版本>` 一起推。
 - 两个脚本在缺产物、或产物不是静态链接时会**直接报错**，不会推一个跑不起来的镜像。
-- 服务器镜像里有 `RUN apk add`，跨架构构建需要本机有 QEMU/binfmt：
-  `docker run --privileged --rm tonistiigi/binfmt --install arm64`；
-  agent 镜像**刻意不含任何 RUN**（只有 COPY），因此不需要模拟器（0.0.4 实测）。
+- 服务器镜像里有 `RUN apk add`，跨架构构建需要本机有 QEMU/binfmt
+  （多平台时期：`docker run --privileged --rm tonistiigi/binfmt --install arm64`）；
+  2026-11-12 收敛到单平台后不再需要模拟器。agent 镜像**刻意不含任何 RUN**（只有 COPY），
+  因此不需要模拟器（0.0.4 实测）。
 - **包可见性只能手点**：用户级 ghcr 包的可见性无法用 API 改（`PATCH /user/packages/...`
   实测一律 404，连已公开的包也一样），新建的包默认 **private**。要公开得去
   `https://github.com/users/<user>/packages/container/<包名>/settings` → Change visibility → Public。
@@ -716,7 +722,8 @@ gh auth token | docker login ghcr.io -u zhemed --password-stdin
   0.0.4 实测：四个 tag 全部匿名可拉，服务器镜像匿名 `docker run` 后 `/install` 200、
   数据落在挂载卷。
 - Dockerfile 里带 `org.opencontainers.image.source` 标签，ghcr 包页面会链回本仓库。
-- **验收必须查"载荷"**：只查平台清单 + 匿名可拉**查不出载荷架构错**——2026-10-23 实测 0.0.4…0.0.21 的
+- **验收必须查"载荷"**（多平台时期的历史记录：2026-11-12 起只维护 linux/amd64，arm64 / armv7 目标已注释停用；
+  以下流程与事故记录保留备查，不再适用于现行单平台发布）：只查平台清单 + 匿名可拉**查不出载荷架构错**——2026-10-23 实测 0.0.4…0.0.21 的
   arm64 / armv7 腿里装的其实是 amd64 二进制（多轮发布都这样"通过"了验收），真实 ARM 硬件上根本起不来。
   根因：`Dockerfile` / `Dockerfile.agent` 在 stage 内**带默认值**声明 `ARG TARGETOS=linux` /
   `ARG TARGETARCH=amd64`，默认值覆盖 buildx 按平台注入的值 ⇒ 每一腿都 COPY amd64 产物；修法（`95085a3`）

@@ -8,7 +8,8 @@
 # 用法：
 #   ./scripts/build-komari.sh                                      # 本机构建（动态链接 glibc）
 #   KOMARI_STATIC=1 ./scripts/build-komari.sh                      # 发布用：linux/amd64 静态（需 zig）
-#   KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
+#   2026-11-12 起只维护自有服务器目标平台，arm64 静态构建注释停用：
+#   # KOMARI_STATIC=1 KOMARI_GOARCH=arm64 ./scripts/build-komari.sh  # 发布用：linux/arm64 静态
 #   KOMARI_VERSION=0.0.2 ./scripts/build-komari.sh                 # 下一版本：递增 patch 位
 #   KOMARI_OUTPUT=/tmp/komari ./scripts/build-komari.sh            # 自定义输出路径
 #
@@ -62,8 +63,9 @@ if [ "${STATIC}" = "1" ] || [ "${STATIC}" = "true" ]; then
      不静默退化为动态链接——alpine 镜像会因此无法运行。"
   case "${GOARCH_TARGET}" in
     amd64) ZIG_TARGET="x86_64-linux-musl" ;;
-    arm64) ZIG_TARGET="aarch64-linux-musl" ;;
-    *) die "静态构建暂不支持 GOARCH=${GOARCH_TARGET}（仅 amd64 / arm64）" ;;
+    # 2026-11-12 起只维护 linux/amd64；恢复 arm64 静态构建时取消下一行注释。
+    # arm64) ZIG_TARGET="aarch64-linux-musl" ;;
+    *) die "静态构建暂不支持 GOARCH=${GOARCH_TARGET}（2026-11-12 起只维护 amd64；其余目标注释停用）" ;;
   esac
   log "静态构建：GOARCH=${GOARCH_TARGET}，CC=\"${ZIG_BIN} cc -target ${ZIG_TARGET}\""
   set -- env CGO_ENABLED=1 "GOARCH=${GOARCH_TARGET}" "CC=${ZIG_BIN} cc -target ${ZIG_TARGET}"

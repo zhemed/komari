@@ -4,12 +4,14 @@
 #
 # 用法：
 #   ./scripts/build-server-image.sh                 # 本地单平台（linux/amd64）构建，不推送
-#   ./scripts/build-server-image.sh --push          # amd64 + arm64 构建并推送 :<版本> 与 :latest
+#   ./scripts/build-server-image.sh --push          # 单平台 linux/amd64 构建并推送 :<版本> 与 :latest
+#                                                   # （2026-11-12 起只维护自有服务器目标平台）
 #   KOMARI_VERSION=0.0.5 ./scripts/build-server-image.sh --push
 #
 # 前提：先产出静态服务器二进制（Dockerfile 注释里写了原因，alpine 需要静态链接）：
 #   KOMARI_STATIC=1 KOMARI_OUTPUT=dist/komari-linux-amd64 ./scripts/build-komari.sh
-#   KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
+#   2026-11-12 起只维护 linux/amd64，arm64 注释停用：
+#   # KOMARI_STATIC=1 KOMARI_GOARCH=arm64 KOMARI_OUTPUT=dist/komari-linux-arm64 ./scripts/build-komari.sh
 #
 # 与 scripts/build-agent-image.sh 是"同一个套路的两份实现"（上下文准备 + buildx 调用），
 # 刻意不抽公共函数：两者的平台/产物名/异常说明都不同，抽出来反而更难读。
@@ -17,7 +19,8 @@
 # 认证：用 gh 的 token（需 write:packages 权限）
 #   gh auth token | docker login ghcr.io -u <你的用户名> --password-stdin
 #
-# 注：本机若没有 QEMU/binfmt 模拟器，arm64 会因为 Dockerfile 里的 `RUN apk add` 报
+# 注：以下为多平台时期的 QEMU/binfmt 说明，2026-11-12 收敛到单平台后不再需要（保留备查）：
+# 本机若没有 QEMU/binfmt 模拟器，arm64 会因为 Dockerfile 里的 `RUN apk add` 报
 # `exec format error`；装一次模拟器即可：
 #   docker run --privileged --rm tonistiigi/binfmt --install arm64
 #
@@ -36,7 +39,9 @@ die() { printf '[build-server-image] ERROR: %s\n' "$*" >&2; exit 1; }
 IMAGE="${KOMARI_SERVER_IMAGE:-ghcr.io/zhemed/komari}"
 SERVER_DIR="${KOMARI_SERVER_OUTPUT:-${REPO_ROOT}/dist}"
 PUSH=0
-PLATFORMS="linux/amd64,linux/arm64"
+# 2026-11-12 起只维护自有服务器目标平台：arm64 注释停用，恢复时取消下一行注释。
+PLATFORMS="linux/amd64"
+# PLATFORMS="linux/amd64,linux/arm64"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -59,8 +64,9 @@ cp -f "${REPO_ROOT}/Dockerfile" "${CTX}/Dockerfile"
 need_asset() {
   case "$1" in
     linux/amd64) echo "komari-linux-amd64" ;;
-    linux/arm64) echo "komari-linux-arm64" ;;
-    *) die "服务器镜像暂不支持的平台：$1（只发 amd64/arm64，因为只有这两个静态产物）" ;;
+    # 2026-11-12 起只维护 linux/amd64，arm64 注释停用：
+    # linux/arm64) echo "komari-linux-arm64" ;;
+    *) die "服务器镜像暂不支持的平台：$1（2026-11-12 起只维护 linux/amd64）" ;;
   esac
 }
 
@@ -74,7 +80,7 @@ for p in "${plat_list[@]}"; do
   asset="$(need_asset "${p}")"
   [ -f "${SERVER_DIR}/${asset}" ] || die "缺少产物 ${SERVER_DIR}/${asset}
      先跑：KOMARI_STATIC=1 KOMARI_OUTPUT=${SERVER_DIR}/${asset} ./scripts/build-komari.sh
-     （arm64 加 KOMARI_GOARCH=arm64；静态构建需要 zig，见 docs/MAINTAINING.md §3.3）"
+     （静态构建需要 zig，见 docs/MAINTAINING.md §3.3；2026-11-12 起只维护 amd64）"
   file "${SERVER_DIR}/${asset}" | grep -q "statically linked" \
     || die "${SERVER_DIR}/${asset} 不是静态链接。alpine 镜像里跑不起来，
      用 KOMARI_STATIC=1 重新构建（这也是 Dockerfile 注释里的前提）。"
