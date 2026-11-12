@@ -103,6 +103,18 @@ chunk 连锁改名 → 索引与 Service Worker 的预缓存 revision 同步变�
   （**不要**改回 `/opt/komari`，会和服务器的目录撞车），默认装脚本 pin 的版本。
   `build-agent.sh` 会把补丁回放结果与仓库成品**逐字节比对**，不一致即失败。
 
+### 1.7 内置主题包（2026-11-12 起）
+
+- `web/public/builtinThemes/ink.zip` 是 `themes/ink` 的构建产物，`//go:embed` 进二进制；
+  首次启动若 `data/theme/ink` 缺失会自动解压安装，全新库默认激活 `ink`
+  （已有显式主题设置不覆盖；主题仍可通过 `data/theme/` 覆盖更新）。
+- 构建：`./build.sh` 构建主题后自动同步该 zip；**改主题后必须提交刷新后的 zip**，否则二进制里带旧主题。
+  纯 Go 构建（`scripts/build-komari.sh`）直接用仓库里的 zip，不需要 Node。
+- 门禁：`scripts/check-repo.sh` 第 17 项校验包存在、含 `dist/index.html`、`short=ink`、
+  版本与 `themes/ink/komari-theme.json` 一致。
+- **不要**用主题构建产物替换 `web/public/defaultTheme/`：官方默认主题继续承担 `/admin`、`/install`
+  与 guide 页面（见 §1.1）；替换会破坏安装向导与前端哈希门禁。
+
 ## 2. 构建与验证命令
 
 ```bash

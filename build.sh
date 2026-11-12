@@ -66,6 +66,9 @@ if [ "$SKIP_THEME" = "0" ]; then
   VITE_API_BASE=/api bun run build >/dev/null
   ZIP="$(ls ink-build-*.zip | head -1)"
   [ -n "$ZIP" ] || { echo "主题构建未产出 zip" >&2; exit 1; }
+  # 同步内置主题包：随二进制 go:embed 分发（首次启动自动安装，check-repo 第 17 项校验版本）。
+  mkdir -p "$ROOT/web/public/builtinThemes"
+  cp "$ZIP" "$ROOT/web/public/builtinThemes/ink.zip"
   ZIP_PATH="$ROOT/ops-dist/theme/$ZIP"
   cp "$ZIP" "$ZIP_PATH"
   ( cd "$ROOT/ops-dist/theme" && sha256sum "$ZIP" > "$ZIP.sha256" )

@@ -90,6 +90,9 @@ cd /root/ssh/komari-src && ./build.sh --skip-server --skip-install
 
 # 2) 取产物：ops-dist/theme/ink-build-<sha>.zip（+ .sha256）
 
+# 2.5) 构建脚本已自动把同一 zip 同步到 web/public/builtinThemes/ink.zip（内置主题，随二进制分发）；
+#      改主题后记得把它一起提交（check-repo 第 17 项校验包内版本与 themes/ink 一致）
+
 # 3) 覆盖滚动 release（tag 固定 theme-latest；必须 --prerelease）
 mkdir -p /tmp/ink-release && cp ops-dist/theme/ink-build-*.zip /tmp/ink-release/ink-theme.zip
 cp ops-dist/theme/ink-build-*.zip.sha256 /tmp/ink-release/ink-theme.zip.sha256
@@ -105,6 +108,9 @@ gh release create theme-latest --prerelease \
 ```
 
 注意：
+- **内置主题包**：`build.sh` 构建主题后会把 zip 同步到 `web/public/builtinThemes/ink.zip`，
+  它随**服务端发版**生效（首次启动自动安装到 `data/theme/ink`，新库默认激活）；
+  只发主题、不动服务端时，内置包保持旧版本（现有实例走主题更新通道即可）。
 - 滚动 release 资产名固定 `ink-theme.zip`（manifest 与 catalog 都引用稳定 URL）。
 - **不得把 theme-latest 改成正式 release**：会被 Komari 内核自升级误判为新版本（prerelease 才被过滤）。
 - `deploy/theme-market/v1.json` 是自有市场目录；`web/api/admin/theme_market.go` 的

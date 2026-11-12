@@ -27,6 +27,7 @@
 | agent 源码 | **在本仓库**：`agent/`（上游 commit `1186aafb…`，2026-08-07，**1.4.3 同期**的快照 + 我们内联的改动） | 溯源与构建参数在 `scripts/agent-build.env`；见第 11 节 |
 | agent 资产 | `komari-agent-<os>-<arch>`（只维护 linux/amd64；其余平台 2026-11-12 起注释停用） | 与服务器资产**同一个 release**，由 `scripts/build-agent.sh` 构建 |
 | agent 镜像 | `ghcr.io/zhemed/komari-agent:<版本>` / `:latest` | 由 `scripts/build-agent-image.sh --push` 推送 |
+| 内置主题包 | `web/public/builtinThemes/ink.zip`（`//go:embed` 进二进制） | 首次启动若 `data/theme/ink` 缺失会自动安装；全新库默认激活 `ink`；`build.sh` 构建主题后自动同步；`check-repo` 第 17 项校验版本与 `themes/ink` 一致 |
 
 **为什么前端源码/产物都在仓库里**：`web/public/public.go:18` 是 `//go:embed defaultTheme`，
 主题产物缺失时 `static()` 会在 `public.go:130` 直接 panic——即后端单独无法构建。所以：
@@ -140,6 +141,11 @@ gh run list -R zhemed/komari --workflow=trellis-gate.yml --limit 5
 主题产物已 vendor 在仓库内，克隆后即可直接构建。若 `web/public/defaultTheme/` 缺失，
 脚本会明确报错并指出这正是 `public.go:130` panic 的根因。
 
+ink 主题的构建产物内置在二进制里（`web/public/builtinThemes/ink.zip`，见 §1 表）：
+**全新部署无需再手动安装主题**——首次启动若 `data/theme/ink` 缺失会自动解压安装，新库默认激活；
+已有实例/已选主题不覆盖，主题仍可通过 `data/theme/` 或主题更新通道覆盖。改了主题后重跑
+`./build.sh` 会同步刷新内置包（记得提交该 zip）。
+
 ### 3.2 重新构建前端产物（改了 frontend/ 才需要，需要网络 + Node）
 
 ```bash
@@ -213,6 +219,9 @@ KOMARI_STATIC=1 ./scripts/build-komari.sh                      # linux/amd64 静
    `install-komari.sh` 都按它校验。恢复多平台时同步本命令与第 2、3 步。）
 7. 推送镜像：`./scripts/build-server-image.sh --push && ./scripts/build-agent-image.sh --push`
    （2026-11-12 起两个镜像都只推 linux/amd64）
+8. 若本次包含主题改动：确认 `web/public/builtinThemes/ink.zip` 已随构建刷新并提交
+   （`build.sh` 构建主题时自动同步；`check-repo` 第 17 项校验版本一致）。
+   内置包随服务端发版生效；只发主题（`theme-latest`）不会更新它。
 
 > **顺序很重要**：服务器二进制的版本 hash 来自构建时的 `git rev-parse HEAD`，
 > 且 Go 会把 VCS 信息也编进去。所以**先提交、后构建**，否则 release 里的二进制

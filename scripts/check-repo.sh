@@ -448,6 +448,51 @@ else
   done
 fi
 
+# ---------- 17. 内置主题包（随二进制分发） ----------
+# 2026-11-12 加：ink 主题作为内置主题随二进制分发（web/public/builtinThemes/ink.zip，
+# go:embed 进二进制，首次启动自动安装到 data/theme/ink）。这里校验：包存在、含
+# dist/index.html、short=ink、版本与 themes/ink/komari-theme.json 一致——防止发版带出旧主题/坏包。
+head_ "17. 内置主题包与主题源码一致"
+BUILTIN_THEME_ZIP="web/public/builtinThemes/ink.zip"
+if [ ! -f "${BUILTIN_THEME_ZIP}" ]; then
+  bad "缺少内置主题包 ${BUILTIN_THEME_ZIP}（先跑 ./build.sh --skip-server --skip-install 或从 themes/ink 构建后同步）"
+else
+  builtin_theme_err="$(python3 - "${BUILTIN_THEME_ZIP}" themes/ink/komari-theme.json <<'PY'
+import json
+import sys
+import zipfile
+
+zip_path, manifest_path = sys.argv[1], sys.argv[2]
+try:
+    with zipfile.ZipFile(zip_path) as archive:
+        names = set(archive.namelist())
+        if 'komari-theme.json' not in names:
+            print('包内缺少 komari-theme.json')
+            sys.exit(0)
+        if 'dist/index.html' not in names:
+            print('包内缺少 dist/index.html')
+            sys.exit(0)
+        inner = json.loads(archive.read('komari-theme.json'))
+except Exception as exc:  # noqa: BLE001 - 统一转成一行错误信息
+    print(f'无法读取内置主题包: {exc}')
+    sys.exit(0)
+
+with open(manifest_path, encoding='utf-8') as handle:
+    repo = json.load(handle)
+if inner.get('short') != 'ink':
+    print(f"short 不是 ink: {inner.get('short')}")
+    sys.exit(0)
+if inner.get('version') != repo.get('version'):
+    print(f"版本不一致：内置 {inner.get('version')} / 源码 {repo.get('version')}")
+PY
+)"
+  if [ -n "${builtin_theme_err}" ]; then
+    bad "内置主题包不可用：${builtin_theme_err}"
+  else
+    ok "内置主题包就位（$(du -h "${BUILTIN_THEME_ZIP}" | awk '{print $1}')，版本与 themes/ink 一致）"
+  fi
+fi
+
 printf '\n[check-repo] 结论：'
 if [ "${FAIL}" = 0 ]; then
   printf '\033[32m全部通过\033[0m\n'; exit 0
