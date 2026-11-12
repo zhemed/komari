@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-11-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~411 | Active |
+| `journal-1.md` | ~446 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-11-12 | 主题默认值调整：comfortable / 色觉友好开启 / 访客信息关闭（1.0.7） | `d6812ff` | `main` |
 | 11 | 2026-11-12 | 三网行丢包条改实线色块（主题 1.0.6，本机+生产更新） | `9788c6e` | `main` |
 | 10 | 2026-11-12 | 生产机升级到 0.0.26（+ 主题 1.0.5） | `d3b2626` | `main` |
 | 9 | 2026-11-12 | 发布 0.0.26（内置主题 + 主题商店移除 + 三网双条 + 主题 URL 修复） | `41c3a22` | `main` |

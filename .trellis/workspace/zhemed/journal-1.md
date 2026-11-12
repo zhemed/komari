@@ -409,3 +409,38 @@
 ### Next Steps
 
 - 0.0.26 二进制内置主题仍 1.0.5，下次服务端发版内置 1.0.6；生产旧主题备份 theme-1.0.5-20261112T133954Z 可回滚
+
+
+## Session 12: 主题默认值调整：comfortable / 色觉友好开启 / 访客信息关闭（1.0.7）
+<!-- trellis-session: v=2 fp=7b49de5dd0833ae1 -->
+
+**Date**: 2026-11-12
+**Task**: 主题默认值调整：comfortable / 色觉友好开启 / 访客信息关闭（1.0.7）
+**Branch**: `main`
+
+### Summary
+
+用户定稿主题默认值：nodeCardSize=comfortable、colorVisionMode=色觉友好、visitorInfoEnabled=false。实现两处：运行时兜底（stores/app.ts：nodeCardSize 兜底 comfortable、parseColorVisionMode 兜底 accessible、visitorInfoEnabled 兜底 false）与管理端表单默认（komari-theme.json 三处 default + help 文案）。主题 1.0.6→1.0.7，重建 zip + 内置包，README 同步。验证：lint/build 通过；全新实例（无 theme_configurations 行、1.0.7 主题）实测 html.color-vision-friendly 存在、无访客 IP 条；theme-latest 更新为 1.0.7（sha256 ecc2de1b…，匿名下载一致）；本机设置对齐并读回验证；生产主题更新 1.0.7（其已保存设置本就匹配）；check-repo --full 17 项全绿。
+
+### Main Changes
+
+- themes/ink/src/stores/app.ts：三处默认值兜底；themes/ink/komari-theme.json：三处 default + help；版本 1.0.7；内置包重建；README 同步
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6812ff` | feat(theme): 默认值调整——comfortable / 色觉友好开启 / 访客信息关闭（1.0.7） [task:theme-defaults] |
+
+### Testing
+
+- [OK] 全新实例：htmlClass=dark color-vision-friendly、hasVisitor=false（无保存设置）
+- [OK] theme-latest 1.0.7 匿名下载 sha256 一致；生产/本机主题 1.0.7；check-repo --full 17 项全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 0.0.26 内置主题仍 1.0.5，下次服务端发版内置 1.0.7
