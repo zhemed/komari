@@ -298,3 +298,41 @@
 ### Next Steps
 
 - 主题市场已移除；主题上传/导入/更新保留；方案 2（替换 defaultTheme）仍待办；生产未动
+
+
+## Session 9: 发布 0.0.26（内置主题 + 主题商店移除 + 三网双条 + 主题 URL 修复）
+<!-- trellis-session: v=2 fp=a6a87c6ae14f9cc8 -->
+
+**Date**: 2026-11-12
+**Task**: 发布 0.0.26（内置主题 + 主题商店移除 + 三网双条 + 主题 URL 修复）
+**Branch**: `main`
+
+### Summary
+
+按用户 2026-11-12「发版吧」执行完整发布（docs/MAINTAINING §3.4）。版本：内核 0.0.25→0.0.26（own.6→own.7）、主题 1.0.4→1.0.5；字面量同步 scripts/version.env、install-komari.sh、install-agent.sh/ps1、README、MAINTAINING（当前版本/已发布区间/本次说明）、ops-docs/VERSION/DEPLOY，新增 deploy/komari-v0.0.26-own.7-listen-local.sh。工具链：本机安装 zig 0.16.0（sha 校验，静态构建）与 docker 29.1.3 + buildx v0.39.0（镜像推送，gh token 登录 ghcr）。构建：先提交（41c3a22）再静态构建 dist/komari-linux-amd64（38.6MB, 静态）、agent（12.5MB）、SHA256SUMS；check-repo --full 17 项全绿。发布：tag 0.0.26/server/v0.0.26-own.7/theme-ink/v1.0.5；GitHub release 0.0.26（4 资产，Latest）；theme-latest prerelease 更新 ink-theme.zip 1.0.5（sha 439cb768…）；镜像 ghcr komari:0.0.26/:latest 与 komari-agent:0.0.26/:latest（linux/amd64，匿名 manifest 200，镜像内二进制报 0.0.26/hash 41c3a22）。核验：匿名下载资产校验和一致；本机实例装发布版静态二进制（/api/version=0.0.26/hash 41c3a22），面板「主题→更新」实测 200 且主题 1.0.4→1.0.5，首页三网双条正常。生产未动。
+
+### Main Changes
+
+- 版本字面量 + 主题 manifest 1.0.5 + 内置包刷新 + 新版本化部署脚本（提交 41c3a22）
+- 发布产物：dist/komari-linux-amd64、dist/agent/komari-agent-linux-amd64、两个 SHA256SUMS（不入库）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `41c3a22` | release: 0.0.26（内置主题 + 主题商店移除 + 三网双条 + 主题 URL 修复） [task:release-0.0.26] |
+
+### Testing
+
+- [OK] check-repo.sh --full：17 项全绿（tag 前 exit 0）
+- [OK] GitHub release 0.0.26：4 资产匿名下载 + 校验和一致；tag 指向 41c3a22
+- [OK] theme-latest：ink-theme.zip sha256 439cb768…、包内 1.0.5；面板主题更新 200
+- [OK] ghcr 两镜像 0.0.26/:latest 匿名 manifest 200；镜像内二进制版本 0.0.26/hash 41c3a22
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 生产升级由用户决定（面板一键升级或换镜像 tag）；本机已装 docker/zig 供后续发版使用
