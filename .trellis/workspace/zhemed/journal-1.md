@@ -336,3 +336,39 @@
 ### Next Steps
 
 - 生产升级由用户决定（面板一键升级或换镜像 tag）；本机已装 docker/zig 供后续发版使用
+
+
+## Session 10: 生产机升级到 0.0.26（+ 主题 1.0.5）
+<!-- trellis-session: v=2 fp=91cf43d11858553d -->
+
+**Date**: 2026-11-12
+**Task**: 生产机升级到 0.0.26（+ 主题 1.0.5）
+**Branch**: `main`
+
+### Summary
+
+用户 2026-11-12 授权本次生产升级。生产 = zzds.de（19.9刀 VPS），komari 容器 host 网络监听 127.0.0.1:25774，数据 /root/komari/data，nginx 反代 vps.miio.cc。按 ops 工作区 change-process：只读核对 → 备份（sqlite3 在线备份 DB + 主题 tgz + 容器/镜像 inspect + SHA256SUMS）→ 拉取 ghcr.io/zhemed/komari:0.0.26（digest d7768daa…）→ 旧容器改名 komari-rollback-0.0.25 并停止 → 同配置重建（带失败自动回滚兜底）→ 验证：/api/version=0.0.26/hash 41c3a22、站点 /admin/api 均 200、agent WebSocket 重连 v2、负载 61 点/小时 + ping 183 点、日志 0 error/panic/fatal、市场接口已删、程序自动升级备份 data/backup/upgrade-20261112-104204.zip。用户确认后主题 1.0.4→1.0.5（theme-latest sha256 439cb768… 校验，原子替换 data/theme/ink），首页三网行双条版式截图确认。升级前备份已下载到 ops 工作区 backups/ 作异地副本（gitignore）。nginx/sb/new-api/picsur/防火墙/sshd/证书均未动；旧容器/旧镜像保留作回滚。
+
+### Main Changes
+
+- .trellis/tasks/11-12-prod-upgrade-0.0.26/：PRD + 实施记录（生产侧变更与回滚命令）
+- 生产运行手册（/root/19.9刀/server-zzds.de.md）：Docker 表镜像 0.0.26、变更记录新增升级与回滚
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d3b2626` | chore(task): archive 11-12-prod-upgrade-0.0.26 |
+
+### Testing
+
+- [OK] 生产 /api/version = 0.0.26/hash 41c3a22；https://vps.miio.cc/ 200；节点 RAKsmart 在线
+- [OK] 负载/ping 记录连续；docker logs 0 error/panic/fatal；主题 manifest 1.0.5、三网双条截图
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 旧容器 komari-rollback-0.0.25 与旧镜像清理待用户确认；生产已与 0.0.26 发布状态一致
