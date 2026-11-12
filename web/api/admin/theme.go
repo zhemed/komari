@@ -429,12 +429,19 @@ func getGitHubReleaseDownloadURL(owner, repo string) (string, error) {
 	return releaseInfo.Assets[0].BrowserDownloadURL, nil
 }
 
-// isGitHubRepoURL 检查URL是否是GitHub仓库地址
-// 支持的格式:
-// - https://github.com/owner/repo
-// - https://github.com/owner/repo.git
-// - https://www.github.com/owner/repo
-// - http://github.com/owner/repo
+// isGitHubRepoURL 检查 URL 是否是 GitHub **仓库根地址**。
+//
+// 只接受以下形态（可带末尾斜杠）：
+//   - https://github.com/owner/repo
+//   - https://github.com/owner/repo.git
+//   - https://www.github.com/owner/repo
+//   - http://github.com/owner/repo
+//
+// 具体资源路径（`/owner/repo/releases/download/...`、`/owner/repo/archive/...`、
+// `/owner/repo/tree/...` 等）**不是**仓库地址：必须返回 false，让调用方按普通 URL 直接下载。
+// 否则会把 release 下载链接当成仓库去 GitHub API 取 latest release 的第一个资产（通常是二进制），
+// 导致主题导入/更新报 “not a valid zip”（2026-11-12 本机实例实测）。
+//
 // 返回:
 //   - 是否是GitHub仓库URL
 //   - 仓库所有者
@@ -444,12 +451,6 @@ func isGitHubRepoURL(urlStr string) (bool, string, string) {
 		return false, "", ""
 	}
 
-	// 检查URL是否包含github.com
-	if !strings.Contains(strings.ToLower(urlStr), "github.com") {
-		return false, "", ""
-	}
-
-	// 解析URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return false, "", ""
@@ -461,20 +462,21 @@ func isGitHubRepoURL(urlStr string) (bool, string, string) {
 		return false, "", ""
 	}
 
-	// 解析路径部分，提取owner和repo
-	// 路径格式应该是 /owner/repo 或 /owner/repo.git
-	path := strings.TrimPrefix(parsedURL.Path, "/")
+	// 仓库根地址的路径必须恰好是 /owner/repo（允许末尾斜杠与 .git 后缀）。
+	path := strings.Trim(parsedURL.Path, "/")
+	if path == "" {
+		return false, "", ""
+	}
 	parts := strings.Split(path, "/")
-
-	if len(parts) < 2 {
+	if len(parts) != 2 {
 		return false, "", ""
 	}
 
 	owner := parts[0]
-	repo := parts[1]
-
-	// 如果repo以.git结尾，去掉这个后缀
-	repo = strings.TrimSuffix(repo, ".git")
+	repo := strings.TrimSuffix(parts[1], ".git")
+	if owner == "" || repo == "" {
+		return false, "", ""
+	}
 
 	return true, owner, repo
 }

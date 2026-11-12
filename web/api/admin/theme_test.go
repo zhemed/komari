@@ -131,3 +131,43 @@ func TestPeekThemeFromZipAcceptsLocalizedMetadata(t *testing.T) {
 		t.Fatalf("installed short = %q, want localized-theme", installed.Short)
 	}
 }
+
+// TestIsGitHubRepoURL 防止把 GitHub release 下载 / archive / tree 等具体资源 URL
+// 误判成仓库根地址。2026-11-12 本机实例实测：主题导入/更新把
+// https://github.com/zhemed/komari/releases/download/theme-latest/ink-theme.zip
+// 当成仓库地址，去 GitHub API 取 latest release 的第一个资产（服务器二进制），
+// 解压时报 "not a valid zip"。修复后只有 /owner/repo[.git][/] 才算仓库地址。
+func TestIsGitHubRepoURL(t *testing.T) {
+	cases := []struct {
+		name  string
+		url   string
+		want  bool
+		owner string
+		repo  string
+	}{
+		{"repo root", "https://github.com/owner/repo", true, "owner", "repo"},
+		{"repo root with .git", "https://github.com/owner/repo.git", true, "owner", "repo"},
+		{"repo root trailing slash", "https://github.com/owner/repo/", true, "owner", "repo"},
+		{"www host", "https://www.github.com/owner/repo", true, "owner", "repo"},
+		{"http scheme", "http://github.com/owner/repo", true, "owner", "repo"},
+		{"release asset download", "https://github.com/zhemed/komari/releases/download/theme-latest/ink-theme.zip", false, "", ""},
+		{"release page", "https://github.com/owner/repo/releases", false, "", ""},
+		{"archive zip", "https://github.com/owner/repo/archive/refs/heads/main.zip", false, "", ""},
+		{"tree page", "https://github.com/owner/repo/tree/main", false, "", ""},
+		{"blob page", "https://github.com/owner/repo/blob/main/README.md", false, "", ""},
+		{"owner only", "https://github.com/owner", false, "", ""},
+		{"github root", "https://github.com/", false, "", ""},
+		{"non github host", "https://gitlab.com/owner/repo", false, "", ""},
+		{"empty", "", false, "", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, owner, repo := isGitHubRepoURL(tc.url)
+			if got != tc.want || owner != tc.owner || repo != tc.repo {
+				t.Fatalf("isGitHubRepoURL(%q) = (%v, %q, %q), want (%v, %q, %q)",
+					tc.url, got, owner, repo, tc.want, tc.owner, tc.repo)
+			}
+		})
+	}
+}
