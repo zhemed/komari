@@ -220,3 +220,42 @@
 ### Next Steps
 
 - 主题未发布（版本仍 1.0.4）；确认版式后按 docs §3.4.2 发布 theme-latest + 回填市场目录；生产未动
+
+
+## Session 7: ink 主题内置进二进制（首次启动自动安装 + 新库默认激活）
+<!-- trellis-session: v=2 fp=b154c72b5aab9b81 -->
+
+**Date**: 2026-11-12
+**Task**: ink 主题内置进二进制（首次启动自动安装 + 新库默认激活）
+**Branch**: `main`
+
+### Summary
+
+按用户 2026-11-12 决定（方案 1）：把 ink 主题构建产物提交进仓库并 go:embed 进二进制——web/public/builtinThemes/ink.zip（3.5MB，含双条版式）；新增 web/public/builtin_theme.go（安全解压内置包 + 首次启动安装 + 新库默认激活 ink）；Bootstrap 里调用。不替换官方默认主题：/admin、/install、guide 页面零风险。build.sh 构建主题后自动同步内置包；check-repo 新增第 17 项校验包结构/版本与 themes/ink 一致。验证：全新临时实例（独立端口/数据目录）装完即 ink（configs.theme=ink、/ 为 ink、/themes/ink 200、/admin 仍是官方应用）；已有本机实例换新二进制后主题 manifest 未被覆盖、服务正常；check-repo --full 17 项全通过；二进制 25.8→29.4MB。文档同步 MAINTAINING/BUILD/spec/README。生产未动。
+
+### Main Changes
+
+- web/public/builtinThemes/ink.zip + web/public/builtin_theme.go：内置主题包与首次启动安装/激活逻辑
+- internal/server/bootstrap.go：Bootstrap 中安装内置主题并按需激活
+- build.sh：主题构建后同步内置包；check-repo.sh：新增第 17 项守卫
+- docs/MAINTAINING.md、ops-docs/BUILD.md、spec/backend/build-and-pinning.md、README.md：内置主题口径
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `24d0ec1` | feat(theme): ink 主题内置进二进制（首次启动自动安装 + 新库默认激活） [task:builtin-theme-embed] |
+
+### Testing
+
+- [OK] go build ./... / go vet 通过；全新实例 data/theme/ink 自动生成、theme=ink、首页 ink、/admin 官方应用
+- [OK] 已有本机实例换二进制后主题 manifest sha256 未变、服务 active、首页正常
+- [OK] check-repo.sh --full：17 项全部通过（含新增第 17 项）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 下一步：阉割主题商店（后端市场 API/目录 + 后台 UI 重建）；方案 2（替换 defaultTheme）留待办
