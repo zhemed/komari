@@ -80,3 +80,40 @@
 ### Next Steps
 
 - 本机实例可直接使用；下次发版（0.0.26）按运行手册升级流程更新；VPS 生产保持不动
+
+
+## Session 3: 修复主题导入/更新对 GitHub release 下载 URL 的误判（本机实例验证通过）
+<!-- trellis-session: v=2 fp=658ada246aff323e -->
+
+**Date**: 2026-11-12
+**Task**: 修复主题导入/更新对 GitHub release 下载 URL 的误判（本机实例验证通过）
+**Branch**: `main`
+
+### Summary
+
+本机实例实测后台「主题→导入/更新」对 https://github.com/zhemed/komari/releases/download/theme-latest/ink-theme.zip 报 400 not a valid zip：根因是 web/api/admin/theme.go 的 isGitHubRepoURL 把任何 github.com 且路径≥2段的 URL 当仓库地址，于是 release 下载 URL 被送去 GitHub API 取 latest release 的第一个资产（服务器二进制）。修复：只认仓库根地址 /owner/repo[.git][/]，具体资源路径返回 false 走直接下载；新增表驱动 TestIsGitHubRepoURL（5 正例 + 9 反例）。本机首次安装 Go 1.26.11（go.dev 官方包 + sha256）后：go build/vet/test 全绿、check-repo.sh --full 16 项全通过（Go 门禁/离线构建/agent 门禁首次跑通）。用修复版二进制（hash 664efff）替换本机实例：主题更新 200 主题更新成功、主题导入 200（已覆盖同名主题），ink 1.0.4 资源全部 200。旧二进制已备份。生产未动。
+
+### Main Changes
+
+- web/api/admin/theme.go: isGitHubRepoURL 收紧为仓库根地址判定（releases/download、archive、tree、blob 等不再误判）
+- web/api/admin/theme_test.go: 新增 TestIsGitHubRepoURL 表驱动回归测试
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4a0632b` | fix(theme): 修正 GitHub release 下载 URL 被误判为仓库地址 [task:theme-import-url-fix] |
+
+### Testing
+
+- [OK] go test ./web/api/admin/ 全 PASS（含 14 个子用例）；go build ./...、go vet ./... 通过
+- [OK] 本机实例：修复前 import/update 均 400 not a valid zip；修复后 update 200 主题更新成功、import 200 主题导入成功（已覆盖同名主题）
+- [OK] check-repo.sh --full：16 项全部通过（首次在本机跑通 Go 门禁/离线构建/agent 门禁）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 修复随下次发版（0.0.26）生效；生产面板届时才具备主题更新能力；本机实例已是修复版
