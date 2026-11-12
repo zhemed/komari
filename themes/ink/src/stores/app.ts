@@ -775,9 +775,10 @@ function resolveBackgroundSource(value: unknown): string {
 }
 
 function parseColorVisionMode(value: unknown): ColorVisionMode {
+  // 2026-11-12 用户定稿：色觉友好默认开启（原默认标准）。
   if (typeof value !== 'string')
-    return 'default'
-  return COLOR_VISION_MODE_ALIASES[value.trim()] ?? 'default'
+    return 'accessible'
+  return COLOR_VISION_MODE_ALIASES[value.trim()] ?? 'accessible'
 }
 
 const useAppStore = defineStore('app', () => {
@@ -884,7 +885,8 @@ const useAppStore = defineStore('app', () => {
     const settings = themeSettings.value
     if (isValidNodeCardSize(settings.nodeCardSize))
       return settings.nodeCardSize
-    return 'compact'
+    // 2026-11-12 用户定稿：默认卡片尺寸改为 comfortable（原 compact）。
+    return 'comfortable'
   })
 
   // 当前实际使用的视图模式
@@ -931,7 +933,8 @@ const useAppStore = defineStore('app', () => {
 
   const dataUpdateInterval = computed<number>(() => readNumberSetting(themeSettings.value, 'dataUpdateInterval', 3, 1, 60))
 
-  const visitorInfoEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'visitorInfoEnabled', true))
+  // 2026-11-12 用户定稿：访客信息默认关闭（原默认开启）。
+  const visitorInfoEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'visitorInfoEnabled', false))
 
   const generalCardEnabledMap = computed<Record<GeneralCardKey, boolean>>(() => {
     const settings = themeSettings.value
