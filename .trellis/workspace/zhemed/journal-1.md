@@ -45,3 +45,38 @@
 ### Next Steps
 
 - 本机无 go/zig/docker：check-repo.sh --full 第 9-11 项需在发版机补跑；下次发版按 §3.4 只产 4 个资产
+
+
+## Session 2: 本机部署 Komari 本地维护实例（二进制 + systemd）
+<!-- trellis-session: v=2 fp=30f64f5adbcc7673 -->
+
+**Date**: 2026-11-12
+**Task**: 本机部署 Komari 本地维护实例（二进制 + systemd）
+**Branch**: `main`
+
+### Summary
+
+按用户 2026-11-12 定稿，在本机（DSH 主机，linux/amd64）用已发布 0.0.25 二进制 + systemd 部署全新独立实例：下载 release komari-linux-amd64 并用 komari-SHA256SUMS 校验（sha256 b40c781f… 一致）；安装到 /opt/komari；unit komari.service（Restart=always、WorkingDirectory=/opt/komari、仅绑 LAN 地址:25774、开机自启）；systemd 已 enabled+active；通过 /api/install/complete 完成首装（管理员 admin、站点 Komari Local、监控库 ./data/metrics.db），初始凭据只写本机 600 文件、不进对话与仓库；/api/version=0.0.25、/api/login=200、GET /=200。运行手册在仓库外（含启停/日志/升级/备份/回滚/卸载）。VPS 生产零改动。
+
+### Main Changes
+
+- 本机部署（仓库外）：/opt/komari + /etc/systemd/system/komari.service + 运行手册 /root/komari-local/RUNBOOK.md
+- 仓库内仅任务记录（.trellis），无代码/文档改动；站点专属值不写入公开仓库
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] sha256sum -c（release 清单）→ komari-linux-amd64: OK；file → statically linked
+- [OK] systemctl is-enabled= enabled / is-active= active；重启后恢复 active
+- [OK] curl /api/version → 0.0.25；/api/install/complete → success；POST /api/login → 200；GET / → 200
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 本机实例可直接使用；下次发版（0.0.26）按运行手册升级流程更新；VPS 生产保持不动
