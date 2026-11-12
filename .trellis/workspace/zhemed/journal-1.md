@@ -259,3 +259,42 @@
 ### Next Steps
 
 - 下一步：阉割主题商店（后端市场 API/目录 + 后台 UI 重建）；方案 2（替换 defaultTheme）留待办
+
+
+## Session 8: 阉割主题商店（后端市场 API/目录 + 后台 UI 入口）
+<!-- trellis-session: v=2 fp=2f8629230d921540 -->
+
+**Date**: 2026-11-12
+**Task**: 阉割主题商店（后端市场 API/目录 + 后台 UI 入口）
+**Branch**: `main`
+
+### Summary
+
+按用户 2026-11-12 决定（内置主题后商店失去意义）：①后端删除 web/api/admin/theme_market.go + 两个测试、6 条 /api/admin/theme/market/* 路由、configs.theme_market_sources 配置键、deploy/theme-market/ 自有目录；②前端删除市场页面/路由/侧栏菜单/主题页 find more 链接，isValidMarketShort 更名 isValidThemeShort；③重建前端产物（FRONTEND_TREE_SHA256=269c4df4…）→ sync:admin 同步进 ink 主题 → build.sh 重建主题并刷新内置包（761 文件，无市场 chunk）；④文档 README/MAINTAINING/ops-docs/spec 同步。验证：市场 API 返回 SPA 兜底（路由已删）、后台登录实测侧栏无市场入口/主题页无 find more 链接（截图）、主题设置接口仍可用（Unauthorized 鉴权正常）、check-repo --full 17 项全通过（第 16 项渲染层 89/89）。本机实例已部署新二进制（hash 62d18b5）。生产未动。
+
+### Main Changes
+
+- web/api/admin/theme_market.go 等 3 文件删除；web/router/router.go 移除市场路由；internal/config/settings.go 移除市场配置键
+- frontend：删除市场页面/路由/菜单/入口链接，menuConfig.json 去掉市场项
+- web/public/defaultTheme/ 重建（hash 更新）；themes/ink/public/admin-app 同步；web/public/builtinThemes/ink.zip 刷新
+- docs/README/ops-docs/spec：主题市场移除口径
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `446708d` | feat(theme): 阉割主题商店（后端市场 API/目录 + 后台 UI 入口） [task:remove-theme-market] |
+
+### Testing
+
+- [OK] go build/vet/test 全绿；市场 API 路由消失；主题设置/管理接口仍在
+- [OK] 后台实测：侧栏 Theme 下无市场入口、主题页无 find more、/admin/market/themes 已 404
+- [OK] check-repo.sh --full：17 项全部通过（前端哈希、内置包版本一致、渲染层 89/89）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 主题市场已移除；主题上传/导入/更新保留；方案 2（替换 defaultTheme）仍待办；生产未动

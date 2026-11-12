@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-11-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~261 | Active |
+| `journal-1.md` | ~300 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-11-12 | 阉割主题商店（后端市场 API/目录 + 后台 UI 入口） | `446708d` | `main` |
 | 7 | 2026-11-12 | ink 主题内置进二进制（首次启动自动安装 + 新库默认激活） | `24d0ec1` | `main` |
 | 6 | 2026-11-12 | ink 主题三网行双条版式（按参考图）+ 主题构建 RPC 基址修复 | `23f0dca` | `main` |
 | 5 | 2026-11-12 | 本地实例三网行跑通（3 个测试 ping 任务） | - | `main` |
