@@ -80,3 +80,21 @@ func TestShutdownReturnsCleanupError(t *testing.T) {
 		t.Fatalf("shutdown error = %v, want %v", err, wantErr)
 	}
 }
+
+// 全新实例会在安装前激活内置主题；安装向导必须只发内置前端，否则 /install
+// 会被主题 SPA 接管（没有该路由），操作者看到 404 且 RPC 全失败。
+func TestInstallGuideConfigRestrictsStaticFrontend(t *testing.T) {
+	cfg := installGuideConfig()
+	if !cfg.restrictedStatic {
+		t.Fatal("install guide must restrict static assets to the embedded frontend")
+	}
+	if cfg.requireIdentity {
+		t.Fatal("install guide must stay reachable without authentication")
+	}
+	if cfg.pagePath != "/install" {
+		t.Fatalf("install guide page path = %q, want /install", cfg.pagePath)
+	}
+	if cfg.missingAPI != "Not found in install mode" {
+		t.Fatalf("install guide API error = %q, want the install-mode message", cfg.missingAPI)
+	}
+}

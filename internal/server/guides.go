@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/internal/metricstore"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/internal/metricstore"
 	"github.com/komari-monitor/komari/internal/migrations"
 	installweb "github.com/komari-monitor/komari/web/install"
 	migrationweb "github.com/komari-monitor/komari/web/migration"
@@ -50,14 +50,27 @@ func (a *App) DatabaseMigrationRequired() (DatabaseMigrationRequirement, error) 
 	return DatabaseMigrationRequirement{}, nil
 }
 
+// installGuideConfig describes the first-run installation listener.
+//
+// Static assets are restricted to the embedded default frontend: a fresh
+// instance activates the builtin theme before the installation completes, and
+// serving that theme here would replace the installation guide with the theme
+// SPA (which has no /install route), leaving the operator with a 404 page and
+// failing RPC calls. Recovery and migration guides already restrict static
+// assets for the same reason.
+func installGuideConfig() guideServerConfig {
+	return guideServerConfig{
+		pagePath:         installweb.PagePath,
+		missingAPI:       "Not found in install mode",
+		logMessage:       "First-run installation guide is available on %s",
+		restrictedStatic: true,
+	}
+}
+
 // RunInstallGuide exposes only first-run installation APIs. It intentionally
 // does not mount authentication or normal application routes.
 func (a *App) RunInstallGuide() (bool, error) {
-	return a.runGuideServer(installweb.NewController(dbcore.GetDBInstance()), guideServerConfig{
-		pagePath:   installweb.PagePath,
-		missingAPI: "Not found in install mode",
-		logMessage: "First-run installation guide is available on %s",
-	})
+	return a.runGuideServer(installweb.NewController(dbcore.GetDBInstance()), installGuideConfig())
 }
 
 // RunMetricStoreRecovery keeps login available while exposing only the
