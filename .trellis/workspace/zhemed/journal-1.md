@@ -478,3 +478,39 @@
 ### Next Steps
 
 - 禁止外部 sqlite3 直连运行中实例；读设置走 API
+
+
+## Session 14: 修复安装向导被主题前端接管（restrictedStatic）
+<!-- trellis-session: v=2 fp=7901430d24dbc1e2 -->
+
+**Date**: 2026-11-14
+**Task**: 修复安装向导被主题前端接管（restrictedStatic）
+**Branch**: `main`
+
+### Summary
+
+全新实例安装前即激活内置主题 ink，/install 由当前主题渲染 → 主题 SPA 无该路由 → 页面不存在 + RPC 404。抽 installGuideConfig() 并补 restrictedStatic: true（与 recovery/migration 一致），加回归测试。
+
+### Main Changes
+
+- internal/server/guides.go：新增 installGuideConfig()，RunInstallGuide 使用它并设 restrictedStatic: true
+- internal/server/app_test.go：新增 TestInstallGuideConfigRestrictsStaticFrontend 锁定契约
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0ad1575` | fix(install): 安装向导只发内置前端，避免被已激活主题接管 [task:install-guide-static] |
+
+### Testing
+
+- [OK] [OK] go build ./... 与 go test ./... 通过；gofmt 干净；scripts/check-repo.sh 全绿
+- [OK] [OK] A/B 实测：旧二进制 /install 返回主题 bundle；新二进制返回内置前端 entry-index-ymZJXoEr.js（theme 仍为 ink）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 待定：是否升版本号 0.0.27 并推 main/tag 以构建新镜像

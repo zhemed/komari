@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
-- **Last Active**: 2026-11-12
+- **Total Sessions**: 14
+- **Last Active**: 2026-11-14
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~480 | Active |
+| `journal-1.md` | ~516 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-11-14 | 修复安装向导被主题前端接管（restrictedStatic） | `0ad1575` | `main` |
 | 13 | 2026-11-12 | 事故与修复：外部 SQLite 连接删掉 WAL 导致写入不落盘（本机+生产） | `69eb9a5` | `main` |
 | 12 | 2026-11-12 | 主题默认值调整：comfortable / 色觉友好开启 / 访客信息关闭（1.0.7） | `d6812ff` | `main` |
 | 11 | 2026-11-12 | 三网行丢包条改实线色块（主题 1.0.6，本机+生产更新） | `9788c6e` | `main` |
