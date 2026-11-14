@@ -550,3 +550,42 @@
 ### Next Steps
 
 - 用户本地 build.sh 构建 0.0.27 镜像并推送 ghcr（本次不构建镜像）
+
+
+## Session 16: 发布 0.0.27 完整发版（tag + release + 镜像）
+<!-- trellis-session: v=2 fp=09331501b46db556 -->
+
+**Date**: 2026-11-14
+**Task**: 发布 0.0.27 完整发版（tag + release + 镜像）
+**Branch**: `main`
+
+### Summary
+
+按 docs/MAINTAINING §3.4 完成 0.0.27 整套发版：静态二进制 + agent + SHA256SUMS + check-repo --full 全绿 + tag 0.0.27 与 server/v0.0.27-own.8 + GitHub release（4 资产，Latest）+ 推 ghcr komari/komari-agent 0.0.27 与 latest。
+
+### Main Changes
+
+- 产物：dist/komari-linux-amd64（38581296B, sha aadd9e94…）、dist/agent/komari-agent-linux-amd64（12526845B, sha d7fc35ea…）
+- tag：0.0.27、server/v0.0.27-own.8（均指向 1220d02）
+- release：https://github.com/zhemed/komari/releases/tag/0.0.27（4 资产 + Latest）
+- 镜像：ghcr.io/zhemed/komari:0.0.27/:latest、ghcr.io/zhemed/komari-agent:0.0.27/:latest（匿名可拉 200）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1220d02` | chore(task): archive 11-14-release-0.0.27 [task:release-0.0.27] |
+
+### Testing
+
+- [OK] [OK] check-repo.sh --full 全部通过
+- [OK] [OK] gh release view 0.0.27：非 draft / 非 prerelease / 4 资产 / 列表显示 Latest
+- [OK] [OK] ghcr manifest 匿名拉取：komari 与 komari-agent 的 0.0.27 与 latest 均 200
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 生产机（49.9刀）仍是 0.0.26；升级到 0.0.27 由用户决定

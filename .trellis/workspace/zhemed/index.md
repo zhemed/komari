@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
+- **Total Sessions**: 16
 - **Last Active**: 2026-11-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~552 | Active |
+| `journal-1.md` | ~591 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-11-14 | 发布 0.0.27 完整发版（tag + release + 镜像） | `1220d02` | `main` |
 | 15 | 2026-11-14 | 发布 0.0.27（安装向导修复） | `3886fcf` | `main` |
 | 14 | 2026-11-14 | 修复安装向导被主题前端接管（restrictedStatic） | `0ad1575` | `main` |
 | 13 | 2026-11-12 | 事故与修复：外部 SQLite 连接删掉 WAL 导致写入不落盘（本机+生产） | `69eb9a5` | `main` |
