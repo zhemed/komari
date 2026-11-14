@@ -514,3 +514,39 @@
 ### Next Steps
 
 - 待定：是否升版本号 0.0.27 并推 main/tag 以构建新镜像
+
+
+## Session 15: 发布 0.0.27（安装向导修复）
+<!-- trellis-session: v=2 fp=14bd62a500fd3844 -->
+
+**Date**: 2026-11-14
+**Task**: 发布 0.0.27（安装向导修复）
+**Branch**: `main`
+
+### Summary
+
+按用户选择执行发版：内核 0.0.26→0.0.27、own.7→own.8，同步全部版本字面量与部署脚本，check-repo --full 全绿后推 main。
+
+### Main Changes
+
+- 版本：scripts/version.env、install-komari.sh、install-agent.sh/ps1、README、docs/MAINTAINING.md、ops-docs/VERSION.md、ops-docs/DEPLOY.md
+- 新增 deploy/komari-v0.0.27-own.8-listen-local.sh（IMAGE 默认 0.0.27）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3886fcf` | release: 0.0.27（安装向导修复） [task:release-0.0.27] |
+
+### Testing
+
+- [OK] [OK] check-repo.sh 与 check-repo.sh --full 全部通过（含 Go 门禁、离线构建、agent 门禁）
+- [OK] [OK] 版本口径：MAINTAINING 当前 0.0.27 / 已发布区间右端 0.0.26 / install-komari 默认 tag 0.0.27
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户本地 build.sh 构建 0.0.27 镜像并推送 ghcr（本次不构建镜像）
